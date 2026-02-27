@@ -32,6 +32,7 @@ type NativeSandboxForAgent interface {
 // ToolExecParams 工具执行参数。
 type ToolExecParams struct {
 	WorkspaceDir string
+	SessionID    string // 当前 session 标识（用于合约 issuedBy 等）
 	TimeoutMs    int64
 	// 权限守卫
 	AllowWrite   bool // 是否允许写文件

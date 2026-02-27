@@ -131,7 +131,10 @@ func executeSpawnCoderAgent(ctx context.Context, inputJSON json.RawMessage, para
 	}
 
 	// 3. 创建委托合约
-	issuedBy := "main-agent" // TODO: Phase 3 从 session context 获取
+	issuedBy := params.SessionID
+	if issuedBy == "" {
+		issuedBy = "main-agent"
+	}
 	contract, err := NewDelegationContract(issuedBy, input.TaskBrief, input.SuccessCriteria, input.Scope, constraints)
 	if err != nil {
 		return fmt.Sprintf("[spawn_coder_agent] Contract validation failed: %s", err), nil

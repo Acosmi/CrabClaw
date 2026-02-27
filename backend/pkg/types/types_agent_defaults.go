@@ -165,18 +165,6 @@ type SandboxDefaultsConfig struct {
 }
 
 // ============================================================
-// Coder 编程子智能体默认配置
-// ============================================================
-
-// CoderDefaultsConfig Coder 编程子智能体配置（oa-coder MCP bridge）
-type CoderDefaultsConfig struct {
-	Enabled        *bool  `json:"enabled,omitempty"`        // 启用/禁用 coder bridge (默认 true)
-	TimeoutSeconds *int   `json:"timeoutSeconds,omitempty"` // 工具调用超时秒数 (默认 120)
-	Sandboxed      *bool  `json:"sandboxed,omitempty"`      // bash 命令是否在沙箱内执行
-	Workspace      string `json:"workspace,omitempty"`      // 工作区路径覆盖
-}
-
-// ============================================================
 // Agent 默认总配置
 // ============================================================
 
@@ -216,5 +204,5 @@ type AgentDefaultsConfig struct {
 	MaxConcurrent          *int                              `json:"maxConcurrent,omitempty"`
 	Subagents              *SubagentDefaultsConfig           `json:"subagents,omitempty"`
 	Sandbox                *SandboxDefaultsConfig            `json:"sandbox,omitempty"`
-	Coder                  *CoderDefaultsConfig              `json:"coder,omitempty"`
+	// (Phase 2A: Coder *CoderDefaultsConfig 已删除 — oa-coder 升级为 spawn_coder_agent)
 }

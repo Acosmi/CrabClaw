@@ -275,6 +275,7 @@ func (r *EmbeddedAttemptRunner) RunAttempt(ctx context.Context, params AttemptPa
 
 			output, toolErr := ExecuteToolCall(ctx, tc.Name, tc.Input, ToolExecParams{
 				WorkspaceDir:        params.WorkspaceDir,
+				SessionID:           params.SessionID,
 				TimeoutMs:           params.TimeoutMs,
 				AllowWrite:          secLvl == "full" || secLvl == "allowlist", // L1 沙箱内允许写入
 				AllowExec:           secLvl == "full" || secLvl == "allowlist",
@@ -361,6 +362,7 @@ func (r *EmbeddedAttemptRunner) RunAttempt(ctx context.Context, params AttemptPa
 						}
 						output, toolErr := ExecuteToolCall(ctx, tc.Name, tc.Input, ToolExecParams{
 							WorkspaceDir:        params.WorkspaceDir,
+							SessionID:           params.SessionID,
 							TimeoutMs:           params.TimeoutMs,
 							AllowWrite:          secLvl == "full" || secLvl == "allowlist", // L1 沙箱内允许写入
 							AllowExec:           secLvl == "full" || secLvl == "allowlist",
