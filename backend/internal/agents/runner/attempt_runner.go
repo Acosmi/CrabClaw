@@ -273,25 +273,8 @@ func (r *EmbeddedAttemptRunner) RunAttempt(ctx context.Context, params AttemptPa
 				secLvl = params.SecurityLevelFunc()
 			}
 
-			output, toolErr := ExecuteToolCall(ctx, tc.Name, tc.Input, ToolExecParams{
-				WorkspaceDir:        params.WorkspaceDir,
-				SessionID:           params.SessionID,
-				TimeoutMs:           params.TimeoutMs,
-				AllowWrite:          secLvl == "full" || secLvl == "allowlist", // L1 沙箱内允许写入
-				AllowExec:           secLvl == "full" || secLvl == "allowlist",
-				SandboxMode:         secLvl == "allowlist",
-				Rules:               resolveCommandRules(),
-				SecurityLevel:       secLvl,
-				OnPermissionDenied:  params.OnPermissionDenied,
-				ArgusBridge:         r.ArgusBridge,
-				// (Phase 2A: CoderBridge/CoderTimeoutSeconds 已删除)
-				CoderConfirmation:   r.CoderConfirmation,
-				RemoteMCPBridge:     r.RemoteMCPBridge,
-				NativeSandbox:       r.NativeSandbox,
-				SkillsCache:         r.skillsCache,
-				UHMSBridge:          r.UHMSBridge,
-				SpawnSubagent:       r.SpawnSubagent,
-			})
+			toolExecParams := r.buildToolExecParams(params, secLvl)
+			output, toolErr := ExecuteToolCall(ctx, tc.Name, tc.Input, toolExecParams)
 
 			isError := false
 			if toolErr != nil {
@@ -360,25 +343,9 @@ func (r *EmbeddedAttemptRunner) RunAttempt(ctx context.Context, params AttemptPa
 						if params.SecurityLevelFunc != nil {
 							secLvl = params.SecurityLevelFunc()
 						}
-						output, toolErr := ExecuteToolCall(ctx, tc.Name, tc.Input, ToolExecParams{
-							WorkspaceDir:        params.WorkspaceDir,
-							SessionID:           params.SessionID,
-							TimeoutMs:           params.TimeoutMs,
-							AllowWrite:          secLvl == "full" || secLvl == "allowlist", // L1 沙箱内允许写入
-							AllowExec:           secLvl == "full" || secLvl == "allowlist",
-							SandboxMode:         secLvl == "allowlist",
-							Rules:               resolveCommandRules(),
-							SecurityLevel:       secLvl,
-							OnPermissionDenied:  params.OnPermissionDenied,
-							ArgusBridge:         r.ArgusBridge,
-							// (Phase 2A: CoderBridge/CoderTimeoutSeconds 已删除)
-							CoderConfirmation:   r.CoderConfirmation,
-							RemoteMCPBridge:     r.RemoteMCPBridge,
-							NativeSandbox:       r.NativeSandbox,
-							SkillsCache:         r.skillsCache,
-							UHMSBridge:          r.UHMSBridge,
-							SpawnSubagent:       r.SpawnSubagent,
-						})
+
+						retryToolExecParams := r.buildToolExecParams(params, secLvl)
+						output, toolErr := ExecuteToolCall(ctx, tc.Name, tc.Input, retryToolExecParams)
 						isError := false
 						if toolErr != nil {
 							output = fmt.Sprintf("Error: %s", toolErr.Error())
@@ -664,6 +631,44 @@ func (r *EmbeddedAttemptRunner) buildToolDefinitions() []llmclient.ToolDef {
 
 func (r *EmbeddedAttemptRunner) resolveBaseURL(provider string) string {
 	return models.ResolveProviderBaseURL(provider, r.Config)
+}
+
+// buildToolExecParams 构造 ToolExecParams 并注入合约约束（如有）。
+// 集中处理 SecurityLevel 封顶 + ApplyConstraints 收窄，消除主路径/重试路径的代码重复。
+func (r *EmbeddedAttemptRunner) buildToolExecParams(params AttemptParams, secLvl string) ToolExecParams {
+	// Phase 3: 合约约束注入前，先封顶安全级别
+	if params.DelegationContract != nil {
+		maxLevel := deriveMaxSecurityLevel(params.DelegationContract)
+		if securityLevelRank(secLvl) > securityLevelRank(maxLevel) {
+			secLvl = maxLevel
+		}
+	}
+
+	tep := ToolExecParams{
+		WorkspaceDir:       params.WorkspaceDir,
+		SessionID:          params.SessionID,
+		TimeoutMs:          params.TimeoutMs,
+		AllowWrite:         secLvl == "full" || secLvl == "allowlist",
+		AllowExec:          secLvl == "full" || secLvl == "allowlist",
+		SandboxMode:        secLvl == "allowlist",
+		Rules:              resolveCommandRules(),
+		SecurityLevel:      secLvl,
+		OnPermissionDenied: params.OnPermissionDenied,
+		ArgusBridge:        r.ArgusBridge,
+		CoderConfirmation:  r.CoderConfirmation,
+		RemoteMCPBridge:    r.RemoteMCPBridge,
+		NativeSandbox:      r.NativeSandbox,
+		SkillsCache:        r.skillsCache,
+		UHMSBridge:         r.UHMSBridge,
+		SpawnSubagent:      r.SpawnSubagent,
+	}
+
+	// Phase 3: 合约约束注入 — 只收窄不扩展
+	if params.DelegationContract != nil {
+		params.DelegationContract.ApplyConstraints(&tep)
+	}
+
+	return tep
 }
 
 // ---------- 辅助函数 ----------

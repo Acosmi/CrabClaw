@@ -153,6 +153,7 @@ func RunEmbeddedPiAgent(ctx context.Context, params RunEmbeddedPiAgentParams, de
 			OnPermissionDenied: params.OnPermissionDenied,
 			WaitForApproval:    params.WaitForApproval,
 			SecurityLevelFunc:  params.SecurityLevelFunc,
+			DelegationContract: params.DelegationContract,
 		})
 		if err != nil {
 			return nil, err

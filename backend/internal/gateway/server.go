@@ -739,14 +739,15 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 		)
 
 		result, err := runner.RunEmbeddedPiAgent(childCtx, runner.RunEmbeddedPiAgentParams{
-			SessionID:         childSessionID,
-			SessionKey:        childSessionKey,
-			Prompt:            sp.Task,
-			Provider:          runner.DefaultProvider,
-			Model:             runner.DefaultModel,
-			TimeoutMs:         timeoutMs,
-			ExtraSystemPrompt: sp.SystemPrompt,
-			Config:            currentCfg,
+			SessionID:          childSessionID,
+			SessionKey:         childSessionKey,
+			Prompt:             sp.Task,
+			Provider:           runner.DefaultProvider,
+			Model:              runner.DefaultModel,
+			TimeoutMs:          timeoutMs,
+			ExtraSystemPrompt:  sp.SystemPrompt,
+			Config:             currentCfg,
+			DelegationContract: sp.Contract,
 		}, runner.EmbeddedRunDeps{
 			AttemptRunner: attemptRunner,
 			ModelResolver: &runner.EnvModelResolver{Catalog: modelCatalog},

@@ -8,6 +8,7 @@ package runner
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -347,6 +348,12 @@ func (c *DelegationContract) ApplyConstraints(params *ToolExecParams) {
 		params.Rules = append(contractRules, params.Rules...)
 	}
 
+	// 安全级别封顶: 合约约束 → 限制 SecurityLevel 天花板
+	contractMaxLevel := deriveMaxSecurityLevel(c)
+	if securityLevelRank(params.SecurityLevel) > securityLevelRank(contractMaxLevel) {
+		params.SecurityLevel = contractMaxLevel
+	}
+
 	// scope_paths 提取（供 validateToolPathWithScope 使用）
 	scopePaths := make([]string, 0, len(c.Scope))
 	for _, s := range c.Scope {
@@ -355,4 +362,148 @@ func (c *DelegationContract) ApplyConstraints(params *ToolExecParams) {
 	if len(scopePaths) > 0 {
 		params.ScopePaths = scopePaths
 	}
+}
+
+// ---------- CapabilitySet — 权限单调衰减验证 ----------
+
+// CapabilitySet 描述 agent 的有效权限天花板。
+type CapabilitySet struct {
+	AllowWrite       bool
+	AllowExec        bool
+	AllowNetwork     bool
+	MaxSecurityLevel string   // "deny" < "allowlist" < "full"
+	ScopePaths       []string // 空 = workspace 全局
+}
+
+// securityLevelRank 返回安全级别的数值排序（越大越宽松）。
+func securityLevelRank(level string) int {
+	switch level {
+	case "deny":
+		return 0
+	case "allowlist":
+		return 1
+	case "full":
+		return 2
+	default:
+		return 0
+	}
+}
+
+// deriveMaxSecurityLevel 从合约约束推导安全级别天花板。
+func deriveMaxSecurityLevel(c *DelegationContract) string {
+	if c == nil {
+		return "full"
+	}
+	// scope 不含 execute → 最高 "deny"
+	hasExec := false
+	for _, s := range c.Scope {
+		for _, p := range s.Permissions {
+			if p == PermExecute {
+				hasExec = true
+				break
+			}
+		}
+		if hasExec {
+			break
+		}
+	}
+	if !hasExec || c.Constraints.NoSpawn {
+		return "deny"
+	}
+	// sandbox_required → 最高 "allowlist"
+	if c.Constraints.SandboxRequired {
+		return "allowlist"
+	}
+	return "full"
+}
+
+// CapabilitySetFromToolExecParams 从当前 ToolExecParams 提取父 agent 权限。
+// 注意: AllowNetwork 字段仅控制 Docker 沙箱网络（allowlist 模式）。
+// full 模式下命令在宿主机原生执行，网络天然可用，需从 SecurityLevel 推导。
+func CapabilitySetFromToolExecParams(p *ToolExecParams) *CapabilitySet {
+	// full 模式: 原生执行 = 网络无限制; allowlist 模式: Docker 沙箱 = 由 AllowNetwork 控制
+	allowNetwork := p.AllowNetwork || p.SecurityLevel == "full"
+	return &CapabilitySet{
+		AllowWrite:       p.AllowWrite,
+		AllowExec:        p.AllowExec,
+		AllowNetwork:     allowNetwork,
+		MaxSecurityLevel: p.SecurityLevel,
+		ScopePaths:       p.ScopePaths,
+	}
+}
+
+// CapabilitySetFromContract 从合约 scope/constraints 提取请求权限。
+func CapabilitySetFromContract(c *DelegationContract) *CapabilitySet {
+	hasWrite := false
+	hasExec := false
+	for _, s := range c.Scope {
+		for _, p := range s.Permissions {
+			switch p {
+			case PermWrite:
+				hasWrite = true
+			case PermExecute:
+				hasExec = true
+			}
+		}
+	}
+	return &CapabilitySet{
+		AllowWrite:       hasWrite,
+		AllowExec:        hasExec && !c.Constraints.NoSpawn,
+		AllowNetwork:     !c.Constraints.NoNetwork,
+		MaxSecurityLevel: deriveMaxSecurityLevel(c),
+	}
+}
+
+// ValidateMonotonicDecay 校验 child ⊆ parent（不允许扩展）。
+// 返回 nil 表示合法，非 nil 描述违规维度。
+func (parent *CapabilitySet) ValidateMonotonicDecay(child *CapabilitySet) error {
+	var violations []string
+	if child.AllowWrite && !parent.AllowWrite {
+		violations = append(violations, "child requests write but parent denies it")
+	}
+	if child.AllowExec && !parent.AllowExec {
+		violations = append(violations, "child requests exec but parent denies it")
+	}
+	if child.AllowNetwork && !parent.AllowNetwork {
+		violations = append(violations, "child requests network but parent denies it")
+	}
+	if securityLevelRank(child.MaxSecurityLevel) > securityLevelRank(parent.MaxSecurityLevel) {
+		violations = append(violations, fmt.Sprintf(
+			"child security level %q exceeds parent %q",
+			child.MaxSecurityLevel, parent.MaxSecurityLevel,
+		))
+	}
+
+	// ScopePaths 子集校验：parent 有 scope 约束时，child 的每条路径必须在 parent 某条路径下
+	if len(parent.ScopePaths) > 0 && len(child.ScopePaths) > 0 {
+		for _, cp := range child.ScopePaths {
+			if !isPathUnderAny(cp, parent.ScopePaths) {
+				violations = append(violations, fmt.Sprintf(
+					"child scope path %q is not under any parent scope path", cp))
+			}
+		}
+	}
+	// parent 有 scope 约束但 child 无约束 → child 隐式要求全局访问 → violation
+	if len(parent.ScopePaths) > 0 && len(child.ScopePaths) == 0 {
+		violations = append(violations, "parent has scope constraints but child has none (implicit global access)")
+	}
+
+	if len(violations) == 0 {
+		return nil
+	}
+	return fmt.Errorf("monotonic decay violation: %s", strings.Join(violations, "; "))
+}
+
+// isPathUnderAny 检查 target 路径是否在 bases 中任一路径之下。
+// 使用 filepath.Clean 纯词法归一化 + prefix check，与 validateToolPathScoped 一致。
+func isPathUnderAny(target string, bases []string) bool {
+	cleanTarget := filepath.Clean(target)
+	for _, b := range bases {
+		cleanBase := filepath.Clean(b)
+		if cleanTarget == cleanBase ||
+			strings.HasPrefix(cleanTarget, cleanBase+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
 }

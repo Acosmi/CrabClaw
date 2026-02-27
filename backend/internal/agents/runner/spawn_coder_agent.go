@@ -156,6 +156,13 @@ func executeSpawnCoderAgent(ctx context.Context, inputJSON json.RawMessage, para
 		"parentContract", contract.ParentContract,
 	)
 
+	// 3.5 单调衰减校验: 合约不能超出当前 agent 的权限
+	parentCaps := CapabilitySetFromToolExecParams(&params)
+	contractCaps := CapabilitySetFromContract(contract)
+	if err := parentCaps.ValidateMonotonicDecay(contractCaps); err != nil {
+		return fmt.Sprintf("[spawn_coder_agent] Permission monotonic decay violation: %s", err), nil
+	}
+
 	// 4. 构建子智能体系统提示词（含合约段）
 	systemPrompt := BuildSubagentSystemPrompt(SubagentSystemPromptParams{
 		Task:     input.TaskBrief,

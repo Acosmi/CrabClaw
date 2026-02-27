@@ -152,6 +152,9 @@ type RunEmbeddedPiAgentParams struct {
 	WaitForApproval func(ctx context.Context) bool `json:"-"`
 	// SecurityLevelFunc 动态获取当前有效安全级别（由 server.go 注入）
 	SecurityLevelFunc func() string `json:"-"`
+	// DelegationContract 子 agent 委托合约（可选）——传递到 AttemptParams → ToolExecParams。
+	// nil = 主 agent 无合约限制。
+	DelegationContract *DelegationContract `json:"-"`
 }
 
 // ---------- Subagent Announce ----------

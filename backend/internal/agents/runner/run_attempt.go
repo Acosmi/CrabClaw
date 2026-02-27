@@ -131,6 +131,8 @@ type AttemptParams struct {
 	// SecurityLevelFunc 动态获取当前有效安全级别（含临时提权）。
 	// 由 server.go 注入，内部调用 EscalationManager.GetEffectiveLevel()。
 	SecurityLevelFunc func() string
+	// DelegationContract 委托合约约束（可选，nil = 主 agent 无合约限制）。
+	DelegationContract *DelegationContract
 }
 
 // --- Compaction ---
