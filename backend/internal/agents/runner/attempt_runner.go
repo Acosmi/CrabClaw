@@ -92,6 +92,8 @@ type EmbeddedAttemptRunner struct {
 	NativeSandbox     NativeSandboxForAgent     // 可选，nil = 使用 Docker fallback
 	UHMSBridge        UHMSBridgeForAgent        // 可选，nil = UHMS 记忆系统不可用
 	CoderConfirmation *CoderConfirmationManager // 可选，nil = coder 工具不需要确认
+	// SpawnSubagent 子智能体生成回调（可选，nil = spawn_coder_agent 返回合约但不启动 session）
+	SpawnSubagent SpawnSubagentFunc
 
 	// skillsCache 按需加载缓存: skill name → full SKILL.md content
 	// 在 buildSystemPrompt 中填充，在 lookup_skill 工具调用时读取
@@ -287,6 +289,7 @@ func (r *EmbeddedAttemptRunner) RunAttempt(ctx context.Context, params AttemptPa
 				NativeSandbox:       r.NativeSandbox,
 				SkillsCache:         r.skillsCache,
 				UHMSBridge:          r.UHMSBridge,
+				SpawnSubagent:       r.SpawnSubagent,
 			})
 
 			isError := false
@@ -372,6 +375,7 @@ func (r *EmbeddedAttemptRunner) RunAttempt(ctx context.Context, params AttemptPa
 							NativeSandbox:       r.NativeSandbox,
 							SkillsCache:         r.skillsCache,
 							UHMSBridge:          r.UHMSBridge,
+							SpawnSubagent:       r.SpawnSubagent,
 						})
 						isError := false
 						if toolErr != nil {

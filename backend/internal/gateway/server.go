@@ -571,6 +571,7 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 	registry.RegisterAll(TaskPresetHandlers())     // P5: 任务预设权限
 	RegisterSandboxMethods(registry)               // 沙箱配置 + 状态 + 测试
 	registry.RegisterAll(ArgusHandlers())          // Argus 视觉子智能体静态方法
+	registry.RegisterAll(SubagentHandlers())       // 子智能体状态/控制方法
 	registry.RegisterAll(MCPRemoteHandlers())      // P2: MCP 远程工具方法
 	registry.RegisterAll(UHMSHandlers())           // P3: UHMS 记忆系统方法
 	registry.RegisterAll(MemoryHandlers())         // memory.* 直接操作方法
@@ -708,6 +709,86 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 		UHMSBridge:        uhmsBridgeForAgent,      // UHMS 记忆系统注入
 		CoderConfirmation: state.CoderConfirmMgr(), // Coder 确认流注入
 		// RemoteMCPBridge 在 4h 节之后注入
+	}
+
+	// SpawnSubagent 回调注入 — spawn_coder_agent 工具通过此回调启动子 LLM session。
+	// 闭包捕获 cfgLoader/modelCatalog/attemptRunner，与 pipelineDispatcher 共享依赖。
+	attemptRunner.SpawnSubagent = func(ctx context.Context, sp runner.SpawnSubagentParams) (*runner.SubagentRunOutcome, error) {
+		childSessionID := fmt.Sprintf("spawn-%d", time.Now().UnixNano())
+		childSessionKey := fmt.Sprintf("spawn-coder-%s", sp.Contract.ContractID[:8])
+
+		// 热加载最新配置
+		currentCfg := loadedCfg
+		if freshCfg, err := cfgLoader.LoadConfig(); err == nil {
+			currentCfg = freshCfg
+		}
+
+		// 超时 context
+		timeoutMs := sp.TimeoutMs
+		if timeoutMs <= 0 {
+			timeoutMs = 60000
+		}
+		childCtx, childCancel := context.WithTimeout(ctx, time.Duration(timeoutMs)*time.Millisecond)
+		defer childCancel()
+
+		slog.Info("spawn_coder_agent: launching sub-agent session",
+			"contractID", sp.Contract.ContractID,
+			"childSessionID", childSessionID,
+			"timeoutMs", timeoutMs,
+			"label", sp.Label,
+		)
+
+		result, err := runner.RunEmbeddedPiAgent(childCtx, runner.RunEmbeddedPiAgentParams{
+			SessionID:         childSessionID,
+			SessionKey:        childSessionKey,
+			Prompt:            sp.Task,
+			Provider:          runner.DefaultProvider,
+			Model:             runner.DefaultModel,
+			TimeoutMs:         timeoutMs,
+			ExtraSystemPrompt: sp.SystemPrompt,
+			Config:            currentCfg,
+		}, runner.EmbeddedRunDeps{
+			AttemptRunner: attemptRunner,
+			ModelResolver: &runner.EnvModelResolver{Catalog: modelCatalog},
+		})
+		if err != nil {
+			return &runner.SubagentRunOutcome{
+				Status: "error",
+				Error:  err.Error(),
+			}, nil
+		}
+
+		// 提取最后一条文本回复
+		var lastReply string
+		for i := len(result.Payloads) - 1; i >= 0; i-- {
+			if result.Payloads[i].Text != "" {
+				lastReply = result.Payloads[i].Text
+				break
+			}
+		}
+
+		// 解析 ThoughtResult（子智能体结构化返回）
+		tr := runner.ParseThoughtResult(lastReply)
+
+		outcome := &runner.SubagentRunOutcome{
+			Status:        "ok",
+			ThoughtResult: tr,
+		}
+		if result.Meta.Aborted {
+			outcome.Status = "timeout"
+		}
+		if result.Meta.Error != nil {
+			outcome.Status = "error"
+			outcome.Error = result.Meta.Error.Message
+		}
+
+		slog.Info("spawn_coder_agent: sub-agent session completed",
+			"contractID", sp.Contract.ContractID,
+			"status", outcome.Status,
+			"hasThoughtResult", tr != nil,
+		)
+
+		return outcome, nil
 	}
 
 	// ---------- 4e. 创建真实 PipelineDispatcher（内联实现，避免循环导入） ----------
