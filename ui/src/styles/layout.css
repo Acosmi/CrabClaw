@@ -90,26 +90,6 @@
   /* Support custom dragging window if running in Tauri/Electron */
 }
 
-/* Inject macOS window controls (Traffic Lights) */
-.topbar::before {
-  content: "";
-  display: block;
-  width: 54px;
-  height: 12px;
-  flex-shrink: 0;
-  margin-right: 8px;
-  background-image: radial-gradient(circle at 6px 6px, #ff5f56 6px, transparent 6px), radial-gradient(circle at 26px 6px, #ffbd2e 6px, transparent 6px), radial-gradient(circle at 46px 6px, #27c93f 6px, transparent 6px);
-  background-repeat: no-repeat;
-  /* Hover state: darken slightly to mimic macOS interactivity */
-  transition: opacity 0.2s;
-  opacity: 0.8;
-  -webkit-app-region: no-drag;
-}
-
-.topbar:hover::before {
-  opacity: 1;
-}
-
 .topbar-left {
   display: flex;
   align-items: center;
