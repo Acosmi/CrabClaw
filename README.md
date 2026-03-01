@@ -6,7 +6,7 @@
 **"Creating new order in the void, building the realm of Acosmi"**<br><br>
 **🌐 官网 / Official Website: [Acosmi.com](https://acosmi.com)**
 
-<img src="./透明.png" alt="Claw Acosmi 创宇太虚架构图 / Architecture Diagram" width="800" />
+<img src="./claw-crab-logo.png" alt="Claw Acosmi 创宇太虚架构图 / Architecture Diagram" width="800" />
 
 [English](#english) | [中文](#中文)
 
