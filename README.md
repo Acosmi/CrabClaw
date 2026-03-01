@@ -160,4 +160,12 @@ Welcome to submit Issues and Pull Requests to explore the ultimate form of Large
 
 ## 📄 License
 
-*(TBD)*
+This project is licensed under the [MIT License](LICENSE).
+## 🤝 参与构筑太虚
+
+在混沌中建立秩序离不开每一位开发者的力量。
+欢迎提交 Issue 和 Pull Request，与我们一同探索大语言模型系统的最终形态。
+
+## 📄 许可证
+
+本项目采用 [MIT 许可证](LICENSE) 开源。
