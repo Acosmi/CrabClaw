@@ -157,15 +157,25 @@ For detailed developer environments and multi-terminal startup methods, please r
 Establishing order from chaos requires the strength of every developer.
 Welcome to submit Issues and Pull Requests to explore the ultimate form of Large Language Model systems with us.
 
-## 📄 License
+## 📄 License (Dual Licensing)
 
-This project is licensed under the [MIT License](LICENSE).
+This project adopts a **Dual Licensing** model:
+
+- **Non-Commercial Use**: The project is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). You are free to use, modify, and distribute the software for any non-commercial purposes (e.g., academic, personal, or non-profit use).
+- **Commercial Use**: Any commercial use, including but not limited to offering the software as a paid service, integrating it into commercial products, or using it for internal business operations that directly or indirectly generate revenue, **requires a commercial license**.
+
+**To acquire a commercial authorization or regarding any license inquiries, please contact: `fushihua@fgfn.cc`**
 
 ## 🤝 参与构筑太虚
 
 在混沌中建立秩序离不开每一位开发者的力量。
 欢迎提交 Issue 和 Pull Request，与我们一同探索大语言模型系统的最终形态。
 
-## 📄 许可证
+## 📄 开源与商业授权说明
 
-本项目采用 [MIT 许可证](LICENSE) 开源。
+本项目采用 **双重授权（Dual Licensing）** 模式：
+
+- **个人与非商业使用**：本项目采用 [PolyForm Noncommercial License 1.0.0](LICENSE) 协议。允许在**非商业目的**（如个人学习、教育学术研究、非营利开源项目）下免费使用、修改和分发代码。
+- **商业使用**：任何形式的商业用途（包括但不限于：作为付费 SaaS/DaaS 提供服务、集成到商业软件/硬件中销售、用于公司内部产生直接盈利的业务等）**均需提前获取商业授权**。
+
+**获取商业授权或有任何授权疑问，请联系作者：`fushihua@fgfn.cc`**
