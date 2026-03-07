@@ -5,7 +5,6 @@
 /// and auto-confirm modes.
 ///
 /// Source: `src/commands/uninstall.ts`
-
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -249,16 +248,31 @@ mod tests {
 
     #[test]
     fn scope_from_str_valid() {
-        assert_eq!(UninstallScope::from_str("service"), Some(UninstallScope::Service));
-        assert_eq!(UninstallScope::from_str("state"), Some(UninstallScope::State));
-        assert_eq!(UninstallScope::from_str("workspace"), Some(UninstallScope::Workspace));
+        assert_eq!(
+            UninstallScope::from_str("service"),
+            Some(UninstallScope::Service)
+        );
+        assert_eq!(
+            UninstallScope::from_str("state"),
+            Some(UninstallScope::State)
+        );
+        assert_eq!(
+            UninstallScope::from_str("workspace"),
+            Some(UninstallScope::Workspace)
+        );
         assert_eq!(UninstallScope::from_str("app"), Some(UninstallScope::App));
     }
 
     #[test]
     fn scope_from_str_case_insensitive() {
-        assert_eq!(UninstallScope::from_str("SERVICE"), Some(UninstallScope::Service));
-        assert_eq!(UninstallScope::from_str("State"), Some(UninstallScope::State));
+        assert_eq!(
+            UninstallScope::from_str("SERVICE"),
+            Some(UninstallScope::Service)
+        );
+        assert_eq!(
+            UninstallScope::from_str("State"),
+            Some(UninstallScope::State)
+        );
     }
 
     #[test]

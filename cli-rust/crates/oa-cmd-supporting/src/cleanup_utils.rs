@@ -4,7 +4,6 @@
 /// collection, agent session directory listing, and path containment checks.
 ///
 /// Source: `src/commands/cleanup-utils.ts`
-
 use std::path::{Path, PathBuf};
 
 use tracing::{error, info};
@@ -76,9 +75,7 @@ pub fn collect_workspace_dirs(cfg: Option<&OpenAcosmiConfig>) -> Vec<PathBuf> {
 /// Source: `src/commands/cleanup-utils.ts` - `isPathWithin`
 pub fn is_path_within(child: &Path, parent: &Path) -> bool {
     match child.strip_prefix(parent) {
-        Ok(relative) => {
-            relative == Path::new("") || !relative.starts_with("..")
-        }
+        Ok(relative) => relative == Path::new("") || !relative.starts_with(".."),
         Err(_) => false,
     }
 }
@@ -136,11 +133,7 @@ pub fn shorten_home_path(path: &str) -> String {
 /// Refuses to remove root, home, or empty paths. Supports dry-run mode.
 ///
 /// Source: `src/commands/cleanup-utils.ts` - `removePath`
-pub async fn remove_path(
-    target: &str,
-    dry_run: bool,
-    label: Option<&str>,
-) -> RemovalResult {
+pub async fn remove_path(target: &str, dry_run: bool, label: Option<&str>) -> RemovalResult {
     let trimmed = target.trim();
     if trimmed.is_empty() {
         return RemovalResult {
@@ -186,12 +179,10 @@ pub async fn remove_path(
                         skipped: false,
                     }
                 }
-                Err(ref e2) if e2.kind() == std::io::ErrorKind::NotFound => {
-                    RemovalResult {
-                        ok: true,
-                        skipped: true,
-                    }
-                }
+                Err(ref e2) if e2.kind() == std::io::ErrorKind::NotFound => RemovalResult {
+                    ok: true,
+                    skipped: true,
+                },
                 Err(e2) => {
                     error!("Failed to remove {display_label}: {e2}");
                     RemovalResult {
@@ -295,9 +286,7 @@ mod tests {
 
     #[test]
     fn safe_removal_normal_path() {
-        assert!(!is_unsafe_removal_target(Path::new(
-            "/tmp/test-openacosmi"
-        )));
+        assert!(!is_unsafe_removal_target(Path::new("/tmp/test-openacosmi")));
     }
 
     #[test]

@@ -43,12 +43,12 @@ type mockBrowserController struct {
 	tabsErr        error
 	createdTab     *browser.TabInfo
 	createTabErr   error
-	closeTabErr      error
-	switchTabErr     error
-	somScreenshot    []byte
-	somMime          string
-	somAnnotations   []browser.SOMAnnotation
-	somErr           error
+	closeTabErr    error
+	switchTabErr   error
+	somScreenshot  []byte
+	somMime        string
+	somAnnotations []browser.SOMAnnotation
+	somErr         error
 }
 
 func (m *mockBrowserController) Navigate(_ context.Context, url string) error {
@@ -76,8 +76,8 @@ func (m *mockBrowserController) Evaluate(_ context.Context, _ string) (any, erro
 func (m *mockBrowserController) WaitForSelector(_ context.Context, _ string) error {
 	return m.waitErr
 }
-func (m *mockBrowserController) GoBack(_ context.Context) error       { return m.backErr }
-func (m *mockBrowserController) GoForward(_ context.Context) error    { return m.forwardErr }
+func (m *mockBrowserController) GoBack(_ context.Context) error    { return m.backErr }
+func (m *mockBrowserController) GoForward(_ context.Context) error { return m.forwardErr }
 func (m *mockBrowserController) GetURL(_ context.Context) (string, error) {
 	return m.url, m.urlErr
 }
@@ -111,9 +111,9 @@ func (m *mockBrowserController) SwitchTab(_ context.Context, _ string) error {
 func (m *mockBrowserController) AnnotateSOM(_ context.Context) ([]byte, string, []browser.SOMAnnotation, error) {
 	return m.somScreenshot, m.somMime, m.somAnnotations, m.somErr
 }
-func (m *mockBrowserController) StartGIFRecording()            {}
+func (m *mockBrowserController) StartGIFRecording()                     {}
 func (m *mockBrowserController) StopGIFRecording() ([]byte, int, error) { return nil, 0, nil }
-func (m *mockBrowserController) IsGIFRecording() bool          { return false }
+func (m *mockBrowserController) IsGIFRecording() bool                   { return false }
 
 func TestNewServer(t *testing.T) {
 	mock := &mockBrowserController{}

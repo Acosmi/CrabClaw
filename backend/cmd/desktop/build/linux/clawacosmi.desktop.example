@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=ClawAcosmi
+Comment=ClawAcosmi desktop shell
+Exec=ClawAcosmi-desktop
+Terminal=false
+Categories=Utility;Development;

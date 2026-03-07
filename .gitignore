@@ -75,3 +75,4 @@ backend/browser-mcp
 # 其他编译产物
 backend/internal/memory/go-api/server
 Rust 沙箱设计方案文档.md
+.claude/

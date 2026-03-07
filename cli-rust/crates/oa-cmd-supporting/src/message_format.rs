@@ -5,7 +5,6 @@
 /// react, read, search, and other channel actions.
 ///
 /// Source: `src/commands/message-format.ts`
-
 use serde::{Deserialize, Serialize};
 
 use crate::message::MessageActionRunResult;
@@ -148,14 +147,8 @@ fn format_broadcast(result: &MessageActionRunResult) -> Vec<String> {
     )];
 
     for entry in results.iter().take(50) {
-        let channel = entry
-            .get("channel")
-            .and_then(|v| v.as_str())
-            .unwrap_or("?");
-        let ok = entry
-            .get("ok")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+        let channel = entry.get("channel").and_then(|v| v.as_str()).unwrap_or("?");
+        let ok = entry.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
         let status = if ok { "ok" } else { "error" };
         let error_text = if ok {
             String::new()
@@ -166,10 +159,7 @@ fn format_broadcast(result: &MessageActionRunResult) -> Vec<String> {
                 .unwrap_or("unknown error")
                 .to_owned()
         };
-        let target = entry
-            .get("to")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let target = entry.get("to").and_then(|v| v.as_str()).unwrap_or("");
         lines.push(format!(
             "  {channel} {target} [{status}]{err}",
             err = if error_text.is_empty() {

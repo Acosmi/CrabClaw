@@ -1,0 +1,21 @@
+version: '3'
+
+includes:
+  common: ../Taskfile.yml
+
+tasks:
+  build:
+    desc: Placeholder Windows desktop build task
+    cmds:
+      - task: common:stage:ui
+      - echo "Placeholder only: Windows wails3 build wiring is deferred."
+
+  package:
+    desc: Placeholder Windows desktop package task
+    cmds:
+      - echo "Placeholder only: Windows NSIS/MSI packaging wiring is deferred."
+
+  run:
+    desc: Placeholder Windows desktop run task
+    cmds:
+      - echo "Placeholder only: Windows desktop run wiring is deferred."

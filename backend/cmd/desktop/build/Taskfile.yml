@@ -1,0 +1,15 @@
+version: '3'
+
+tasks:
+  stage:ui:
+    desc: Explain the staged Control UI flow for desktop builds
+    cmds:
+      - echo "Control UI staging script: ../../../scripts/desktop/stage_control_ui.sh"
+      - echo "Staging target: backend/cmd/desktop/frontend/dist"
+      - echo "This safe scaffold does not invoke the script automatically."
+
+  verify:layout:
+    desc: Explain the expected desktop build layout
+    cmds:
+      - echo "Expected taskfiles: build/windows/Taskfile.yml build/linux/Taskfile.yml build/darwin/Taskfile.yml"
+      - echo "Expected CI templates: build/ci/*.example"

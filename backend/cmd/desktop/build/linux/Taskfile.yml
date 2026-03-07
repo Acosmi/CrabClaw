@@ -1,0 +1,21 @@
+version: '3'
+
+includes:
+  common: ../Taskfile.yml
+
+tasks:
+  build:
+    desc: Placeholder Linux desktop build task
+    cmds:
+      - task: common:stage:ui
+      - echo "Placeholder only: Linux wails3 build wiring is deferred."
+
+  package:
+    desc: Placeholder Linux desktop package task
+    cmds:
+      - echo "Placeholder only: Linux AppImage/deb/rpm packaging wiring is deferred."
+
+  run:
+    desc: Placeholder Linux desktop run task
+    cmds:
+      - echo "Placeholder only: Linux desktop run wiring is deferred."

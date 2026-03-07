@@ -51,6 +51,16 @@ export default defineConfig(() => {
             });
           },
         },
+        "/browser-extension": {
+          target: "http://localhost:19001",
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          configure: (proxy: any) => {
+            proxy.on("error", (err: { code?: string; message?: string }) => {
+              if (err.code === "ECONNREFUSED") return;
+              console.error("[vite-proxy]", err.message);
+            });
+          },
+        },
       },
     },
   };

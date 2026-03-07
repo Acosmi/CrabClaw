@@ -64,6 +64,9 @@ pub enum Commands {
     /// Open the Claw Acosmi dashboard in a browser.
     Dashboard(DashboardArgs),
 
+    /// Launch the native desktop shell.
+    Desktop(DesktopArgs),
+
     /// Search Claw Acosmi documentation.
     Docs(DocsArgs),
 
@@ -985,6 +988,22 @@ pub struct DashboardArgs {
     /// Do not open the browser.
     #[arg(long)]
     pub no_open: bool,
+}
+
+/// Arguments for the `desktop` command.
+#[derive(Debug, Args)]
+pub struct DesktopArgs {
+    /// Override the gateway port passed to the desktop shell.
+    #[arg(long)]
+    pub port: Option<u16>,
+
+    /// Explicit Control UI directory for development builds.
+    #[arg(long)]
+    pub control_ui_dir: Option<String>,
+
+    /// Wait for the desktop process to exit instead of returning immediately.
+    #[arg(long)]
+    pub wait: bool,
 }
 
 /// Arguments for the `docs` command.
@@ -3025,6 +3044,15 @@ pub async fn dispatch(cmd: Commands, json: bool, verbose: bool) -> Result<()> {
                 no_open: args.no_open,
             };
             oa_cmd_supporting::dashboard::dashboard_command(opts).await
+        }
+        Commands::Desktop(args) => {
+            let opts = oa_cmd_supporting::desktop::DesktopOptions {
+                port: args.port,
+                control_ui_dir: args.control_ui_dir,
+                wait: args.wait,
+                json,
+            };
+            oa_cmd_supporting::desktop::desktop_command(opts).await
         }
         Commands::Docs(args) => oa_cmd_supporting::docs::docs_search_command(&args.query).await,
         Commands::Reset(args) => {

@@ -347,14 +347,14 @@ type WebSearchGoogleConfig struct {
 
 // WebSearchConfig Web 搜索配置
 type WebSearchConfig struct {
-	Enabled         *bool                      `json:"enabled,omitempty"`
-	Provider        string                   `json:"provider,omitempty"` // "bocha"|"google"
-	APIKey          string                   `json:"apiKey,omitempty"`
-	MaxResults      *int                     `json:"maxResults,omitempty"`
-	TimeoutSeconds  *int                     `json:"timeoutSeconds,omitempty"`
-	CacheTTLMinutes *int                     `json:"cacheTtlMinutes,omitempty"`
-	Bocha           *WebSearchBochaConfig    `json:"bocha,omitempty"`
-	Google          *WebSearchGoogleConfig   `json:"google,omitempty"`
+	Enabled         *bool                  `json:"enabled,omitempty"`
+	Provider        string                 `json:"provider,omitempty"` // "bocha"|"google"
+	APIKey          string                 `json:"apiKey,omitempty"`
+	MaxResults      *int                   `json:"maxResults,omitempty"`
+	TimeoutSeconds  *int                   `json:"timeoutSeconds,omitempty"`
+	CacheTTLMinutes *int                   `json:"cacheTtlMinutes,omitempty"`
+	Bocha           *WebSearchBochaConfig  `json:"bocha,omitempty"`
+	Google          *WebSearchGoogleConfig `json:"google,omitempty"`
 }
 
 // WebFetchFirecrawlConfig Firecrawl 配置

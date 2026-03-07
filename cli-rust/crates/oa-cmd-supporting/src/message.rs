@@ -4,10 +4,9 @@
 /// channel-specific message actions (react, read, search, etc.)
 ///
 /// Source: `src/commands/message.ts`
-
 use std::collections::HashMap;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
@@ -103,9 +102,7 @@ pub fn normalize_action_name(input: &str) -> Result<String> {
 /// and channel plugin infrastructure. This function provides the CLI
 /// orchestration layer; the execution is delegated to the gateway.
 pub async fn message_command(opts: &MessageCommandOptions) -> Result<()> {
-    let action = normalize_action_name(
-        opts.action.as_deref().unwrap_or("send"),
-    )?;
+    let action = normalize_action_name(opts.action.as_deref().unwrap_or("send"))?;
 
     // In the full implementation, this would:
     // 1. Load config

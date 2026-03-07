@@ -4,7 +4,6 @@
 /// and their display metadata.
 ///
 /// Source: `src/commands/daemon-runtime.ts`
-
 use serde::{Deserialize, Serialize};
 
 /// Gateway daemon runtime environment.
@@ -59,10 +58,7 @@ pub const GATEWAY_DAEMON_RUNTIME_OPTIONS: &[RuntimeOption] = &[RuntimeOption {
 ///
 /// Source: `src/commands/daemon-runtime.ts` - `isGatewayDaemonRuntime`
 pub fn is_gateway_daemon_runtime(value: Option<&str>) -> bool {
-    matches!(
-        value.map(str::trim).unwrap_or(""),
-        "node" | "bun"
-    )
+    matches!(value.map(str::trim).unwrap_or(""), "node" | "bun")
 }
 
 /// Parse a string into a `GatewayDaemonRuntime`.

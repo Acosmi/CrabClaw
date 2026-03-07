@@ -2,17 +2,19 @@
 // Runs as stdio transport for MCP clients (Claude Code, Cursor, VS Code).
 //
 // Usage:
-//   openacosmi-browser-mcp [--cdp-url ws://127.0.0.1:9222]
+//
+//	openacosmi-browser-mcp [--cdp-url ws://127.0.0.1:9222]
 //
 // MCP config (claude_desktop_config.json):
-//   {
-//     "mcpServers": {
-//       "openacosmi-browser": {
-//         "command": "openacosmi-browser-mcp",
-//         "args": ["--cdp-url", "ws://127.0.0.1:9222"]
-//       }
-//     }
-//   }
+//
+//	{
+//	  "mcpServers": {
+//	    "openacosmi-browser": {
+//	      "command": "openacosmi-browser-mcp",
+//	      "args": ["--cdp-url", "ws://127.0.0.1:9222"]
+//	    }
+//	  }
+//	}
 package main
 
 import (

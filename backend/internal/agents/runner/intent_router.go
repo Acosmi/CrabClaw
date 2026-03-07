@@ -271,6 +271,7 @@ var tierToolAllowlist = map[intentTier]map[string]bool{
 		"grep":            true,
 		"glob":            true,
 		"web_search":      true,
+		"browser":         true, // navigate/screenshot/observe 是只读操作，与 web_search 同级
 		"search_skills":   true,
 		"lookup_skill":    true,
 		"memory_search":   true,

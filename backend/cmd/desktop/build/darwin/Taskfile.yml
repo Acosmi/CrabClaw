@@ -1,0 +1,21 @@
+version: '3'
+
+includes:
+  common: ../Taskfile.yml
+
+tasks:
+  build:
+    desc: Reserved macOS taskfile placeholder
+    cmds:
+      - task: common:stage:ui
+      - echo "Reserved only: macOS remains on apps/macos in the current implementation scope."
+
+  package:
+    desc: Reserved macOS package placeholder
+    cmds:
+      - echo "Reserved only: macOS Wails packaging is not part of the current execution scope."
+
+  run:
+    desc: Reserved macOS run placeholder
+    cmds:
+      - echo "Reserved only: macOS Wails runtime wiring is not active."

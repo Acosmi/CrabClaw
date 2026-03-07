@@ -232,6 +232,37 @@ func (c *CDPClient) CreateTarget(ctx context.Context, targetURL string) (string,
 	return targetID, err
 }
 
+// ResolveFirstPageWsURL fetches /json from the CDP HTTP endpoint derived from
+// a browser-level WebSocket URL, and returns the first "page" target's WS URL.
+// Returns empty string on failure. Used to convert browser-level WS URLs
+// (which don't support Page/Runtime domains) to page-level WS URLs.
+func ResolveFirstPageWsURL(browserWsURL string) string {
+	httpBase := wsToHTTP(browserWsURL)
+	if idx := strings.Index(httpBase, "/devtools/"); idx >= 0 {
+		httpBase = httpBase[:idx]
+	}
+	endpoint, err := AppendCdpPath(httpBase, "/json")
+	if err != nil {
+		return ""
+	}
+	var targets []CDPTarget
+	if err := FetchJSON(context.Background(), endpoint, &targets, 3000); err != nil {
+		return ""
+	}
+	for _, t := range targets {
+		if t.Type == "page" && t.WebSocketDebuggerURL != "" {
+			return t.WebSocketDebuggerURL
+		}
+	}
+	return ""
+}
+
+// IsBrowserWsURL returns true if the URL points to a browser-level target
+// (/devtools/browser/...) rather than a page-level target.
+func IsBrowserWsURL(wsURL string) bool {
+	return strings.Contains(wsURL, "/devtools/browser/")
+}
+
 // GetWebSocketDebuggerURL fetches the browser-level WebSocket URL from /json/version.
 // Aligns with TS cdp.ts getChromeWebSocketUrl() partial logic.
 func (c *CDPClient) GetWebSocketDebuggerURL(ctx context.Context) (string, error) {

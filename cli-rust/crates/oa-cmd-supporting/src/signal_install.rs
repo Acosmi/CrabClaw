@@ -5,7 +5,6 @@
 /// redirect following, extraction, and binary discovery.
 ///
 /// Source: `src/commands/signal-install.ts`
-
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -60,10 +59,7 @@ fn looks_like_archive(name: &str) -> bool {
 /// Pick the best asset for the current platform.
 ///
 /// Source: `src/commands/signal-install.ts` - `pickAsset`
-fn pick_asset<'a>(
-    assets: &'a [ReleaseAsset],
-    platform: &str,
-) -> Option<(&'a str, &'a str)> {
+fn pick_asset<'a>(assets: &'a [ReleaseAsset], platform: &str) -> Option<(&'a str, &'a str)> {
     let with_name: Vec<_> = assets
         .iter()
         .filter_map(|a| {
@@ -86,14 +82,27 @@ fn pick_asset<'a>(
     match platform {
         "linux" => by_name("linux-native")
             .or_else(|| by_name("linux"))
-            .or_else(|| with_name.iter().find(|(n, _)| looks_like_archive(&n.to_lowercase())).copied()),
+            .or_else(|| {
+                with_name
+                    .iter()
+                    .find(|(n, _)| looks_like_archive(&n.to_lowercase()))
+                    .copied()
+            }),
         "macos" | "darwin" => by_name("macos")
             .or_else(|| by_name("osx"))
             .or_else(|| by_name("darwin"))
-            .or_else(|| with_name.iter().find(|(n, _)| looks_like_archive(&n.to_lowercase())).copied()),
-        "windows" | "win32" => by_name("windows")
-            .or_else(|| by_name("win"))
-            .or_else(|| with_name.iter().find(|(n, _)| looks_like_archive(&n.to_lowercase())).copied()),
+            .or_else(|| {
+                with_name
+                    .iter()
+                    .find(|(n, _)| looks_like_archive(&n.to_lowercase()))
+                    .copied()
+            }),
+        "windows" | "win32" => by_name("windows").or_else(|| by_name("win")).or_else(|| {
+            with_name
+                .iter()
+                .find(|(n, _)| looks_like_archive(&n.to_lowercase()))
+                .copied()
+        }),
         _ => with_name
             .iter()
             .find(|(n, _)| looks_like_archive(&n.to_lowercase()))
@@ -179,18 +188,13 @@ pub async fn install_signal_cli() -> SignalInstallResult {
             ok: false,
             cli_path: None,
             version: None,
-            error: Some(
-                "Signal CLI auto-install is not supported on Windows yet.".to_owned(),
-            ),
+            error: Some("Signal CLI auto-install is not supported on Windows yet.".to_owned()),
         };
     }
 
     let api_url = "https://api.github.com/repos/AsamK/signal-cli/releases/latest";
 
-    let client = match reqwest::Client::builder()
-        .user_agent("openacosmi")
-        .build()
-    {
+    let client = match reqwest::Client::builder().user_agent("openacosmi").build() {
         Ok(c) => c,
         Err(e) => {
             return SignalInstallResult {
@@ -258,9 +262,7 @@ pub async fn install_signal_cli() -> SignalInstallResult {
                 ok: false,
                 cli_path: None,
                 version: Some(version),
-                error: Some(
-                    "No compatible release asset found for this platform.".to_owned(),
-                ),
+                error: Some("No compatible release asset found for this platform.".to_owned()),
             };
         }
     };
@@ -315,10 +317,7 @@ pub async fn install_signal_cli() -> SignalInstallResult {
 
     // Extract archive.
     let state_dir = resolve_state_dir();
-    let install_root = state_dir
-        .join("tools")
-        .join("signal-cli")
-        .join(&version);
+    let install_root = state_dir.join("tools").join("signal-cli").join(&version);
     if let Err(e) = tokio::fs::create_dir_all(&install_root).await {
         return SignalInstallResult {
             ok: false,
@@ -330,12 +329,22 @@ pub async fn install_signal_cli() -> SignalInstallResult {
 
     let extract_result = if asset_name.ends_with(".zip") {
         tokio::process::Command::new("unzip")
-            .args(["-q", &archive_path.display().to_string(), "-d", &install_root.display().to_string()])
+            .args([
+                "-q",
+                &archive_path.display().to_string(),
+                "-d",
+                &install_root.display().to_string(),
+            ])
             .output()
             .await
     } else if asset_name.ends_with(".tar.gz") || asset_name.ends_with(".tgz") {
         tokio::process::Command::new("tar")
-            .args(["-xzf", &archive_path.display().to_string(), "-C", &install_root.display().to_string()])
+            .args([
+                "-xzf",
+                &archive_path.display().to_string(),
+                "-C",
+                &install_root.display().to_string(),
+            ])
             .output()
             .await
     } else {

@@ -5,10 +5,9 @@
 /// and plain markdown output modes.
 ///
 /// Source: `src/commands/docs.ts`
-
 use std::process::Stdio;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use tracing::{error, info};
 
 use oa_cli_shared::command_format::format_cli_command;
@@ -16,7 +15,8 @@ use oa_cli_shared::command_format::format_cli_command;
 /// The MCP tool identifier for searching docs.
 ///
 /// Source: `src/commands/docs.ts` - `SEARCH_TOOL`
-const SEARCH_TOOL: &str = "https://github.com/Acosmi/Claw-Acosmi/tree/main/docs/mcp.SearchOpenAcosmi";
+const SEARCH_TOOL: &str =
+    "https://github.com/Acosmi/Claw-Acosmi/tree/main/docs/mcp.SearchOpenAcosmi";
 
 /// Default timeout for doc search in milliseconds.
 ///
@@ -96,9 +96,7 @@ fn first_paragraph(text: &str) -> String {
 /// Source: `src/commands/docs.ts` - `parseSearchOutput`
 pub fn parse_search_output(raw: &str) -> Vec<DocResult> {
     let normalized = raw.replace('\r', "");
-    let blocks: Vec<&str> = normalized
-        .split("\nTitle: ")
-        .collect();
+    let blocks: Vec<&str> = normalized.split("\nTitle: ").collect();
 
     let mut results = Vec::new();
 
@@ -123,7 +121,10 @@ pub fn parse_search_output(raw: &str) -> Vec<DocResult> {
 
         let lines: Vec<&str> = full_block.lines().collect();
         // First line is the title (after "Title: " was stripped)
-        let title = lines.first().map(|l| l.trim().to_owned()).unwrap_or_default();
+        let title = lines
+            .first()
+            .map(|l| l.trim().to_owned())
+            .unwrap_or_default();
         if title.is_empty() {
             continue;
         }
@@ -180,7 +181,10 @@ fn escape_markdown(text: &str) -> String {
 ///
 /// Source: `src/commands/docs.ts` - `buildMarkdown`
 pub fn build_markdown(query: &str, results: &[DocResult]) -> String {
-    let mut lines = vec![format!("# Docs search: {}", escape_markdown(query)), String::new()];
+    let mut lines = vec![
+        format!("# Docs search: {}", escape_markdown(query)),
+        String::new(),
+    ];
 
     if results.is_empty() {
         lines.push("_No results._".to_owned());
@@ -194,7 +198,7 @@ pub fn build_markdown(query: &str, results: &[DocResult]) -> String {
             .as_ref()
             .map(|s| format!(" - {}", escape_markdown(s)))
             .unwrap_or_default();
-        lines.push(format!("- [{title}]({}){}",item.link, suffix));
+        lines.push(format!("- [{title}]({}){}", item.link, suffix));
     }
 
     lines.join("\n")
@@ -333,7 +337,10 @@ mod tests {
         let results = parse_search_output(raw);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].title, "Getting Started");
-        assert_eq!(results[0].link, "https://github.com/Acosmi/Claw-Acosmi/tree/main/docs/start");
+        assert_eq!(
+            results[0].link,
+            "https://github.com/Acosmi/Claw-Acosmi/tree/main/docs/start"
+        );
         assert_eq!(results[0].snippet, Some("Quick start guide".to_owned()));
     }
 

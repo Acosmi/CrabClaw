@@ -36,6 +36,10 @@ type CDPPlaywrightTools struct {
 	// On subsequent access (same page URL), we try cached selector first (zero JS eval).
 	selectorCache    map[string]string // key: "url|ref" → CSS selector
 	selectorCacheURL string            // URL when cache was populated; invalidated on navigation
+
+	// Cached page-level WS URL resolved from browser-level WS URL.
+	// Page/Runtime domain commands only work on page-level WebSocket connections.
+	cachedPageWsURL string
 }
 
 // NewCDPPlaywrightTools creates a new CDP-based PlaywrightTools implementation.
@@ -420,7 +424,7 @@ func (t *CDPPlaywrightTools) AnnotateSOM(ctx context.Context, opts PWTargetOpts)
 	err := WithCdpSocket(ctx, t.resolveTargetWsURL(opts), func(send CdpSendFn) error {
 		// Step 1: Inject annotation overlays and collect element info.
 		raw, err := send("Runtime.evaluate", map[string]any{
-			"expression": somInjectJS,
+			"expression":    somInjectJS,
 			"returnByValue": true,
 			"awaitPromise":  false,
 		})
@@ -1594,6 +1598,18 @@ func (t *CDPPlaywrightTools) resolveTargetWsURL(opts PWTargetOpts) string {
 			base = base[:idx]
 		}
 		return base + "/devtools/page/" + opts.TargetID
+	}
+	// If browser-level URL, resolve first page target's WS URL.
+	// Page/Runtime domain commands don't work on browser-level WebSocket.
+	if IsBrowserWsURL(cdpURL) {
+		if t.cachedPageWsURL != "" {
+			return t.cachedPageWsURL
+		}
+		if pageURL := ResolveFirstPageWsURL(cdpURL); pageURL != "" {
+			t.cachedPageWsURL = pageURL
+			t.logger.Debug("cdp tools: resolved page-level WS URL", "page", pageURL)
+			return pageURL
+		}
 	}
 	return cdpURL
 }

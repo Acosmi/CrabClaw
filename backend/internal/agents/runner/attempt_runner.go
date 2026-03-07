@@ -18,13 +18,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Acosmi/ClawAcosmi/internal/browser"
 	"github.com/Acosmi/ClawAcosmi/internal/agents/capabilities"
 	"github.com/Acosmi/ClawAcosmi/internal/agents/llmclient"
 	"github.com/Acosmi/ClawAcosmi/internal/agents/models"
 	"github.com/Acosmi/ClawAcosmi/internal/agents/prompt"
 	"github.com/Acosmi/ClawAcosmi/internal/agents/session"
 	"github.com/Acosmi/ClawAcosmi/internal/agents/skills"
+	"github.com/Acosmi/ClawAcosmi/internal/browser"
 	goproviders_common "github.com/Acosmi/ClawAcosmi/internal/goproviders/common"
 	"github.com/Acosmi/ClawAcosmi/internal/infra"
 	"github.com/Acosmi/ClawAcosmi/internal/routing"
@@ -298,6 +298,12 @@ func (r *EmbeddedAttemptRunner) RunAttempt(ctx context.Context, params AttemptPa
 	tools = filterToolsByIntent(tools, tier)
 	log.Debug("intent filter", "tier", tier, "toolCount", len(tools), "historyCount", len(priorMessages))
 
+	// 构建过滤后的工具名集合，用于在工具调用时验证 LLM 是否幻觉出未暴露的工具
+	allowedToolNames := make(map[string]bool, len(tools))
+	for _, t := range tools {
+		allowedToolNames[t.Name] = true
+	}
+
 	effectiveSecurityLevel := resolveEffectiveSecurityLevel(params, r.Config)
 
 	// 5c. Phase 1: 方案确认门控（三级指挥体系）
@@ -528,6 +534,21 @@ func (r *EmbeddedAttemptRunner) RunAttempt(ctx context.Context, params AttemptPa
 				"id", tc.ID,
 				"iteration", iteration,
 			)
+
+			// 工具调用过滤验证: 拒绝 LLM 幻觉出的未暴露工具（在事件发射前拦截）
+			if len(allowedToolNames) > 0 && !allowedToolNames[tc.Name] {
+				log.Warn("tool call rejected: not in filtered tool set",
+					"tool", tc.Name,
+					"tier", tier,
+					"iteration", iteration,
+				)
+				toolResults = append(toolResults, llmclient.ContentBlock{
+					Type:      "tool_result",
+					ToolUseID: tc.ID,
+					Text:      fmt.Sprintf("[Tool '%s' is not available in the current context. Use only the tools provided.]", tc.Name),
+				})
+				continue
+			}
 
 			toolMetas = append(toolMetas, map[string]string{
 				"toolName": tc.Name,

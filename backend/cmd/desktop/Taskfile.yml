@@ -1,0 +1,37 @@
+version: '3'
+
+includes:
+  common: ./build/Taskfile.yml
+  windows: ./build/windows/Taskfile.yml
+  linux: ./build/linux/Taskfile.yml
+  darwin: ./build/darwin/Taskfile.yml
+
+vars:
+  APP_NAME: "ClawAcosmi"
+
+tasks:
+  explain:
+    desc: Explain the current non-destructive desktop build scaffold
+    cmds:
+      - echo "Desktop build scaffold is present, but real build wiring is intentionally deferred."
+      - echo "The current Taskfiles are placeholders and templates only."
+
+  stage:ui:
+    desc: Explain how Control UI assets are staged for desktop builds
+    cmds:
+      - task: common:stage:ui
+
+  build:
+    desc: Placeholder platform build entrypoint
+    cmds:
+      - echo "Placeholder only. See build/windows/Taskfile.yml and build/linux/Taskfile.yml for templates."
+
+  package:
+    desc: Placeholder platform package entrypoint
+    cmds:
+      - echo "Placeholder only. Packaging wiring remains deferred until runtime-safe review."
+
+  run:
+    desc: Placeholder platform run entrypoint
+    cmds:
+      - echo "Placeholder only. Runtime execution stays on the existing desktop bootstrap path."

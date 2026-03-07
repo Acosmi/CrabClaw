@@ -4,7 +4,6 @@
 /// working directory, environment), detect dev mode, and generate error hints.
 ///
 /// Source: `src/commands/daemon-install-helpers.ts`
-
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
@@ -120,7 +119,9 @@ pub async fn build_gateway_install_plan(
 
     // Merge caller-provided env (but don't override the above).
     for (key, value) in &params.env {
-        environment.entry(key.clone()).or_insert_with(|| value.clone());
+        environment
+            .entry(key.clone())
+            .or_insert_with(|| value.clone());
     }
 
     Ok(GatewayInstallPlan {
@@ -206,7 +207,9 @@ mod tests {
             node_path: Some("/usr/bin/node".to_owned()),
             config: None,
         };
-        let plan = build_gateway_install_plan(&params).await.expect("should build plan");
+        let plan = build_gateway_install_plan(&params)
+            .await
+            .expect("should build plan");
         assert_eq!(
             plan.environment.get("OPENACOSMI_GATEWAY_PORT"),
             Some(&"8080".to_owned())

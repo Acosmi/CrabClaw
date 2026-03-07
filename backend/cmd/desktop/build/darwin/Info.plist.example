@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>CFBundleDisplayName</key>
+    <string>ClawAcosmi</string>
+    <key>CFBundleExecutable</key>
+    <string>ClawAcosmi-desktop</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.acosmi.clawacosmi.desktop</string>
+    <key>CFBundleName</key>
+    <string>ClawAcosmi</string>
+    <key>CFBundleVersion</key>
+    <string>0.0.0-dev</string>
+  </dict>
+</plist>

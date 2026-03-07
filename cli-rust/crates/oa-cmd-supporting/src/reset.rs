@@ -5,7 +5,6 @@
 /// and auto-confirm modes.
 ///
 /// Source: `src/commands/reset.ts`
-
 use std::path::Path;
 
 use anyhow::Result;

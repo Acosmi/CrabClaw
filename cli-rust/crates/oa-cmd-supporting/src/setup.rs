@@ -4,7 +4,6 @@
 /// directories for the Claw Acosmi CLI.
 ///
 /// Source: `src/commands/setup.ts`
-
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
@@ -120,7 +119,10 @@ pub async fn setup_command(opts: SetupOptions) -> Result<()> {
     tokio::fs::create_dir_all(&ws_path)
         .await
         .with_context(|| format!("Failed to create workspace: {}", ws_path.display()))?;
-    info!("Workspace OK: {}", shorten_home_path(&ws_path.display().to_string()));
+    info!(
+        "Workspace OK: {}",
+        shorten_home_path(&ws_path.display().to_string())
+    );
 
     // Ensure sessions directory exists.
     let sessions_dir = resolve_session_transcripts_dir();

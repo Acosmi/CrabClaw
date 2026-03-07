@@ -41,9 +41,19 @@ func NewPlaywrightBrowserController(tools PlaywrightTools, cdpURL string) *Playw
 }
 
 // cdpClient returns the cached CDPClient, creating it on first use.
+// If the stored URL is a browser-level WS URL (/devtools/browser/...),
+// it resolves the first page target's WS URL via /json — because Page/Runtime
+// domain commands only work on page-level WebSocket connections.
 func (c *PlaywrightBrowserController) cdpClient() *CDPClient {
 	c.cdpOnce.Do(func() {
-		c.cdp = NewCDPClient(c.target.CDPURL, nil)
+		wsURL := c.target.CDPURL
+		if IsBrowserWsURL(wsURL) {
+			if pageURL := ResolveFirstPageWsURL(wsURL); pageURL != "" {
+				slog.Debug("cdp: resolved page-level WS URL", "browser", wsURL, "page", pageURL)
+				wsURL = pageURL
+			}
+		}
+		c.cdp = NewCDPClient(wsURL, nil)
 	})
 	return c.cdp
 }

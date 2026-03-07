@@ -4,7 +4,6 @@
 /// opens it in the default browser.
 ///
 /// Source: `src/commands/dashboard.ts`
-
 use anyhow::Result;
 use tracing::info;
 
@@ -28,13 +27,9 @@ fn percent_encode_token(input: &str) -> String {
     let mut result = String::with_capacity(input.len());
     for byte in input.bytes() {
         match byte {
-            b'A'..=b'Z'
-            | b'a'..=b'z'
-            | b'0'..=b'9'
-            | b'-'
-            | b'_'
-            | b'.'
-            | b'~' => result.push(byte as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                result.push(byte as char)
+            }
             _ => {
                 result.push('%');
                 result.push_str(&format!("{byte:02X}"));
@@ -58,9 +53,7 @@ pub fn resolve_dashboard_url(
     token: Option<&str>,
 ) -> String {
     let host = match bind {
-        "loopback" | "localhost" | "127.0.0.1" | "auto" => {
-            custom_bind_host.unwrap_or("127.0.0.1")
-        }
+        "loopback" | "localhost" | "127.0.0.1" | "auto" => custom_bind_host.unwrap_or("127.0.0.1"),
         other if !other.is_empty() => other,
         _ => "127.0.0.1",
     };
@@ -111,10 +104,7 @@ pub async fn dashboard_command(options: DashboardOptions) -> Result<()> {
 
     let port = resolve_gateway_port(Some(&cfg));
 
-    let bind_mode = cfg
-        .gateway
-        .as_ref()
-        .and_then(|g| g.bind.as_ref());
+    let bind_mode = cfg.gateway.as_ref().and_then(|g| g.bind.as_ref());
     let bind_str = bind_mode.map_or("loopback", bind_mode_to_str);
 
     let base_path = cfg
@@ -137,7 +127,8 @@ pub async fn dashboard_command(options: DashboardOptions) -> Result<()> {
         .or(env_token.as_deref())
         .unwrap_or("");
 
-    let dashboard_url = resolve_dashboard_url(port, bind_str, base_path, custom_bind_host, Some(token));
+    let dashboard_url =
+        resolve_dashboard_url(port, bind_str, base_path, custom_bind_host, Some(token));
 
     info!("Dashboard URL: {dashboard_url}");
 

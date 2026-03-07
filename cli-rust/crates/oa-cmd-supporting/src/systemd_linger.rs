@@ -5,7 +5,6 @@
 /// and non-interactive flows.
 ///
 /// Source: `src/commands/systemd-linger.ts`
-
 use anyhow::Result;
 use tracing::{error, info};
 
@@ -89,10 +88,7 @@ pub async fn read_systemd_user_linger_status() -> Option<LingerStatus> {
 /// Enable systemd user lingering for a user.
 ///
 /// Source: `src/daemon/systemd.ts` - `enableSystemdUserLinger`
-pub async fn enable_systemd_user_linger(
-    user: &str,
-    use_sudo: bool,
-) -> LingerEnableResult {
+pub async fn enable_systemd_user_linger(user: &str, use_sudo: bool) -> LingerEnableResult {
     let mut cmd = if use_sudo {
         let mut c = tokio::process::Command::new("sudo");
         c.args(["loginctl", "enable-linger", user]);
@@ -123,9 +119,7 @@ pub async fn enable_systemd_user_linger(
 /// first without sudo and then with sudo if needed.
 ///
 /// Source: `src/commands/systemd-linger.ts` - `ensureSystemdUserLingerInteractive`
-pub async fn ensure_systemd_user_linger_interactive(
-    prompt_enabled: bool,
-) -> Result<()> {
+pub async fn ensure_systemd_user_linger_interactive(prompt_enabled: bool) -> Result<()> {
     if cfg!(not(target_os = "linux")) {
         return Ok(());
     }
@@ -142,7 +136,9 @@ pub async fn ensure_systemd_user_linger_interactive(
     let status = match read_systemd_user_linger_status().await {
         Some(s) => s,
         None => {
-            info!("Unable to read loginctl linger status. Ensure systemd + loginctl are available.");
+            info!(
+                "Unable to read loginctl linger status. Ensure systemd + loginctl are available."
+            );
             return Ok(());
         }
     };
@@ -151,9 +147,7 @@ pub async fn ensure_systemd_user_linger_interactive(
         return Ok(());
     }
 
-    info!(
-        "Systemd user services stop when you log out or go idle, which kills the Gateway."
-    );
+    info!("Systemd user services stop when you log out or go idle, which kills the Gateway.");
     info!("Enabling lingering now (may require sudo; writes /var/lib/systemd/linger).");
 
     // Try without sudo first.
@@ -180,10 +174,7 @@ pub async fn ensure_systemd_user_linger_interactive(
             "unknown error"
         }
     );
-    info!(
-        "Run manually: sudo loginctl enable-linger {}",
-        status.user
-    );
+    info!("Run manually: sudo loginctl enable-linger {}", status.user);
 
     Ok(())
 }

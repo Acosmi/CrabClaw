@@ -40,8 +40,8 @@ type ExtensionRelay struct {
 
 	// Extension mode: when Chrome extension connects without a CDP target,
 	// it enters extension mode where chrome.debugger API handles CDP.
-	extConn   *websocket.Conn // active extension connection
-	extMu     sync.Mutex
+	extConn    *websocket.Conn // active extension connection
+	extMu      sync.Mutex
 	extPending sync.Map // map[requestID]chan json.RawMessage — pending CDP requests
 	extNextID  int64
 }

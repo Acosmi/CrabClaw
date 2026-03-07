@@ -192,4 +192,3 @@ func downscaleImage(src image.Image, targetWidth int) image.Image {
 	}
 	return dst
 }
-
