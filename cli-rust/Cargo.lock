@@ -1338,6 +1338,7 @@ dependencies = [
  "oa-cmd-models",
  "oa-cmd-node",
  "oa-cmd-onboard",
+ "oa-cmd-packages",
  "oa-cmd-pairing",
  "oa-cmd-plugins",
  "oa-cmd-sandbox",
@@ -1353,6 +1354,7 @@ dependencies = [
  "oa-cmd-webhooks",
  "oa-coder",
  "oa-config",
+ "oa-gateway-rpc",
  "oa-infra",
  "oa-mcp-install",
  "oa-sandbox",
@@ -1818,6 +1820,20 @@ dependencies = [
  "tracing",
  "url",
  "which",
+]
+
+[[package]]
+name = "oa-cmd-packages"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "oa-cli-shared",
+ "oa-config",
+ "oa-gateway-rpc",
+ "oa-terminal",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -251,7 +251,7 @@ func CollectFilesystemFindings(stateDir, configPath string) []SecurityAuditFindi
 				CheckID:     "fs.state_dir.perms_world_writable",
 				Severity:    SeverityCritical,
 				Title:       "State dir is world-writable",
-				Detail:      FormatPermissionDetail(stateDir, stateDirPerms) + "; other users can write into your OpenAcosmi state.",
+				Detail:      FormatPermissionDetail(stateDir, stateDirPerms) + "; other users can write into your Crab Claw（蟹爪） state.",
 				Remediation: FormatPermissionRemediation(stateDir, stateDirPerms, true, 0o700),
 			})
 		} else if stateDirPerms.GroupWritable {
@@ -259,7 +259,7 @@ func CollectFilesystemFindings(stateDir, configPath string) []SecurityAuditFindi
 				CheckID:     "fs.state_dir.perms_group_writable",
 				Severity:    SeverityWarn,
 				Title:       "State dir is group-writable",
-				Detail:      FormatPermissionDetail(stateDir, stateDirPerms) + "; group users can write into your OpenAcosmi state.",
+				Detail:      FormatPermissionDetail(stateDir, stateDirPerms) + "; group users can write into your Crab Claw（蟹爪） state.",
 				Remediation: FormatPermissionRemediation(stateDir, stateDirPerms, true, 0o700),
 			})
 		} else if stateDirPerms.GroupReadable || stateDirPerms.WorldReadable {

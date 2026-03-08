@@ -1,7 +1,6 @@
 /// Agents list command: display all configured agents with their summaries.
 ///
 /// Source: `src/commands/agents.commands.list.ts`
-
 use anyhow::Result;
 
 use oa_cli_shared::command_format::format_cli_command;
@@ -10,7 +9,7 @@ use oa_types::agents::AgentBinding;
 use oa_types::config::OpenAcosmiConfig;
 
 use crate::bindings::describe_binding;
-use crate::config::{build_agent_summaries, AgentSummary};
+use crate::config::{AgentSummary, build_agent_summaries};
 
 /// Format a single agent summary for text display.
 ///
@@ -47,8 +46,14 @@ fn format_summary(summary: &AgentSummary) -> String {
             .unwrap_or_default();
         lines.push(format!("  Identity: {identity}{source_suffix}"));
     }
-    lines.push(format!("  Workspace: {}", shorten_home_path(&summary.workspace)));
-    lines.push(format!("  Agent dir: {}", shorten_home_path(&summary.agent_dir)));
+    lines.push(format!(
+        "  Workspace: {}",
+        shorten_home_path(&summary.workspace)
+    ));
+    lines.push(format!(
+        "  Agent dir: {}",
+        shorten_home_path(&summary.agent_dir)
+    ));
     if let Some(ref model) = summary.model {
         lines.push(format!("  Model: {model}"));
     }
@@ -113,9 +118,8 @@ pub fn agents_list_command(
         for summary in &mut summaries {
             if let Some(bindings) = binding_map.get(&summary.id) {
                 if !bindings.is_empty() {
-                    summary.binding_details = Some(
-                        bindings.iter().map(|b| describe_binding(b)).collect(),
-                    );
+                    summary.binding_details =
+                        Some(bindings.iter().map(|b| describe_binding(b)).collect());
                 }
             }
         }
@@ -153,7 +157,7 @@ pub fn agents_list_command(
     );
     lines.push(format!(
         "Channel status reflects local config/creds. For live health: {}.",
-        format_cli_command("openacosmi channels status --probe")
+        format_cli_command("crabclaw channels status --probe")
     ));
     Ok(lines.join("\n"))
 }

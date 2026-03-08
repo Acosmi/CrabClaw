@@ -1,34 +1,35 @@
 ---
 name: qianfan
-description: "通过千帆统一 API 在创宇太虚中访问多种模型"
+description: "Use Qianfan's unified API to access many models in Crab Claw（蟹爪）"
 ---
 
-# 千帆供应商指南
+# Qianfan Provider Guide
 
-千帆是百度的 MaaS 平台，提供**统一 API**，通过单一端点和 API 密钥将请求路由到多种模型。它兼容 OpenAI，大多数 OpenAI SDK 只需切换 base URL 即可使用。
+Qianfan is Baidu's MaaS platform, provides a **unified API** that routes requests to many models behind a single
+endpoint and API key. It is OpenAI-compatible, so most OpenAI SDKs work by switching the base URL.
 
-## 前提条件
+## Prerequisites
 
-1. 拥有千帆 API 访问权限的百度云账号
-2. 从千帆控制台获取的 API 密钥
-3. 系统上已安装创宇太虚
+1. A Baidu Cloud account with Qianfan API access
+2. An API key from the Qianfan console
+3. Crab Claw（蟹爪） installed on your system
 
-## 获取 API 密钥
+## Getting Your API Key
 
-1. 访问[千帆控制台](https://console.bce.baidu.com/qianfan/ais/console/apiKey)
-2. 创建新应用或选择已有应用
-3. 生成 API 密钥（格式：`bce-v3/ALTAK-...`）
-4. 复制 API 密钥用于创宇太虚
+1. Visit the [Qianfan Console](https://console.bce.baidu.com/qianfan/ais/console/apiKey)
+2. Create a new application or select an existing one
+3. Generate an API key (format: `bce-v3/ALTAK-...`)
+4. Copy the API key for use with Crab Claw（蟹爪）
 
-## CLI 设置
+## CLI setup
 
 ```bash
-openacosmi onboard --auth-choice qianfan-api-key
+crabclaw onboard --auth-choice qianfan-api-key
 ```
 
-## 相关文档
+## Related Documentation
 
-- [创宇太虚配置](/gateway/configuration)
-- [模型供应商](/concepts/model-providers)
-- [智能体设置](/concepts/agent)
-- [千帆 API 文档](https://cloud.baidu.com/doc/qianfan-api/s/3m7of64lb)
+- [Crab Claw（蟹爪） Configuration](/gateway/configuration)
+- [Model Providers](/concepts/model-providers)
+- [Agent Setup](/concepts/agent)
+- [Qianfan API Documentation](https://cloud.baidu.com/doc/qianfan-api/s/3m7of64lb)

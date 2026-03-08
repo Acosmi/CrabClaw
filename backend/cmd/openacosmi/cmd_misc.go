@@ -182,7 +182,10 @@ func newCompletionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "completion [bash|zsh|fish|powershell]",
 		Short: "Generate shell completion scripts",
-		Long: `Generate shell completion scripts for OpenAcosmi CLI.
+		Long: `Generate shell completion scripts for Crab Claw（蟹爪）.
+
+Primary Rust CLI examples use crabclaw. This compatibility Go CLI still emits
+openacosmi-named completion scripts.
 
 Example:
   openacosmi completion bash > /etc/bash_completion.d/openacosmi
@@ -223,7 +226,7 @@ func newDashboardCmd() *cobra.Command {
 func newResetCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "reset",
-		Short: "Reset Claw Acosmi state",
+		Short: "Reset Crab Claw（蟹爪） state",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.Println("⚠️ Reset not yet implemented")
 			return nil

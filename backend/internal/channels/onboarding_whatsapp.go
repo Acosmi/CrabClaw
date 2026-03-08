@@ -144,7 +144,7 @@ func ConfigureWhatsApp(params ConfigureWhatsAppParams) (*ConfigureWhatsAppResult
 	if !linked {
 		prompter.Note(strings.Join([]string{
 			"WhatsApp requires linking via QR code.",
-			"After completing setup, run: openacosmi gateway start",
+			"After completing setup, run: crabclaw gateway start",
 			"Then scan the QR code with your phone.",
 			"Docs: https://docs.openacosmi.dev/whatsapp",
 		}, "\n"), "WhatsApp linking")
@@ -160,7 +160,7 @@ func ConfigureWhatsApp(params ConfigureWhatsAppParams) (*ConfigureWhatsAppResult
 		if loginErr != nil {
 			prompter.Note(
 				"WhatsApp linking failed: "+loginErr.Error()+"\n"+
-					"You can link later: openacosmi channels login --channel whatsapp",
+					"You can link later: crabclaw channels login --channel whatsapp",
 				"WhatsApp login",
 			)
 		} else if loginResult != nil && loginResult.Connected {
@@ -169,7 +169,7 @@ func ConfigureWhatsApp(params ConfigureWhatsAppParams) (*ConfigureWhatsAppResult
 		} else if loginResult != nil {
 			prompter.Note(
 				loginResult.Message+"\n"+
-					"Link later: openacosmi channels login --channel whatsapp --verbose",
+					"Link later: crabclaw channels login --channel whatsapp --verbose",
 				"WhatsApp login",
 			)
 		}

@@ -13,6 +13,7 @@ require (
 	github.com/charmbracelet/glamour v0.10.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/creack/pty v1.1.24
+	github.com/emersion/go-imap/v2 v2.0.0-beta.8
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-playground/validator/v10 v10.30.1
 	github.com/google/uuid v1.6.0
@@ -65,6 +66,8 @@ require (
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ebitengine/purego v0.8.2 // indirect
+	github.com/emersion/go-message v0.18.2 // indirect
+	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
@@ -108,8 +111,6 @@ require (
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/richardlehane/mscfb v1.0.6 // indirect
-	github.com/richardlehane/msoleps v1.0.6 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sahilm/fuzzy v0.1.1 // indirect
 	github.com/samber/lo v1.49.1 // indirect
@@ -118,14 +119,11 @@ require (
 	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
-	github.com/tiendc/go-deepcopy v1.7.2 // indirect
+	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/wailsapp/go-webview2 v1.0.22 // indirect
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
-	github.com/xuri/efp v0.0.1 // indirect
-	github.com/xuri/excelize/v2 v2.10.1 // indirect
-	github.com/xuri/nfp v0.0.2-0.20250530014748-2ddeb826f9a9 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	github.com/yuin/goldmark v1.7.8 // indirect
 	github.com/yuin/goldmark-emoji v1.0.5 // indirect

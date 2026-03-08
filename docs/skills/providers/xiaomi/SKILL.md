@@ -1,27 +1,30 @@
 ---
 name: xiaomi
-description: "通过小米 MiMo（mimo-v2-flash）接入创宇太虚"
+description: "Use Xiaomi MiMo (mimo-v2-flash) with Crab Claw（蟹爪）"
 ---
 
-# 小米 MiMo
+# Xiaomi MiMo
 
-小米 MiMo 是 **MiMo** 模型的 API 平台。提供兼容 OpenAI 和 Anthropic 格式的 REST API，使用 API 密钥认证。在[小米 MiMo 控制台](https://platform.xiaomimimo.com/#/console/api-keys)创建 API 密钥。创宇太虚使用 `xiaomi` 供应商配合小米 MiMo API 密钥。
+Xiaomi MiMo is the API platform for **MiMo** models. It provides REST APIs compatible with
+OpenAI and Anthropic formats and uses API keys for authentication. Create your API key in
+the [Xiaomi MiMo console](https://platform.xiaomimimo.com/#/console/api-keys). Crab Claw（蟹爪） uses
+the `xiaomi` provider with a Xiaomi MiMo API key.
 
-## 模型概览
+## Model overview
 
-- **mimo-v2-flash**：262144 token 上下文窗口，兼容 Anthropic Messages API。
-- Base URL：`https://api.xiaomimimo.com/anthropic`
-- 认证：`Bearer $XIAOMI_API_KEY`
+- **mimo-v2-flash**: 262144-token context window, Anthropic Messages API compatible.
+- Base URL: `https://api.xiaomimimo.com/anthropic`
+- Authorization: `Bearer $XIAOMI_API_KEY`
 
-## CLI 设置
+## CLI setup
 
 ```bash
-openacosmi onboard --auth-choice xiaomi-api-key
-# 或非交互式
-openacosmi onboard --auth-choice xiaomi-api-key --xiaomi-api-key "$XIAOMI_API_KEY"
+crabclaw onboard --auth-choice xiaomi-api-key
+# or non-interactive
+crabclaw onboard --auth-choice xiaomi-api-key --xiaomi-api-key "$XIAOMI_API_KEY"
 ```
 
-## 配置示例
+## Config snippet
 
 ```json5
 {
@@ -51,8 +54,8 @@ openacosmi onboard --auth-choice xiaomi-api-key --xiaomi-api-key "$XIAOMI_API_KE
 }
 ```
 
-## 备注
+## Notes
 
-- 模型引用：`xiaomi/mimo-v2-flash`。
-- 当设置 `XIAOMI_API_KEY`（或存在认证配置）时，供应商会自动注入。
-- 供应商规则参见 [/concepts/model-providers](/concepts/model-providers)。
+- Model ref: `xiaomi/mimo-v2-flash`.
+- The provider is injected automatically when `XIAOMI_API_KEY` is set (or an auth profile exists).
+- See [/concepts/model-providers](/concepts/model-providers) for provider rules.

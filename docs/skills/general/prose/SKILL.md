@@ -1,39 +1,42 @@
 ---
 name: prose
-description: "OpenProse：散文工作流、斜杠命令与状态管理"
+description: "OpenProse: .prose workflows, slash commands, and state in Crab Claw（蟹爪）"
 ---
 
 # OpenProse
 
-OpenProse 是一种可移植的、以 Markdown 为核心的工作流格式，用于编排 AI 会话。在创宇太虚中，它作为插件提供，安装 OpenProse 技能包和 `/prose` 斜杠命令。程序保存在 `.prose` 文件中，可以生成多个子智能体并实现显式控制流。
+OpenProse is a portable, markdown-first workflow format for orchestrating AI sessions. In Crab Claw（蟹爪） it ships as a plugin that installs an OpenProse skill pack plus a `/prose` slash command. Programs live in `.prose` files and can spawn multiple sub-agents with explicit control flow.
 
-官方网站：[https://www.prose.md](https://www.prose.md)
+Primary Rust CLI name: `crabclaw`. Legacy installs may still expose the
+compatible `openacosmi` alias.
 
-## 功能
+Official site: [https://www.prose.md](https://www.prose.md)
 
-- 多智能体研究 + 综合，支持显式并行。
-- 可重复的审批安全工作流（代码审查、事件分类、内容管线）。
-- 可复用的 `.prose` 程序，可在多个支持的智能体运行时上运行。
+## What it can do
 
-## 安装与启用
+- Multi-agent research + synthesis with explicit parallelism.
+- Repeatable approval-safe workflows (code review, incident triage, content pipelines).
+- Reusable `.prose` programs you can run across supported agent runtimes.
 
-捆绑插件默认未启用。启用 OpenProse：
+## Install + enable
+
+Bundled plugins are disabled by default. Enable OpenProse:
 
 ```bash
-openacosmi plugins enable open-prose
+crabclaw plugins enable open-prose
 ```
 
-启用插件后重启网关。
+Restart the Gateway after enabling the plugin.
 
-开发/本地检出：`openacosmi plugins install -l ./extensions/open-prose`
+Dev/local checkout: `crabclaw plugins install -l ./extensions/open-prose`
 
-相关文档：[插件](/tools/plugin)、[插件清单](/plugins/manifest)、[技能](/tools/skills)。
+Related docs: [Plugins](/tools/plugin), [Plugin manifest](/plugins/manifest), [Skills](/tools/skills).
 
-## 斜杠命令
+## Slash command
 
-OpenProse 注册 `/prose` 为用户可调用的技能命令。它路由到 OpenProse VM 指令，底层使用创宇太虚工具。
+OpenProse registers `/prose` as a user-invocable skill command. It routes to the OpenProse VM instructions and uses Crab Claw（蟹爪） tools under the hood.
 
-常用命令：
+Common commands:
 
 ```
 /prose help
@@ -45,34 +48,34 @@ OpenProse 注册 `/prose` 为用户可调用的技能命令。它路由到 OpenP
 /prose update
 ```
 
-## 示例：一个简单的 `.prose` 文件
+## Example: a simple `.prose` file
 
 ```prose
-# 两个智能体并行研究 + 综合。
+# Research + synthesis with two agents running in parallel.
 
-input topic: "我们应该研究什么？"
+input topic: "What should we research?"
 
 agent researcher:
   model: sonnet
-  prompt: "你负责深入研究并引用来源。"
+  prompt: "You research thoroughly and cite sources."
 
 agent writer:
   model: opus
-  prompt: "你负责撰写简洁摘要。"
+  prompt: "You write a concise summary."
 
 parallel:
   findings = session: researcher
-    prompt: "研究 {topic}。"
+    prompt: "Research {topic}."
   draft = session: writer
-    prompt: "总结 {topic}。"
+    prompt: "Summarize {topic}."
 
-session "将研究结果和草稿合并为最终答案。"
+session "Merge the findings + draft into a final answer."
 context: { findings, draft }
 ```
 
-## 文件位置
+## File locations
 
-OpenProse 在工作区内的 `.prose/` 下保存状态：
+OpenProse keeps state under `.prose/` in your workspace:
 
 ```
 .prose/
@@ -86,45 +89,45 @@ OpenProse 在工作区内的 `.prose/` 下保存状态：
 └── agents/
 ```
 
-用户级持久化智能体存储在：
+User-level persistent agents live at:
 
 ```
 ~/.prose/agents/
 ```
 
-## 状态模式
+## State modes
 
-OpenProse 支持多种状态后端：
+OpenProse supports multiple state backends:
 
-- **filesystem**（默认）：`.prose/runs/...`
-- **in-context**：瞬态，适用于小程序
-- **sqlite**（实验性）：需要 `sqlite3` 二进制
-- **postgres**（实验性）：需要 `psql` 和连接字符串
+- **filesystem** (default): `.prose/runs/...`
+- **in-context**: transient, for small programs
+- **sqlite** (experimental): requires `sqlite3` binary
+- **postgres** (experimental): requires `psql` and a connection string
 
-注意事项：
+Notes:
 
-- sqlite/postgres 为可选启用的实验性功能。
-- postgres 凭据会写入子智能体日志；请使用专用的最低权限数据库。
+- sqlite/postgres are opt-in and experimental.
+- postgres credentials flow into subagent logs; use a dedicated, least-privileged DB.
 
-## 远程程序
+## Remote programs
 
-`/prose run <handle/slug>` 解析为 `https://p.prose.md/<handle>/<slug>`。
-直连 URL 按原样获取。这使用 `web_fetch` 工具（或 `exec` 用于 POST）。
+`/prose run <handle/slug>` resolves to `https://p.prose.md/<handle>/<slug>`.
+Direct URLs are fetched as-is. This uses the `web_fetch` tool (or `exec` for POST).
 
-## 创宇太虚运行时映射
+## Crab Claw（蟹爪） runtime mapping
 
-OpenProse 程序映射到创宇太虚原语：
+OpenProse programs map to Crab Claw（蟹爪） primitives:
 
-| OpenProse 概念             | 创宇太虚工具    |
-| ------------------------- | -------------- |
-| 生成会话 / Task 工具        | `sessions_spawn` |
-| 文件读写                    | `read` / `write` |
-| 网页获取                    | `web_fetch`      |
+| OpenProse concept         | Crab Claw（蟹爪） tool    |
+| ------------------------- | ---------------- |
+| Spawn session / Task tool | `sessions_spawn` |
+| File read/write           | `read` / `write` |
+| Web fetch                 | `web_fetch`      |
 
-若工具白名单禁止了这些工具，OpenProse 程序将无法运行。详见 [技能配置](/tools/skills-config)。
+If your tool allowlist blocks these tools, OpenProse programs will fail. See [Skills config](/tools/skills-config).
 
-## 安全与审批
+## Security + approvals
 
-应像对待代码一样对待 `.prose` 文件。运行前请先审查。使用创宇太虚的工具白名单和审批门控来控制副作用。
+Treat `.prose` files like code. Review before running. Use Crab Claw（蟹爪） tool allowlists and approval gates to control side effects.
 
-对于确定性的、带审批门控的工作流，可对比 [Lobster](/tools/lobster)。
+For deterministic, approval-gated workflows, compare with [Lobster](/tools/lobster).

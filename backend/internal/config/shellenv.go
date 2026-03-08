@@ -113,17 +113,17 @@ func LoadShellEnvFallback(opts ShellEnvFallbackOptions) ShellEnvFallbackResult {
 
 // ShouldEnableShellEnvFallback 检查是否应启用 shell 环境回退
 func ShouldEnableShellEnvFallback() bool {
-	return utils.IsTruthy(os.Getenv("OPENACOSMI_LOAD_SHELL_ENV"))
+	return utils.IsTruthy(compatEnvValue("CRABCLAW_LOAD_SHELL_ENV", "OPENACOSMI_LOAD_SHELL_ENV"))
 }
 
 // ShouldDeferShellEnvFallback 检查是否应延迟 shell 环境回退
 func ShouldDeferShellEnvFallback() bool {
-	return utils.IsTruthy(os.Getenv("OPENACOSMI_DEFER_SHELL_ENV_FALLBACK"))
+	return utils.IsTruthy(compatEnvValue("CRABCLAW_DEFER_SHELL_ENV_FALLBACK", "OPENACOSMI_DEFER_SHELL_ENV_FALLBACK"))
 }
 
 // ResolveShellEnvFallbackTimeoutMs 解析 shell 环境回退的超时时间
 func ResolveShellEnvFallbackTimeoutMs() int {
-	raw := strings.TrimSpace(os.Getenv("OPENACOSMI_SHELL_ENV_TIMEOUT_MS"))
+	raw := compatEnvValue("CRABCLAW_SHELL_ENV_TIMEOUT_MS", "OPENACOSMI_SHELL_ENV_TIMEOUT_MS")
 	if raw == "" {
 		return defaultShellEnvTimeoutMs
 	}
@@ -193,6 +193,15 @@ func resolveShell() string {
 		return shell
 	}
 	return "/bin/sh"
+}
+
+func compatEnvValue(keys ...string) string {
+	for _, key := range keys {
+		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 // execShellEnv 执行登录 shell 获取环境变量

@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul 2>&1
-title OpenAcosmi 快速启动
+title CrabClaw 快速启动
 
 echo.
 echo ╔══════════════════════════════════════════╗
-echo ║          OpenAcosmi  快速启动            ║
+echo ║          CrabClaw  快速启动              ║
 echo ╚══════════════════════════════════════════╝
 echo.
 

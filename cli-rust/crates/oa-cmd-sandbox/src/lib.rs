@@ -1,6 +1,6 @@
 pub mod display;
 pub mod explain;
-/// Sandbox management commands for Claw Acosmi CLI.
+/// Sandbox management commands for Crab Claw CLI.
 ///
 /// Provides subcommands for listing, recreating, and explaining sandbox
 /// container state and configuration.

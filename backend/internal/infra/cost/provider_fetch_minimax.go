@@ -10,12 +10,16 @@ import (
 	"math"
 )
 
-func fetchMinimaxUsage(ctx context.Context, auth ProviderAuth) (*ProviderUsageSnapshot, error) {
-	hdrs := map[string]string{
+func minimaxUsageHeaders(auth ProviderAuth) map[string]string {
+	return map[string]string{
 		"Authorization": "Bearer " + auth.Token,
 		"Content-Type":  "application/json",
 		"MM-API-Source": "OpenAcosmi",
 	}
+}
+
+func fetchMinimaxUsage(ctx context.Context, auth ProviderAuth) (*ProviderUsageSnapshot, error) {
+	hdrs := minimaxUsageHeaders(auth)
 	resp, err := fetchJSON(ctx, "GET", "https://api.minimaxi.com/v1/api/openplatform/coding_plan/remains", hdrs, "")
 	if err != nil {
 		return errSnapshot(ProviderMinimax, err.Error()), nil

@@ -13,6 +13,15 @@ import (
 	"strings"
 )
 
+const (
+	HeaderToken         = "X-CrabClaw-Token"
+	HeaderLegacyToken   = "X-OpenAcosmi-Token"
+	HeaderAgentID       = "X-CrabClaw-Agent-Id"
+	HeaderLegacyAgentID = "X-OpenAcosmi-Agent-Id"
+	HeaderAgent         = "X-CrabClaw-Agent"
+	HeaderLegacyAgent   = "X-OpenAcosmi-Agent"
+)
+
 // ---------- IP 地址工具 ----------
 
 // IsLoopbackAddress 判断 IP 是否为回环地址（127.x.x.x / ::1 / ::ffff:127.x）。
@@ -309,6 +318,24 @@ func GetBearerToken(r *http.Request) string {
 	}
 	token := strings.TrimSpace(raw[7:])
 	return token
+}
+
+// GetCompatHeader 按顺序读取兼容 header 名，返回首个非空值。
+func GetCompatHeader(r *http.Request, names ...string) string {
+	for _, name := range names {
+		if value := strings.TrimSpace(GetHeader(r, name)); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+// GetGatewayToken 从 Authorization 或兼容 token header 提取网关认证 token。
+func GetGatewayToken(r *http.Request) string {
+	if token := GetBearerToken(r); token != "" {
+		return token
+	}
+	return GetCompatHeader(r, HeaderToken, HeaderLegacyToken)
 }
 
 // GetHostName 从 Host 头提取主机名（去端口、去 IPv6 括号）。

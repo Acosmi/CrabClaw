@@ -109,6 +109,7 @@ func TestLoadDotEnvFile_MissingFile(t *testing.T) {
 
 func TestResolveCliChannelOptions_Default(t *testing.T) {
 	os.Unsetenv("OPENACOSMI_EAGER_CHANNEL_OPTIONS")
+	os.Unsetenv("CRABCLAW_EAGER_CHANNEL_OPTIONS")
 	opts := ResolveCliChannelOptions()
 	if len(opts) != 6 {
 		t.Fatalf("expected 6 channels, got %d: %v", len(opts), opts)
@@ -120,6 +121,7 @@ func TestResolveCliChannelOptions_Default(t *testing.T) {
 
 func TestFormatChannelOptions_WithExtra(t *testing.T) {
 	os.Unsetenv("OPENACOSMI_EAGER_CHANNEL_OPTIONS")
+	os.Unsetenv("CRABCLAW_EAGER_CHANNEL_OPTIONS")
 	result := FormatChannelOptions("custom")
 	if result == "" {
 		t.Fatal("empty result")
@@ -161,6 +163,7 @@ func TestTryRouteCli_HelpSkipped(t *testing.T) {
 func TestTryRouteCli_Matched(t *testing.T) {
 	ClearRoutedCommandsForTest()
 	os.Unsetenv("OPENACOSMI_DISABLE_ROUTE_FIRST")
+	os.Unsetenv("CRABCLAW_DISABLE_ROUTE_FIRST")
 
 	called := false
 	RegisterRoutedCommand([]string{"msg"}, RoutedCommandHandler{
@@ -202,6 +205,7 @@ func TestTryRouteCli_DisabledByEnv(t *testing.T) {
 func TestTryRouteCli_TwoLevelMatch(t *testing.T) {
 	ClearRoutedCommandsForTest()
 	os.Unsetenv("OPENACOSMI_DISABLE_ROUTE_FIRST")
+	os.Unsetenv("CRABCLAW_DISABLE_ROUTE_FIRST")
 
 	called := false
 	RegisterRoutedCommand([]string{"msg", "send"}, RoutedCommandHandler{
@@ -217,6 +221,25 @@ func TestTryRouteCli_TwoLevelMatch(t *testing.T) {
 	}
 	if !routed || !called {
 		t.Error("expected 2-level route match")
+	}
+	ClearRoutedCommandsForTest()
+}
+
+func TestTryRouteCli_DisabledByCrabClawEnv(t *testing.T) {
+	ClearRoutedCommandsForTest()
+	RegisterRoutedCommand([]string{"test"}, RoutedCommandHandler{
+		Run: func(argv []string) (bool, error) { return true, nil },
+	})
+
+	os.Setenv("CRABCLAW_DISABLE_ROUTE_FIRST", "1")
+	defer os.Unsetenv("CRABCLAW_DISABLE_ROUTE_FIRST")
+
+	routed, err := TryRouteCli([]string{"test"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if routed {
+		t.Error("expected false when CRABCLAW_DISABLE_ROUTE_FIRST=1")
 	}
 	ClearRoutedCommandsForTest()
 }
@@ -281,6 +304,14 @@ func TestResolveProfile_Empty(t *testing.T) {
 	}
 	if profile != "" {
 		t.Errorf("expected empty profile, got %q", profile)
+	}
+}
+
+func TestResolveStateDirPrefersCrabClawEnv(t *testing.T) {
+	t.Setenv("OPENACOSMI_STATE_DIR", "/tmp/open-state")
+	t.Setenv("CRABCLAW_STATE_DIR", "/tmp/crab-state")
+	if got := ResolveStateDir(""); got != "/tmp/crab-state" {
+		t.Fatalf("got %q, want %q", got, "/tmp/crab-state")
 	}
 }
 

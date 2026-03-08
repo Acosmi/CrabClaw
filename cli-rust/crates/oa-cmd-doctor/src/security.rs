@@ -5,7 +5,6 @@
 /// inspects channel DM policies for open / wildcard settings.
 ///
 /// Source: `src/commands/doctor-security.ts`
-
 use oa_cli_shared::command_format::format_cli_command;
 use oa_terminal::note::note;
 use oa_types::config::OpenAcosmiConfig;
@@ -15,10 +14,7 @@ use oa_types::gateway::{GatewayAuthMode, GatewayBindMode};
 ///
 /// Source: `src/commands/doctor-security.ts` — via `isLoopbackHost`
 fn is_loopback_host(host: &str) -> bool {
-    host == "127.0.0.1"
-        || host.starts_with("127.")
-        || host == "::1"
-        || host == "localhost"
+    host == "127.0.0.1" || host.starts_with("127.") || host == "::1" || host == "localhost"
 }
 
 /// Resolve the effective gateway bind host from the configured bind mode.
@@ -31,9 +27,7 @@ fn resolve_gateway_bind_host(
     match bind_mode {
         Some(GatewayBindMode::Loopback) | None => "127.0.0.1".to_string(),
         Some(GatewayBindMode::Lan) | Some(GatewayBindMode::Auto) => "0.0.0.0".to_string(),
-        Some(GatewayBindMode::Custom) => {
-            custom_host.unwrap_or("0.0.0.0").to_string()
-        }
+        Some(GatewayBindMode::Custom) => custom_host.unwrap_or("0.0.0.0").to_string(),
         Some(GatewayBindMode::Tailnet) => "100.0.0.1".to_string(), // Tailscale range
     }
 }
@@ -45,14 +39,11 @@ pub async fn note_security_warnings(cfg: &OpenAcosmiConfig) {
     let mut warnings: Vec<String> = Vec::new();
     let audit_hint = format!(
         "- Run: {}",
-        format_cli_command("openacosmi security audit --deep")
+        format_cli_command("crabclaw security audit --deep")
     );
 
     // ── Gateway network exposure ──
-    let gateway_bind = cfg
-        .gateway
-        .as_ref()
-        .and_then(|gw| gw.bind.as_ref());
+    let gateway_bind = cfg.gateway.as_ref().and_then(|gw| gw.bind.as_ref());
     let custom_bind_host = cfg
         .gateway
         .as_ref()
@@ -85,22 +76,22 @@ pub async fn note_security_warnings(cfg: &OpenAcosmiConfig) {
                 vec![
                     format!(
                         "  Fix: {} to set a password",
-                        format_cli_command("openacosmi configure")
+                        format_cli_command("crabclaw configure")
                     ),
                     format!(
                         "  Or switch to token: {}",
-                        format_cli_command("openacosmi config set gateway.auth.mode token")
+                        format_cli_command("crabclaw config set gateway.auth.mode token")
                     ),
                 ]
             } else {
                 vec![
                     format!(
                         "  Fix: {} to generate a token",
-                        format_cli_command("openacosmi doctor --fix")
+                        format_cli_command("crabclaw doctor --fix")
                     ),
                     format!(
                         "  Or set token directly: {}",
-                        format_cli_command("openacosmi config set gateway.auth.mode token")
+                        format_cli_command("crabclaw config set gateway.auth.mode token")
                     ),
                 ]
             };
@@ -113,16 +104,14 @@ pub async fn note_security_warnings(cfg: &OpenAcosmiConfig) {
             );
             warnings.push(format!(
                 "  Fix: {}",
-                format_cli_command("openacosmi config set gateway.bind loopback")
+                format_cli_command("crabclaw config set gateway.bind loopback")
             ));
             warnings.extend(auth_fix);
         } else {
             warnings.push(format!(
                 "- WARNING: Gateway bound to {bind_descriptor} (network-accessible)."
             ));
-            warnings.push(
-                "  Ensure your auth credentials are strong and not exposed.".to_string(),
-            );
+            warnings.push("  Ensure your auth credentials are strong and not exposed.".to_string());
         }
     }
 

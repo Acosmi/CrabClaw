@@ -1,5 +1,6 @@
 import type { EventLogEntry } from "./app-events.ts";
 import type { AgentProgress, CompactionStatus } from "./app-tool-stream.ts";
+import type { ChatReadonlyRunState, ChatUxMode } from "./chat/readonly-run-state.ts";
 import type { DevicePairingList } from "./controllers/devices.ts";
 import type { CoderConfirmRequest } from "./controllers/coder-confirmation.ts";
 import type { EscalationState } from "./controllers/escalation.ts";
@@ -79,6 +80,8 @@ export type AppViewState = {
   voiceSupported: boolean;
   chatMessages: unknown[];
   chatToolMessages: unknown[];
+  chatUxMode: ChatUxMode;
+  chatReadonlyRun: ChatReadonlyRunState;
   chatStream: string | null;
   chatStreamStartedAt: number | null;
   chatRunId: string | null;
@@ -90,6 +93,7 @@ export type AppViewState = {
   nodesLoading: boolean;
   nodes: Array<Record<string, unknown>>;
   chatNewMessagesBelow: boolean;
+  browserExtBannerDismissed: boolean;
   sidebarOpen: boolean;
   sidebarContent: string | null;
   sidebarError: string | null;
@@ -290,6 +294,9 @@ export type AppViewState = {
   subagentsBusyKey: string | null;
   /** @deprecated 子智能体选择已由 agentsSelectedId 管理，保留用于向后兼容 */
   subagentsActiveTab: string;
+  // Chat model selector — loaded on connect for composer dropdown
+  chatModels: Array<{ id: string; name: string; provider: string; source: string }>;
+  chatCurrentModel: string | null;
   debugLoading: boolean;
   debugStatus: StatusSummary | null;
   debugHealth: HealthSnapshot | null;
@@ -437,7 +444,7 @@ export type AppViewState = {
   taskKanbanState: import("./controllers/task-kanban.js").TaskKanbanState;
 
   // Plugins & Tools
-  pluginsPanel: "plugins" | "tools" | "skills";
+  pluginsPanel: "plugins" | "tools" | "skills" | "packages";
   pluginsLoading: boolean;
   pluginsList: PluginInfo[];
   pluginsError: string | null;
@@ -451,6 +458,15 @@ export type AppViewState = {
   browserToolSaving: boolean;
   browserToolError: string | null;
   browserToolEdits: Record<string, string | boolean>;
+
+  // App Center (packages)
+  packagesLoading: boolean;
+  packagesItems: import("./types.js").PackageCatalogItem[];
+  packagesTotal: number;
+  packagesError: string | null;
+  packagesKindFilter: import("./types.js").PackageKind | "all";
+  packagesKeyword: string;
+  packagesBusyId: string | null;
 
   // MCP Local Servers
   mcpServersLoading: boolean;

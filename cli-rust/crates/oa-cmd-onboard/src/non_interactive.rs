@@ -4,18 +4,18 @@
 /// `--mode` flag. Validates config state before proceeding.
 ///
 /// Source: `src/commands/onboard-non-interactive.ts`
-
 use anyhow::Result;
 use tracing::info;
 
+use oa_cli_shared::command_format::format_cli_command;
 use oa_config::io::{read_config_file_snapshot, write_config_file};
 use oa_types::config::OpenAcosmiConfig;
 use oa_types::gateway::{
-    GatewayAuthMode, GatewayBindMode, GatewayMode,
-    GatewayRemoteConfig, GatewayTailscaleConfig, GatewayTailscaleMode,
+    GatewayAuthMode, GatewayBindMode, GatewayMode, GatewayRemoteConfig, GatewayTailscaleConfig,
+    GatewayTailscaleMode,
 };
 
-use crate::helpers::{random_token, resolve_user_path, DEFAULT_WORKSPACE};
+use crate::helpers::{DEFAULT_WORKSPACE, random_token, resolve_user_path};
 use crate::types::OnboardOptions;
 
 /// Run non-interactive onboarding for a local gateway.
@@ -57,10 +57,7 @@ async fn run_non_interactive_local(
     match auth_mode {
         "token" => {
             auth.mode = Some(GatewayAuthMode::Token);
-            let token = opts
-                .gateway_token
-                .clone()
-                .unwrap_or_else(random_token);
+            let token = opts.gateway_token.clone().unwrap_or_else(random_token);
             auth.token = Some(token);
         }
         "password" => {
@@ -92,10 +89,7 @@ async fn run_non_interactive_local(
     cfg.gateway = Some(gw);
 
     // Apply workspace
-    let workspace = opts
-        .workspace
-        .as_deref()
-        .unwrap_or(DEFAULT_WORKSPACE);
+    let workspace = opts.workspace.as_deref().unwrap_or(DEFAULT_WORKSPACE);
     let resolved_workspace = resolve_user_path(workspace);
 
     let mut agents = cfg.agents.unwrap_or_default();
@@ -121,10 +115,7 @@ async fn run_non_interactive_remote(
 ) -> Result<()> {
     let mut cfg = base_config;
 
-    let remote_url = opts
-        .remote_url
-        .as_deref()
-        .unwrap_or("ws://127.0.0.1:19001");
+    let remote_url = opts.remote_url.as_deref().unwrap_or("ws://127.0.0.1:19001");
     let remote_token = opts.remote_token.clone();
 
     let mut gw = cfg.gateway.unwrap_or_default();
@@ -151,9 +142,8 @@ pub async fn run_non_interactive_onboarding(opts: &OnboardOptions) -> Result<()>
     let snapshot = read_config_file_snapshot().await?;
 
     if snapshot.exists && !snapshot.valid {
-        anyhow::bail!(
-            "Config invalid. Run `openacosmi doctor` to repair it, then re-run onboarding."
-        );
+        let repair_cmd = format_cli_command("crabclaw doctor");
+        anyhow::bail!("Config invalid. Run `{repair_cmd}` to repair it, then re-run onboarding.");
     }
 
     let base_config = if snapshot.valid {

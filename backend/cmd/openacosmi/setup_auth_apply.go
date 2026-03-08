@@ -101,9 +101,9 @@ func ApplyAuthChoice(params ApplyAuthChoiceParams) (*ApplyAuthChoiceResult, erro
 		}
 		return result, err
 
-	// Claw Acosmi Zen
+	// Crab Claw Zen
 	case AuthChoiceAcosmiZen:
-		return applyGenericApiKey(params, "openacosmi", "OPENACOSMI_API_KEY", "Enter Claw Acosmi Zen API key")
+		return applyGenericApiKey(params, "openacosmi", "OPENACOSMI_API_KEY", "Enter Crab Claw Zen API key")
 
 	// OAuth-only providers
 	case AuthChoiceQwenPortal:
@@ -203,7 +203,7 @@ func applyOAuthPlaceholder(params ApplyAuthChoiceParams, provider, label string)
 	if providerConfig == nil {
 		// 对于未注册 OAuth 端点的 provider，回退到提示信息
 		params.Prompter.Note(
-			fmt.Sprintf("%s requires browser-based OAuth.\nPlease use `openacosmi onboard --provider %s` when the gateway is running.", label, provider),
+			fmt.Sprintf("%s requires browser-based OAuth.\nPlease use `crabclaw onboard --provider %s` when the gateway is running.", label, provider),
 			label,
 		)
 		profileID := auth.FormatProfileId(provider, "default")
@@ -240,7 +240,7 @@ func applyOAuthPlaceholder(params ApplyAuthChoiceParams, provider, label string)
 		// OAuth 失败 — 明确报错，不写入空 profile
 		slog.Warn("OAuth web flow failed", "provider", provider, "error", err)
 		params.Prompter.Note(
-			fmt.Sprintf("OAuth authorization failed: %v\nYou can retry with `openacosmi onboard --provider %s`", err, provider),
+			fmt.Sprintf("OAuth authorization failed: %v\nYou can retry with `crabclaw onboard --provider %s`", err, provider),
 			label,
 		)
 		return nil, fmt.Errorf("OAuth authorization for %s failed: %w", label, err)

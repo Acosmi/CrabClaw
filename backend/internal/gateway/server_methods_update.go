@@ -125,7 +125,7 @@ func handleUpdateRun(ctx *MethodHandlerContext) {
 // ---------- 辅助 ----------
 
 func resolveCurrentVersion() string {
-	v := os.Getenv("OPENACOSMI_VERSION")
+	v := preferredGatewayEnvValue("CRABCLAW_VERSION", "OPENACOSMI_VERSION")
 	if v != "" {
 		return v
 	}
@@ -133,7 +133,7 @@ func resolveCurrentVersion() string {
 }
 
 func resolveDefaultStateDir() string {
-	dir := os.Getenv("OPENACOSMI_STATE_DIR")
+	dir := preferredGatewayEnvValue("CRABCLAW_STATE_DIR", "OPENACOSMI_STATE_DIR")
 	if dir != "" {
 		return dir
 	}
@@ -142,7 +142,7 @@ func resolveDefaultStateDir() string {
 }
 
 func resolveProjectRoot() string {
-	dir := os.Getenv("OPENACOSMI_PROJECT_ROOT")
+	dir := preferredGatewayEnvValue("CRABCLAW_PROJECT_ROOT", "OPENACOSMI_PROJECT_ROOT")
 	if dir != "" {
 		return dir
 	}

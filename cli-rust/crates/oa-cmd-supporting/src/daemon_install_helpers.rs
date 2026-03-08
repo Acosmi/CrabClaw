@@ -109,11 +109,13 @@ pub async fn build_gateway_install_plan(
     }
 
     // Service-specific vars (higher priority).
+    environment.insert("CRABCLAW_GATEWAY_PORT".to_owned(), params.port.to_string());
     environment.insert(
         "OPENACOSMI_GATEWAY_PORT".to_owned(),
         params.port.to_string(),
     );
     if let Some(ref token) = params.token {
+        environment.insert("CRABCLAW_GATEWAY_TOKEN".to_owned(), token.clone());
         environment.insert("OPENACOSMI_GATEWAY_TOKEN".to_owned(), token.clone());
     }
 
@@ -138,7 +140,7 @@ pub fn gateway_install_error_hint(platform: &str) -> String {
     if platform == "win32" || platform == "windows" {
         "Tip: rerun from an elevated PowerShell (Start -> type PowerShell -> right-click -> Run as administrator) or skip service install.".to_owned()
     } else {
-        let cmd = format_cli_command("openacosmi gateway install");
+        let cmd = format_cli_command("crabclaw gateway install");
         format!("Tip: rerun `{cmd}` after fixing the error.")
     }
 }
@@ -187,7 +189,7 @@ mod tests {
     #[test]
     fn error_hint_unix() {
         let hint = gateway_install_error_hint("linux");
-        assert!(hint.contains("openacosmi gateway install"));
+        assert!(hint.contains("gateway install"));
     }
 
     #[test]
@@ -211,8 +213,16 @@ mod tests {
             .await
             .expect("should build plan");
         assert_eq!(
+            plan.environment.get("CRABCLAW_GATEWAY_PORT"),
+            Some(&"8080".to_owned())
+        );
+        assert_eq!(
             plan.environment.get("OPENACOSMI_GATEWAY_PORT"),
             Some(&"8080".to_owned())
+        );
+        assert_eq!(
+            plan.environment.get("CRABCLAW_GATEWAY_TOKEN"),
+            Some(&"test-token".to_owned())
         );
         assert_eq!(
             plan.environment.get("OPENACOSMI_GATEWAY_TOKEN"),

@@ -5056,7 +5056,7 @@ export function renderUsage(props: UsageProps) {
                   class="usage-export-item"
                   @click=${() =>
       downloadTextFile(
-        `openacosmi-usage-sessions-${exportStamp}.csv`,
+        `crabclaw-usage-sessions-${exportStamp}.csv`,
         buildSessionsCsv(filteredSessions),
         "text/csv",
       )}
@@ -5068,7 +5068,7 @@ export function renderUsage(props: UsageProps) {
                   class="usage-export-item"
                   @click=${() =>
       downloadTextFile(
-        `openacosmi-usage-daily-${exportStamp}.csv`,
+        `crabclaw-usage-daily-${exportStamp}.csv`,
         buildDailyCsv(filteredDaily),
         "text/csv",
       )}
@@ -5080,7 +5080,7 @@ export function renderUsage(props: UsageProps) {
                   class="usage-export-item"
                   @click=${() =>
       downloadTextFile(
-        `openacosmi-usage-${exportStamp}.json`,
+        `crabclaw-usage-${exportStamp}.json`,
         JSON.stringify(
           {
             totals: displayTotals,

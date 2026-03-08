@@ -80,7 +80,7 @@ func TestManagerParsePrefixedToolName(t *testing.T) {
 	}{
 		{"mcp_myserver_read", "myserver", "read", false},
 		{"mcp_my-server_tool_name", "my-server", "tool_name", false},
-		{"remote_foo", "", "", true},       // wrong prefix
+		{"remote_foo", "", "", true},             // wrong prefix
 		{"mcp_nounderscoresuffix", "", "", true}, // no tool separator
 	}
 	for _, tt := range tests {

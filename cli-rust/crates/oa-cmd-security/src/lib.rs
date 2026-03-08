@@ -1,8 +1,7 @@
-/// Security audit and management commands for Claw Acosmi CLI.
+/// Security audit and management commands for Crab Claw CLI.
 ///
 /// Provides `security` subcommands: audit.
 /// Delegates to Gateway RPC: `security.get`.
-
 use anyhow::Result;
 use clap::Parser;
 

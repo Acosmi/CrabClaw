@@ -1,10 +1,20 @@
 /// Gateway probe authentication and self-presence resolution.
 ///
 /// Source: `src/commands/status.gateway-probe.ts`
-
 use oa_types::config::OpenAcosmiConfig;
 
 use crate::format::GatewayProbeAuth;
+
+fn preferred_gateway_auth_env<F>(getenv: F, keys: &[&str]) -> Option<String>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    keys.iter().find_map(|key| {
+        getenv(key)
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+    })
+}
 
 /// Resolve authentication credentials for probing the gateway.
 ///
@@ -46,17 +56,17 @@ pub fn resolve_gateway_probe_auth(cfg: &OpenAcosmiConfig) -> GatewayProbeAuth {
             .filter(|s| !s.is_empty())
             .map(String::from)
     } else {
-        std::env::var("OPENACOSMI_GATEWAY_TOKEN")
-            .ok()
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .or(auth_token)
+        preferred_gateway_auth_env(
+            |key| std::env::var(key).ok(),
+            &["CRABCLAW_GATEWAY_TOKEN", "OPENACOSMI_GATEWAY_TOKEN"],
+        )
+        .or(auth_token)
     };
 
-    let env_password = std::env::var("OPENACOSMI_GATEWAY_PASSWORD")
-        .ok()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty());
+    let env_password = preferred_gateway_auth_env(
+        |key| std::env::var(key).ok(),
+        &["CRABCLAW_GATEWAY_PASSWORD", "OPENACOSMI_GATEWAY_PASSWORD"],
+    );
 
     let password = env_password.or_else(|| {
         if is_remote {
@@ -96,10 +106,7 @@ pub fn pick_gateway_self_presence(
     })?;
     let obj = entry.as_object()?;
     Some(GatewaySelfPresence {
-        host: obj
-            .get("host")
-            .and_then(|v| v.as_str())
-            .map(String::from),
+        host: obj.get("host").and_then(|v| v.as_str()).map(String::from),
         ip: obj.get("ip").and_then(|v| v.as_str()).map(String::from),
         version: obj
             .get("version")
@@ -135,6 +142,7 @@ pub struct GatewaySelfPresence {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn resolve_auth_default_config() {
@@ -182,6 +190,26 @@ mod tests {
         // so config values should be used.
         assert!(auth.token.is_some());
         assert!(auth.password.is_some());
+    }
+
+    #[test]
+    fn resolve_auth_local_mode_prefers_crabclaw_env() {
+        let env = HashMap::from([
+            ("OPENACOSMI_GATEWAY_TOKEN", "old-token"),
+            ("CRABCLAW_GATEWAY_TOKEN", "new-token"),
+            ("OPENACOSMI_GATEWAY_PASSWORD", "old-pass"),
+            ("CRABCLAW_GATEWAY_PASSWORD", "new-pass"),
+        ]);
+        let token = preferred_gateway_auth_env(
+            |key| env.get(key).map(|value| (*value).to_string()),
+            &["CRABCLAW_GATEWAY_TOKEN", "OPENACOSMI_GATEWAY_TOKEN"],
+        );
+        let password = preferred_gateway_auth_env(
+            |key| env.get(key).map(|value| (*value).to_string()),
+            &["CRABCLAW_GATEWAY_PASSWORD", "OPENACOSMI_GATEWAY_PASSWORD"],
+        );
+        assert_eq!(token.as_deref(), Some("new-token"));
+        assert_eq!(password.as_deref(), Some("new-pass"));
     }
 
     #[test]

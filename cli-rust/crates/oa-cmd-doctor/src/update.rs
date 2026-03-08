@@ -5,9 +5,8 @@
 /// manager for non-git installs.
 ///
 /// Source: `src/commands/doctor-update.ts`
-
 use oa_cli_shared::command_format::format_cli_command;
-use oa_infra::env::is_truthy_env_value;
+use oa_infra::env::{is_truthy_env_value, preferred_env_value};
 use oa_terminal::note::note;
 
 use crate::prompter::DoctorOptions;
@@ -56,11 +55,14 @@ async fn detect_git_checkout(root: &str) -> &'static str {
 /// Offer to update OpenAcosmi from git (or note the package-manager update path).
 ///
 /// Source: `src/commands/doctor-update.ts` — `maybeOfferUpdateBeforeDoctor`
-pub async fn maybe_offer_update_before_doctor(
-    options: &DoctorOptions,
-) -> UpdateResult {
-    let update_in_progress =
-        is_truthy_env_value(std::env::var("OPENACOSMI_UPDATE_IN_PROGRESS").ok().as_deref());
+pub async fn maybe_offer_update_before_doctor(options: &DoctorOptions) -> UpdateResult {
+    let update_in_progress = is_truthy_env_value(
+        preferred_env_value(&[
+            "CRABCLAW_UPDATE_IN_PROGRESS",
+            "OPENACOSMI_UPDATE_IN_PROGRESS",
+        ])
+        .as_deref(),
+    );
 
     let can_offer = !update_in_progress
         && options.non_interactive != Some(true)
@@ -87,7 +89,7 @@ pub async fn maybe_offer_update_before_doctor(
             &format!(
                 "This install is not a git checkout.\n\
                  Run `{}` to update via your package manager (npm/pnpm), then rerun doctor.",
-                format_cli_command("openacosmi update")
+                format_cli_command("crabclaw update")
             ),
             Some("Update"),
         );

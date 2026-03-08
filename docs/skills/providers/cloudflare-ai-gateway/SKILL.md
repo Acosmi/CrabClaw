@@ -1,28 +1,28 @@
 ---
 name: cloudflare-ai-gateway
-description: "Cloudflare AI Gateway 设置（认证 + 模型选择）"
+description: "Cloudflare AI Gateway setup (auth + model selection)"
 ---
 
 # Cloudflare AI Gateway
 
-Cloudflare AI Gateway 置于供应商 API 前端，支持添加分析、缓存和控制。对于 Anthropic，创宇太虚通过你的 Gateway 端点使用 Anthropic Messages API。
+Cloudflare AI Gateway sits in front of provider APIs and lets you add analytics, caching, and controls. For Anthropic, Crab Claw（蟹爪） uses the Anthropic Messages API through your Gateway endpoint.
 
-- 供应商：`cloudflare-ai-gateway`
-- Base URL：`https://gateway.ai.cloudflare.com/v1/<account_id>/<gateway_id>/anthropic`
-- 默认模型：`cloudflare-ai-gateway/claude-sonnet-4-5`
-- API 密钥：`CLOUDFLARE_AI_GATEWAY_API_KEY`（通过 Gateway 发送请求的供应商 API 密钥）
+- Provider: `cloudflare-ai-gateway`
+- Base URL: `https://gateway.ai.cloudflare.com/v1/<account_id>/<gateway_id>/anthropic`
+- Default model: `cloudflare-ai-gateway/claude-sonnet-4-5`
+- API key: `CLOUDFLARE_AI_GATEWAY_API_KEY` (your provider API key for requests through the Gateway)
 
-对于 Anthropic 模型，使用你的 Anthropic API 密钥。
+For Anthropic models, use your Anthropic API key.
 
-## 快速开始
+## Quick start
 
-1. 设置供应商 API 密钥和 Gateway 信息：
+1. Set the provider API key and Gateway details:
 
 ```bash
-openacosmi onboard --auth-choice cloudflare-ai-gateway-api-key
+crabclaw onboard --auth-choice cloudflare-ai-gateway-api-key
 ```
 
-1. 设置默认模型：
+2. Set a default model:
 
 ```json5
 {
@@ -34,10 +34,10 @@ openacosmi onboard --auth-choice cloudflare-ai-gateway-api-key
 }
 ```
 
-## 非交互式示例
+## Non-interactive example
 
 ```bash
-openacosmi onboard --non-interactive \
+crabclaw onboard --non-interactive \
   --mode local \
   --auth-choice cloudflare-ai-gateway-api-key \
   --cloudflare-ai-gateway-account-id "your-account-id" \
@@ -45,9 +45,9 @@ openacosmi onboard --non-interactive \
   --cloudflare-ai-gateway-api-key "$CLOUDFLARE_AI_GATEWAY_API_KEY"
 ```
 
-## 需认证的 Gateway
+## Authenticated gateways
 
-若在 Cloudflare 中启用了 Gateway 认证，需添加 `cf-aig-authorization` 头（这是在供应商 API 密钥之外的额外认证）。
+If you enabled Gateway authentication in Cloudflare, add the `cf-aig-authorization` header (this is in addition to your provider API key).
 
 ```json5
 {
@@ -63,6 +63,6 @@ openacosmi onboard --non-interactive \
 }
 ```
 
-## 环境说明
+## Environment note
 
-若网关作为守护进程（launchd/systemd）运行，确保 `CLOUDFLARE_AI_GATEWAY_API_KEY` 对该进程可用（例如在 `~/.openacosmi/.env` 中或通过 `env.shellEnv`）。
+If the Gateway runs as a daemon (launchd/systemd), make sure `CLOUDFLARE_AI_GATEWAY_API_KEY` is available to that process (for example, in `~/.openacosmi/.env` or via `env.shellEnv`).

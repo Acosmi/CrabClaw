@@ -4,7 +4,6 @@
 /// channels, agents, services, logs, and diagnosis.
 ///
 /// Source: `src/commands/status-all.ts`, `src/commands/status-all/*.ts`
-
 use anyhow::Result;
 
 use oa_cli_shared::command_format::format_cli_command;
@@ -15,7 +14,7 @@ use crate::format::{
     format_duration, format_gateway_auth_used, format_time_ago, redact_secrets, shorten_text,
 };
 use crate::gateway_probe::resolve_gateway_probe_auth;
-use crate::scan::{scan_status, StatusScanResult};
+use crate::scan::{StatusScanResult, scan_status};
 
 /// Execute the status --all command.
 ///
@@ -34,7 +33,7 @@ async fn build_status_all_lines(scan: &StatusScanResult) -> Vec<String> {
     let mut lines: Vec<String> = Vec::new();
 
     // Heading.
-    lines.push(Theme::heading("OpenAcosmi status --all"));
+    lines.push(Theme::heading("Crab Claw status --all"));
     lines.push(String::new());
 
     // Overview.
@@ -64,7 +63,10 @@ async fn build_status_all_lines(scan: &StatusScanResult) -> Vec<String> {
 
     let probe_auth = resolve_gateway_probe_auth(&scan.cfg);
     let auth_label = if scan.gateway_reachable {
-        format!(" \u{00b7} auth {}", format_gateway_auth_used(Some(&probe_auth)))
+        format!(
+            " \u{00b7} auth {}",
+            format_gateway_auth_used(Some(&probe_auth))
+        )
     } else {
         String::new()
     };
@@ -135,7 +137,7 @@ async fn build_status_all_lines(scan: &StatusScanResult) -> Vec<String> {
             "Security",
             format!(
                 "Run: {}",
-                format_cli_command("openacosmi security audit --deep")
+                format_cli_command("crabclaw security audit --deep")
             ),
         ),
     ];
@@ -148,7 +150,9 @@ async fn build_status_all_lines(scan: &StatusScanResult) -> Vec<String> {
     lines.push(String::new());
     lines.push(Theme::heading("Channels"));
     if scan.channels.rows.is_empty() {
-        lines.push(Theme::muted("  No channel plugins loaded (Rust migration)."));
+        lines.push(Theme::muted(
+            "  No channel plugins loaded (Rust migration).",
+        ));
     } else {
         for row in &scan.channels.rows {
             let state_label = match row.state.as_str() {
@@ -247,7 +251,7 @@ async fn build_status_all_lines(scan: &StatusScanResult) -> Vec<String> {
     lines.push(Theme::muted(
         "Pasteable debug report. Auth tokens redacted.",
     ));
-    lines.push("Troubleshooting: https://github.com/Acosmi/Claw-Acosmi/tree/main/docs/skills/general/troubleshooting".to_string());
+    lines.push("Troubleshooting: https://github.com/Acosmi/CrabClaw/tree/main/docs/help/troubleshooting.md".to_string());
     lines.push(String::new());
 
     lines

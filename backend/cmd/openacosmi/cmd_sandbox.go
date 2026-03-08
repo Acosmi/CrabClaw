@@ -109,7 +109,7 @@ func sandboxListContainers(cmd *cobra.Command, registryPath, browserRegistryPath
 	cmd.Printf("Total: %d (%d running)\n", totalCount, runningCount)
 	if mismatchCount > 0 {
 		cmd.Printf("\n⚠️  %d container(s) with image mismatch detected.\n", mismatchCount)
-		cmd.Println("   Run 'openacosmi sandbox recreate --all' to update all containers.")
+		cmd.Println("   Run 'crabclaw sandbox recreate --all' to update all containers.")
 	}
 
 	return nil
@@ -145,7 +145,7 @@ func sandboxListBrowsers(cmd *cobra.Command, browserRegistryPath string, jsonOut
 	cmd.Printf("Total: %d (%d running)\n", len(browsers), runningCount)
 	if mismatchCount > 0 {
 		cmd.Printf("\n⚠️  %d container(s) with image mismatch detected.\n", mismatchCount)
-		cmd.Println("   Run 'openacosmi sandbox recreate --all' to update all containers.")
+		cmd.Println("   Run 'crabclaw sandbox recreate --all' to update all containers.")
 	}
 
 	return nil

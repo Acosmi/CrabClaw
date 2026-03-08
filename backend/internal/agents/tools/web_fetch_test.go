@@ -48,6 +48,13 @@ func TestHtmlToReadableMarkdown_FallbackOnBadURL(t *testing.T) {
 	}
 }
 
+func TestDefaultWebFetchOptionsUsesCrabClawUserAgent(t *testing.T) {
+	opts := DefaultWebFetchOptions()
+	if opts.UserAgent != "CrabClaw/1.0 (Web Fetch Tool)" {
+		t.Fatalf("user agent = %q, want %q", opts.UserAgent, "CrabClaw/1.0 (Web Fetch Tool)")
+	}
+}
+
 func containsAny(s string, subs ...string) bool {
 	for _, sub := range subs {
 		if contains(s, sub) {

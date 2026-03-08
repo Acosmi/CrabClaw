@@ -80,7 +80,7 @@ type ControlCommandGateParams struct {
 // TS 对照: pairing/pairing-messages.ts buildPairingReply()
 func BuildPairingReply(channel, idLine, code string) string {
 	var lines []string
-	lines = append(lines, fmt.Sprintf("👋 Hi! This %s account is paired with Open Acosmi.",
+	lines = append(lines, fmt.Sprintf("👋 Hi! This %s account is paired with Crab Claw（蟹爪）.",
 		strings.ToUpper(channel[:1])+channel[1:]))
 	lines = append(lines, "")
 	if idLine != "" {

@@ -1,11 +1,10 @@
-/// Session management commands for Claw Acosmi CLI.
+/// Session management commands for Crab Claw CLI.
 ///
 /// Provides the `sessions` command that lists session entries from the session
 /// store, with support for filtering by activity time, tabular display with
 /// color-coded columns, and `--json` output.
 ///
 /// Source: `src/commands/sessions.ts`
-
 mod format;
 mod types;
 
@@ -70,20 +69,16 @@ pub async fn execute(args: &SessionsArgs) -> Result<()> {
         .unwrap_or(DEFAULT_CONTEXT_TOKENS as u64);
     let config_model = resolved.model.clone();
 
-    let store_override = args.store.as_deref().or_else(|| {
-        cfg.session
-            .as_ref()
-            .and_then(|s| s.store.as_deref())
-    });
+    let store_override = args
+        .store
+        .as_deref()
+        .or_else(|| cfg.session.as_ref().and_then(|s| s.store.as_deref()));
     let store_path = resolve_store_path(store_override, None);
     let store = load_session_store(&store_path);
 
     // Parse --active filter
     let active_minutes: Option<u64> = if let Some(ref active_str) = args.active {
-        let parsed = active_str
-            .parse::<u64>()
-            .ok()
-            .filter(|&v| v > 0);
+        let parsed = active_str.parse::<u64>().ok().filter(|&v| v > 0);
         if parsed.is_none() {
             eprintln!("--active must be a positive integer (minutes)");
             std::process::exit(1);
@@ -126,16 +121,16 @@ pub async fn execute(args: &SessionsArgs) -> Result<()> {
                 row_json
             }).collect::<Vec<_>>()
         });
-        println!("{}", serde_json::to_string_pretty(&json_output).unwrap_or_default());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&json_output).unwrap_or_default()
+        );
         return Ok(());
     }
 
     println!(
         "{}",
-        Theme::info(&format!(
-            "Session store: {}",
-            store_path.display()
-        ))
+        Theme::info(&format!("Session store: {}", store_path.display()))
     );
     println!(
         "{}",
@@ -164,7 +159,14 @@ pub async fn execute(args: &SessionsArgs) -> Result<()> {
         pad_str("Tokens (ctx %)", TOKENS_PAD),
         "Flags",
     );
-    println!("{}", if rich { Theme::heading(&header) } else { header });
+    println!(
+        "{}",
+        if rich {
+            Theme::heading(&header)
+        } else {
+            header
+        }
+    );
 
     // Print rows
     for row in &rows {

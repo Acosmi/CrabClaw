@@ -1,39 +1,39 @@
 ---
 name: ollama
-description: "使用 Ollama（本地 LLM 运行时）运行 Claw Acosmi"
+description: "Run Crab Claw（蟹爪） with Ollama (local LLM runtime)"
 ---
 
 # Ollama
 
-Ollama 是一个本地 LLM 运行时，可以轻松地在您的机器上运行开源模型。Claw Acosmi 通过 Ollama 的 OpenAI 兼容 API 进行集成，并且当您通过设置 `OLLAMA_API_KEY`（或认证配置）且未定义显式 `models.providers.ollama` 条目时，可以**自动发现支持工具调用的模型**。
+Ollama is a local LLM runtime that makes it easy to run open-source models on your machine. Crab Claw（蟹爪） integrates with Ollama's OpenAI-compatible API and can **auto-discover tool-capable models** when you opt in with `OLLAMA_API_KEY` (or an auth profile) and do not define an explicit `models.providers.ollama` entry.
 
-## 快速开始
+## Quick start
 
-1. 安装 Ollama：[https://ollama.ai](https://ollama.ai)
+1. Install Ollama: [https://ollama.ai](https://ollama.ai)
 
-2. 拉取模型：
+2. Pull a model:
 
 ```bash
 ollama pull gpt-oss:20b
-# 或
+# or
 ollama pull llama3.3
-# 或
+# or
 ollama pull qwen2.5-coder:32b
-# 或
+# or
 ollama pull deepseek-r1:32b
 ```
 
-1. 为 Claw Acosmi 启用 Ollama（任意值均可；Ollama 不需要真正的密钥）：
+3. Enable Ollama for Crab Claw（蟹爪） (any value works; Ollama doesn't require a real key):
 
 ```bash
-# 设置环境变量
+# Set environment variable
 export OLLAMA_API_KEY="ollama-local"
 
-# 或在配置文件中配置
-openacosmi config set models.providers.ollama.apiKey "ollama-local"
+# Or configure in your config file
+crabclaw config set models.providers.ollama.apiKey "ollama-local"
 ```
 
-1. 使用 Ollama 模型：
+4. Use Ollama models:
 
 ```json5
 {
@@ -45,60 +45,60 @@ openacosmi config set models.providers.ollama.apiKey "ollama-local"
 }
 ```
 
-## 模型发现（隐式 Provider）
+## Model discovery (implicit provider)
 
-当您设置了 `OLLAMA_API_KEY`（或认证配置）且**未**定义 `models.providers.ollama` 时，Claw Acosmi 会从本地 Ollama 实例（`http://127.0.0.1:11434`）自动发现模型：
+When you set `OLLAMA_API_KEY` (or an auth profile) and **do not** define `models.providers.ollama`, Crab Claw（蟹爪） discovers models from the local Ollama instance at `http://127.0.0.1:11434`:
 
-- 查询 `/api/tags` 和 `/api/show`
-- 仅保留报告了 `tools` 能力的模型
-- 当模型报告 `thinking` 时标记 `reasoning`
-- 从 `model_info["<arch>.context_length"]` 读取 `contextWindow`（如可用）
-- 将 `maxTokens` 设为上下文窗口的 10 倍
-- 所有费用设为 `0`
+- Queries `/api/tags` and `/api/show`
+- Keeps only models that report `tools` capability
+- Marks `reasoning` when the model reports `thinking`
+- Reads `contextWindow` from `model_info["<arch>.context_length"]` when available
+- Sets `maxTokens` to 10× the context window
+- Sets all costs to `0`
 
-这样可以避免手动配置模型条目，同时保持模型目录与 Ollama 的能力对齐。
+This avoids manual model entries while keeping the catalog aligned with Ollama's capabilities.
 
-查看可用模型：
+To see what models are available:
 
 ```bash
 ollama list
-openacosmi models list
+crabclaw models list
 ```
 
-要添加新模型，只需使用 Ollama 拉取：
+To add a new model, simply pull it with Ollama:
 
 ```bash
 ollama pull mistral
 ```
 
-新模型将被自动发现并可供使用。
+The new model will be automatically discovered and available to use.
 
-如果您显式设置了 `models.providers.ollama`，自动发现功能将被跳过，您需要手动定义模型（见下文）。
+If you set `models.providers.ollama` explicitly, auto-discovery is skipped and you must define models manually (see below).
 
-## 配置
+## Configuration
 
-### 基本设置（隐式发现）
+### Basic setup (implicit discovery)
 
-启用 Ollama 最简单的方式是通过环境变量：
+The simplest way to enable Ollama is via environment variable:
 
 ```bash
 export OLLAMA_API_KEY="ollama-local"
 ```
 
-### 显式设置（手动定义模型）
+### Explicit setup (manual models)
 
-在以下情况使用显式配置：
+Use explicit config when:
 
-- Ollama 运行在其他主机/端口上。
-- 您想强制指定上下文窗口或模型列表。
-- 您想包含未报告工具支持的模型。
+- Ollama runs on another host/port.
+- You want to force specific context windows or model lists.
+- You want to include models that do not report tool support.
 
 ```json5
 {
   models: {
     providers: {
       ollama: {
-        // 使用包含 /v1 的地址以兼容 OpenAI API
+        // Use a host that includes /v1 for OpenAI-compatible APIs
         baseUrl: "http://ollama-host:11434/v1",
         apiKey: "ollama-local",
         api: "openai-completions",
@@ -119,11 +119,11 @@ export OLLAMA_API_KEY="ollama-local"
 }
 ```
 
-如果设置了 `OLLAMA_API_KEY`，您可以在 Provider 条目中省略 `apiKey`，Claw Acosmi 会在可用性检查时自动填充。
+If `OLLAMA_API_KEY` is set, you can omit `apiKey` in the provider entry and Crab Claw（蟹爪） will fill it for availability checks.
 
-### 自定义 Base URL（显式配置）
+### Custom base URL (explicit config)
 
-如果 Ollama 运行在不同的主机或端口上（显式配置会禁用自动发现，需手动定义模型）：
+If Ollama is running on a different host or port (explicit config disables auto-discovery, so define models manually):
 
 ```json5
 {
@@ -138,9 +138,9 @@ export OLLAMA_API_KEY="ollama-local"
 }
 ```
 
-### 模型选择
+### Model selection
 
-配置完成后，所有 Ollama 模型均可使用：
+Once configured, all your Ollama models are available:
 
 ```json5
 {
@@ -155,29 +155,29 @@ export OLLAMA_API_KEY="ollama-local"
 }
 ```
 
-## 高级选项
+## Advanced
 
-### 推理模型
+### Reasoning models
 
-当 Ollama 在 `/api/show` 中报告 `thinking` 时，Claw Acosmi 会将模型标记为具有推理能力：
+Crab Claw（蟹爪） marks models as reasoning-capable when Ollama reports `thinking` in `/api/show`:
 
 ```bash
 ollama pull deepseek-r1:32b
 ```
 
-### 模型费用
+### Model Costs
 
-Ollama 是免费的且在本地运行，因此所有模型费用设为 $0。
+Ollama is free and runs locally, so all model costs are set to $0.
 
-### 流式传输配置
+### Streaming Configuration
 
-由于底层 SDK 与 Ollama 响应格式存在[已知问题](https://github.com/badlogic/pi-mono/issues/1205)，**Ollama 模型默认禁用流式传输**。这可以防止使用支持工具调用的模型时出现损坏的响应。
+Due to a [known issue](https://github.com/badlogic/pi-mono/issues/1205) in the underlying SDK with Ollama's response format, **streaming is disabled by default** for Ollama models. This prevents corrupted responses when using tool-capable models.
 
-禁用流式传输后，响应将一次性返回（非流式模式），避免了交错的 content/reasoning delta 导致的输出混乱。
+When streaming is disabled, responses are delivered all at once (non-streaming mode), which avoids the issue where interleaved content/reasoning deltas cause garbled output.
 
-#### 重新启用流式传输（高级）
+#### Re-enable Streaming (Advanced)
 
-如果您想为 Ollama 重新启用流式传输（可能会导致工具调用模型出现问题）：
+If you want to re-enable streaming for Ollama (may cause issues with tool-capable models):
 
 ```json5
 {
@@ -193,9 +193,9 @@ Ollama 是免费的且在本地运行，因此所有模型费用设为 $0。
 }
 ```
 
-#### 为其他 Provider 禁用流式传输
+#### Disable Streaming for Other Providers
 
-如有需要，您也可以为任何 Provider 禁用流式传输：
+You can also disable streaming for any provider if needed:
 
 ```json5
 {
@@ -211,64 +211,64 @@ Ollama 是免费的且在本地运行，因此所有模型费用设为 $0。
 }
 ```
 
-### 上下文窗口
+### Context windows
 
-对于自动发现的模型，Claw Acosmi 使用 Ollama 报告的上下文窗口（如可用），否则默认为 `8192`。您可以在显式 Provider 配置中覆盖 `contextWindow` 和 `maxTokens`。
+For auto-discovered models, Crab Claw（蟹爪） uses the context window reported by Ollama when available, otherwise it defaults to `8192`. You can override `contextWindow` and `maxTokens` in explicit provider config.
 
-## 故障排除
+## Troubleshooting
 
-### Ollama 未被检测到
+### Ollama not detected
 
-确保 Ollama 正在运行，并且您已设置 `OLLAMA_API_KEY`（或认证配置），且**未**定义显式 `models.providers.ollama` 条目：
+Make sure Ollama is running and that you set `OLLAMA_API_KEY` (or an auth profile), and that you did **not** define an explicit `models.providers.ollama` entry:
 
 ```bash
 ollama serve
 ```
 
-并确保 API 可访问：
+And that the API is accessible:
 
 ```bash
 curl http://localhost:11434/api/tags
 ```
 
-### 没有可用模型
+### No models available
 
-Claw Acosmi 仅自动发现报告了工具支持的模型。如果您的模型未列出，可以：
+Crab Claw（蟹爪） only auto-discovers models that report tool support. If your model isn't listed, either:
 
-- 拉取一个支持工具调用的模型，或
-- 在 `models.providers.ollama` 中显式定义该模型。
+- Pull a tool-capable model, or
+- Define the model explicitly in `models.providers.ollama`.
 
-添加模型：
+To add models:
 
 ```bash
-ollama list  # 查看已安装的模型
-ollama pull gpt-oss:20b  # 拉取支持工具调用的模型
-ollama pull llama3.3     # 或其他模型
+ollama list  # See what's installed
+ollama pull gpt-oss:20b  # Pull a tool-capable model
+ollama pull llama3.3     # Or another model
 ```
 
-### 连接被拒绝
+### Connection refused
 
-检查 Ollama 是否在正确的端口上运行：
+Check that Ollama is running on the correct port:
 
 ```bash
-# 检查 Ollama 是否正在运行
+# Check if Ollama is running
 ps aux | grep ollama
 
-# 或重启 Ollama
+# Or restart Ollama
 ollama serve
 ```
 
-### 响应损坏或输出中包含工具名
+### Corrupted responses or tool names in output
 
-如果您在使用 Ollama 模型时看到包含工具名（如 `sessions_send`、`memory_get`）的混乱响应或碎片化文本，这是由上游 SDK 的流式响应问题导致的。在最新版 Claw Acosmi 中，**此问题已通过默认禁用 Ollama 模型的流式传输来修复**。
+If you see garbled responses containing tool names (like `sessions_send`, `memory_get`) or fragmented text when using Ollama models, this is due to an upstream SDK issue with streaming responses. **This is fixed by default** in the latest Crab Claw（蟹爪） version by disabling streaming for Ollama models.
 
-如果您手动启用了流式传输并遇到此问题：
+If you manually enabled streaming and experience this issue:
 
-1. 从 Ollama 模型条目中移除 `streaming: true` 配置，或
-2. 为 Ollama 模型显式设置 `streaming: false`（参见[流式传输配置](#流式传输配置)）
+1. Remove the `streaming: true` configuration from your Ollama model entries, or
+2. Explicitly set `streaming: false` for Ollama models (see [Streaming Configuration](#streaming-configuration))
 
-## 另请参阅
+## See Also
 
-- [模型 Provider](/concepts/model-providers) - 所有 Provider 概览
-- [模型选择](/concepts/models) - 如何选择模型
-- [配置](/gateway/configuration) - 完整配置参考
+- [Model Providers](/concepts/model-providers) - Overview of all providers
+- [Model Selection](/concepts/models) - How to choose models
+- [Configuration](/gateway/configuration) - Full config reference

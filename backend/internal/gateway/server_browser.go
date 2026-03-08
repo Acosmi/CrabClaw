@@ -6,7 +6,6 @@ package gateway
 
 import (
 	"log/slog"
-	"os"
 	"strings"
 )
 
@@ -25,9 +24,9 @@ type BrowserControlServer struct {
 // StartBrowserControlServerIfEnabled 根据环境变量条件启动浏览器控制服务。
 // TS 对照: server-browser.ts startBrowserControlServerIfEnabled (L7-31)
 func StartBrowserControlServerIfEnabled(service BrowserControlService, logger *slog.Logger) (*BrowserControlServer, error) {
-	if isTruthyEnvValue(os.Getenv("OPENACOSMI_SKIP_BROWSER_CONTROL_SERVER")) {
+	if isTruthyEnvValue(preferredGatewayEnvValue("CRABCLAW_SKIP_BROWSER_CONTROL_SERVER", "OPENACOSMI_SKIP_BROWSER_CONTROL_SERVER")) {
 		if logger != nil {
-			logger.Info("browser control server skipped (OPENACOSMI_SKIP_BROWSER_CONTROL_SERVER)")
+			logger.Info("browser control server skipped (CRABCLAW_SKIP_BROWSER_CONTROL_SERVER / OPENACOSMI_SKIP_BROWSER_CONTROL_SERVER)")
 		}
 		return nil, nil
 	}

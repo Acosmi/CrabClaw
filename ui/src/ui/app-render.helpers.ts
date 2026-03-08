@@ -1,8 +1,14 @@
 import { html, nothing } from "lit";
 import { repeat } from "lit/directives/repeat.js";
 import type { AppViewState } from "./app-view-state.ts";
+import {
+  createChatReadonlyRunState,
+  startChatReadonlyRun,
+  type ChatUxMode,
+} from "./chat/readonly-run-state.ts";
 import type { ThemeTransitionContext } from "./theme-transition.ts";
 import type { ThemeMode } from "./theme.ts";
+import type { UiSettings } from "./storage.ts";
 import type { SessionsListResult } from "./types.ts";
 import { refreshChat } from "./app-chat.ts";
 import { syncUrlWithSessionKey } from "./app-settings.ts";
@@ -19,6 +25,85 @@ import {
   t,
 } from "./i18n.ts";
 import { loadMediaConfig } from "./views/media-config.ts";
+
+type PendingChannelMessage = {
+  text: string;
+  ts: number;
+};
+
+export type ChatSessionSwitchHost = {
+  sessionKey: string;
+  chatReadonlyRun: AppViewState["chatReadonlyRun"];
+  chatMessage: string;
+  chatMessages: unknown[];
+  chatStream: string | null;
+  chatStreamStartedAt: number | null;
+  chatRunId: string | null;
+  settings: UiSettings;
+  resetToolStream: () => void;
+  resetChatScroll: () => void;
+  applySettings: (next: UiSettings) => void;
+  loadAssistantIdentity: () => Promise<unknown> | void;
+  _pendingChannelMsgs?: Record<string, PendingChannelMessage>;
+  _skipEmptyHistory?: boolean;
+};
+
+export function applyChatSessionSwitchState(
+  host: ChatSessionSwitchHost,
+  sessionKey: string,
+  now: number = Date.now(),
+) {
+  const currentKey = host.sessionKey;
+  let nextSettings = host.settings;
+  if (currentKey && currentKey !== sessionKey) {
+    const curPrefixMatch = currentKey.match(/^([a-z]+):/);
+    const curPrefix =
+      curPrefixMatch && curPrefixMatch[1] !== "global" && curPrefixMatch[1] !== "unknown"
+        ? curPrefixMatch[1]
+        : "user";
+    nextSettings = {
+      ...host.settings,
+      lastSessionByChannel: {
+        ...(host.settings.lastSessionByChannel || {}),
+        [curPrefix]: currentKey,
+      },
+    };
+  }
+
+  host.sessionKey = sessionKey;
+  host.chatReadonlyRun = createChatReadonlyRunState(sessionKey);
+  host.chatMessage = "";
+  host.chatStream = null;
+  host.chatStreamStartedAt = null;
+  host.chatRunId = null;
+  host.resetToolStream();
+  host.resetChatScroll();
+  host.applySettings({
+    ...nextSettings,
+    sessionKey,
+    lastActiveSessionKey: sessionKey,
+  });
+  void host.loadAssistantIdentity();
+
+  const pending = host._pendingChannelMsgs?.[sessionKey];
+  if (!pending) {
+    return;
+  }
+
+  delete host._pendingChannelMsgs?.[sessionKey];
+  host.chatMessages = [
+    {
+      role: "user",
+      content: [{ type: "text", text: pending.text }],
+      timestamp: pending.ts,
+    },
+  ] as unknown[];
+  host._skipEmptyHistory = true;
+  host.chatRunId = `remote-switch-${now}`;
+  host.chatStream = "";
+  host.chatStreamStartedAt = pending.ts;
+  startChatReadonlyRun(host, host.chatRunId, pending.ts, sessionKey);
+}
 
 export function renderTab(state: AppViewState, tab: Tab, badge?: number) {
   const href = pathForTab(tab, state.basePath);
@@ -60,6 +145,7 @@ export function renderChatControls(state: AppViewState) {
   );
   const disableThinkingToggle = state.onboarding;
   const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
+  const chatUxMode = state.chatUxMode ?? state.settings.chatUxMode ?? "classic";
   // Refresh icon
   const refreshIcon = html`
     <svg
@@ -77,6 +163,17 @@ export function renderChatControls(state: AppViewState) {
     </svg>
   `;
   const app = state as unknown as OpenAcosmiApp;
+  const applyChatUxMode = (next: ChatUxMode) => (e: Event) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (chatUxMode === next) {
+      return;
+    }
+    state.applySettings({
+      ...state.settings,
+      chatUxMode: next,
+    });
+  };
 
   // Calculate available channels and their most recent session
   const channelSessions = new Map<string, { key: string, name: string }>();
@@ -217,54 +314,9 @@ export function renderChatControls(state: AppViewState) {
   };
 
   const applySessionSwitch = (sessionKey: string) => {
-    // 修复：切换频道前，把当前 sessionKey 保存到 lastSessionByChannel
-    // 以便切回时能恢复到之前的会话，而非 fallback 到 mainSessionKey
-    const currentKey = state.sessionKey;
-    if (currentKey && currentKey !== sessionKey) {
-      const curPrefixMatch = currentKey.match(/^([a-z]+):/);
-      const curPrefix = (curPrefixMatch && curPrefixMatch[1] !== "global" && curPrefixMatch[1] !== "unknown")
-        ? curPrefixMatch[1]
-        : "user";
-      const updatedLastSessionByChannel = {
-        ...(state.settings.lastSessionByChannel || {}),
-        [curPrefix]: currentKey,
-      };
-      state.settings = { ...state.settings, lastSessionByChannel: updatedLastSessionByChannel };
-    }
-    state.sessionKey = sessionKey;
-    state.chatMessage = "";
-    state.chatStream = null;
-    app.chatStreamStartedAt = null;
-    // chatRunId 保留：任务仍在执行时不清空，让 chat.final 事件能正确识别
-    // 并在修复 A（app-gateway.ts）中触发跨 session 回归。
-    // chatRunId 会在 chat.final/error/aborted 时由 handleChatEvent 清空。
-    app.resetToolStream();
-    app.resetChatScroll();
-    state.applySettings({ ...state.settings, sessionKey: sessionKey, lastActiveSessionKey: sessionKey });
-    void state.loadAssistantIdentity();
+    applyChatSessionSwitchState(app as unknown as ChatSessionSwitchHost, sessionKey);
     syncUrlWithSessionKey(state as unknown as Parameters<typeof syncUrlWithSessionKey>[0], sessionKey, true);
     void loadChatHistory(state as unknown as ChatState);
-    // 预填充：从缓存读取该 session 的入站消息，在 transcript 写入前给用户一个视觉占位。
-    // 所有切换路径（红点/下拉/通知中心）共用此逻辑，不依赖红点 3s 超时。
-    const pendingMsgs = (app as any)._pendingChannelMsgs as Record<string, { text: string; ts: number }> | undefined;
-    if (pendingMsgs?.[sessionKey]) {
-      const pending = pendingMsgs[sessionKey];
-      delete pendingMsgs[sessionKey];
-      state.chatMessages = [{
-        role: "user",
-        content: [{ type: "text", text: pending.text }],
-        timestamp: pending.ts,
-      }] as unknown[];
-      (state as any)._skipEmptyHistory = true;
-      // 根因 B 修复：飞书等远程频道无 delta 流式事件，切换后手动触发思考动画，
-      // 让用户在等待 AI 回复期间有视觉反馈。
-      // chatRunId 以 "remote-" 为前缀，chat.message(role=assistant) 到达时会自动清除。
-      if (!app.chatRunId) {
-        app.chatRunId = `remote-switch-${Date.now()}`;
-        (app as any).chatStream = "";
-        (app as any).chatStreamStartedAt = pending.ts;
-      }
-    }
   };
 
   // Determine current active channel and session names
@@ -342,6 +394,46 @@ export function renderChatControls(state: AppViewState) {
       }
       .split-capsule-btn:hover { background: rgba(128,128,128,0.08); }
       .split-capsule-btn:active { background: rgba(128,128,128,0.15); }
+      .chat-ux-toggle {
+        display: inline-flex;
+        align-items: center;
+        padding: 3px;
+        border: 1px solid var(--border-color);
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        flex-shrink: 0;
+      }
+      .chat-ux-toggle__button {
+        border: none;
+        background: transparent;
+        color: var(--text-dim);
+        font-size: 11px;
+        font-weight: 600;
+        padding: 7px 10px;
+        border-radius: 999px;
+        cursor: pointer;
+        transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+        white-space: nowrap;
+      }
+      .chat-ux-toggle__button:hover {
+        color: var(--text-strong);
+      }
+      .chat-ux-toggle__button.active {
+        background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(59, 130, 246, 0.26));
+        color: var(--text-strong);
+        box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.22);
+      }
+      .chat-ux-toggle__button[data-mode="codex-readonly"].active {
+        background: linear-gradient(135deg, rgba(14, 165, 233, 0.24), rgba(59, 130, 246, 0.34));
+        box-shadow: inset 0 0 0 1px rgba(14, 165, 233, 0.32);
+      }
+      @media (max-width: 960px) {
+        .chat-ux-toggle__button {
+          padding: 6px 9px;
+          font-size: 10px;
+        }
+      }
       .switch-tag {
         display: inline-flex;
         align-items: center;
@@ -543,6 +635,29 @@ export function renderChatControls(state: AppViewState) {
             </div>
           ` : nothing}
         </div>
+      </div>
+
+      <div class="chat-ux-toggle" role="group" aria-label="${t("helpers.chatUx")}">
+        <button
+          class="chat-ux-toggle__button ${chatUxMode === "classic" ? "active" : ""}"
+          data-mode="classic"
+          type="button"
+          aria-pressed=${chatUxMode === "classic"}
+          title="${t("helpers.chatUxClassicTitle")}"
+          @click=${applyChatUxMode("classic")}
+        >
+          ${t("helpers.chatUxClassic")}
+        </button>
+        <button
+          class="chat-ux-toggle__button ${chatUxMode === "codex-readonly" ? "active" : ""}"
+          data-mode="codex-readonly"
+          type="button"
+          aria-pressed=${chatUxMode === "codex-readonly"}
+          title="${t("helpers.chatUxCodexTitle")}"
+          @click=${applyChatUxMode("codex-readonly")}
+        >
+          ${t("helpers.chatUxCodex")}
+        </button>
       </div>
     </div>
   `;

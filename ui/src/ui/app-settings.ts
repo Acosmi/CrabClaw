@@ -36,6 +36,7 @@ import {
   tabFromPath,
   type Tab,
 } from "./navigation.ts";
+import type { ChatUxMode } from "./chat/readonly-run-state.ts";
 import { saveSettings, type UiSettings } from "./storage.ts";
 import { startThemeTransition, type ThemeTransitionContext } from "./theme-transition.ts";
 import { resolveTheme, type ResolvedTheme, type ThemeMode } from "./theme.ts";
@@ -61,11 +62,13 @@ type SettingsHost = {
   themeMedia: MediaQueryList | null;
   themeMediaHandler: ((event: MediaQueryListEvent) => void) | null;
   pendingGatewayUrl?: string | null;
+  chatUxMode?: ChatUxMode;
 };
 
 export function applySettings(host: SettingsHost, next: UiSettings) {
   const normalized = {
     ...next,
+    chatUxMode: next.chatUxMode ?? host.settings.chatUxMode ?? "classic",
     lastActiveSessionKey: next.lastActiveSessionKey?.trim() || next.sessionKey.trim() || "main",
   };
   host.settings = normalized;
@@ -73,6 +76,9 @@ export function applySettings(host: SettingsHost, next: UiSettings) {
   if (next.theme !== host.theme) {
     host.theme = next.theme;
     applyResolvedTheme(host, resolveTheme(next.theme));
+  }
+  if ("chatUxMode" in host) {
+    host.chatUxMode = normalized.chatUxMode;
   }
   host.applySessionKey = host.settings.lastActiveSessionKey;
 }
@@ -115,6 +121,7 @@ export function applySettingsFromUrl(host: SettingsHost) {
   const passwordRaw = params.get("password") ?? hashParams.get("password");
   const sessionRaw = params.get("session") ?? hashParams.get("session");
   const gatewayUrlRaw = params.get("gatewayUrl") ?? hashParams.get("gatewayUrl");
+  const chatUxRaw = params.get("chatUx") ?? hashParams.get("chatUx");
   let shouldCleanUrl = false;
 
   if (tokenRaw != null) {
@@ -156,6 +163,19 @@ export function applySettingsFromUrl(host: SettingsHost) {
     }
     params.delete("gatewayUrl");
     hashParams.delete("gatewayUrl");
+    shouldCleanUrl = true;
+  }
+
+  if (chatUxRaw != null) {
+    const normalizedChatUx =
+      chatUxRaw.trim() === "codex" || chatUxRaw.trim() === "codex-readonly"
+        ? "codex-readonly"
+        : "classic";
+    if (normalizedChatUx !== host.settings.chatUxMode) {
+      applySettings(host, { ...host.settings, chatUxMode: normalizedChatUx });
+    }
+    params.delete("chatUx");
+    hashParams.delete("chatUx");
     shouldCleanUrl = true;
   }
 
@@ -453,6 +473,10 @@ export function syncUrlWithTab(host: SettingsHost, tab: Tab, replace: boolean) {
     url.searchParams.set("session", host.sessionKey);
   } else {
     url.searchParams.delete("session");
+  }
+
+  if (tab !== "media") {
+    url.searchParams.delete("mediaSubTab");
   }
 
   if (currentPath !== targetPath) {

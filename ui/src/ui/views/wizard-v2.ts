@@ -511,9 +511,9 @@ export function renderWizardV2(state: AppViewState) {
             ${stepIndex === 0 ? html`
               <!-- 1. 欢迎页 / 安全须知 -->
               <div style="text-align:center; margin-bottom: 24px;">
-                <img src="/logo1.png" alt="创宇太虚 Logo" style="width: 80px; height: auto;" />
+                <img src="/logo1.png" alt="Crab Claw（蟹爪） Logo" style="width: 80px; height: auto;" />
               </div>
-              <h2 class="wizard-v2-title" style="text-align:center; margin-top: 0; margin-bottom: 8px;">欢迎使用 创宇太虚（Claw Acosmi）</h2>
+              <h2 class="wizard-v2-title" style="text-align:center; margin-top: 0; margin-bottom: 8px;">欢迎使用 Crab Claw（蟹爪）</h2>
               <p class="wizard-v2-subtitle" style="text-align:center; margin-top: 0; margin-bottom: 24px;">由原 OpenClaw 重构升级的新一代安全智能体网关</p>
 
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; text-align: left;">
@@ -621,7 +621,7 @@ export function renderWizardV2(state: AppViewState) {
             ${stepIndex === 4 ? html`
               <!-- 5. 频道 -->
               <h2 class="wizard-v2-title">接入通讯频道</h2>
-              <p class="wizard-v2-subtitle">将 创宇太虚（Claw Acosmi） 接入您的 IM 矩阵，让智能体主动触达业务一线。</p>
+              <p class="wizard-v2-subtitle">将 Crab Claw（蟹爪） 接入您的 IM 矩阵，让智能体主动触达业务一线。</p>
               
               <div class="wizard-v2-providers-grid">
                  <div class="wizard-v2-provider-card">
@@ -845,7 +845,7 @@ export function renderWizardV2(state: AppViewState) {
                      <div class="wizard-v2-restarting-container" style="text-align: center;">
                         <!-- Custom CSS Spinners added to stylesheet -->
                         <div class="wizard-v2-spinner"></div>
-                        <h2 class="wizard-v2-title" style="margin-top:24px;">创宇太虚引擎 重燃中...</h2>
+                        <h2 class="wizard-v2-title" style="margin-top:24px;">Crab Claw 引擎启动中...</h2>
                         
                         <div style="width: 300px; height: 6px; background: #e8e8e8; border-radius: 4px; margin: 20px auto; overflow: hidden;">
                            <div style="width: ${restartProgress}%; height: 100%; background: #1890FF; transition: width 0.3s ease;"></div>
@@ -867,7 +867,7 @@ export function renderWizardV2(state: AppViewState) {
                      <h2 class="wizard-v2-title" style="margin-bottom:8px;">系统重燃启动成功！</h2>
                      <p class="wizard-v2-subtitle" style="text-align:center;">
                         您配置的骨干网模型和工作流已被热重载接管。<br/>
-                        欢迎回到 创宇太虚（Claw Acosmi） 指挥中心。
+                        欢迎回到 Crab Claw（蟹爪） 指挥中心。
                      </p>
                      
                      <div style="display:flex; gap:16px; margin-top:16px;">
@@ -890,7 +890,7 @@ export function renderWizardV2(state: AppViewState) {
                   state.handleSendChat("/new");
                   // 2. Queue the welcome message natively
                   setTimeout(() => {
-                     state.handleSendChat("系统启动完成！请向我全面介绍一下 创宇太虚 (Claw Acosmi) 系统的各项优势与核心能力，并做个简短的欢迎致辞。");
+                     state.handleSendChat("系统启动完成！请向我全面介绍一下 Crab Claw（蟹爪）系统的各项优势与核心能力，并做个简短的欢迎致辞。");
                   }, 300);
                }, 500);
             }} style="padding: 12px 32px; font-size:16px;">

@@ -24,7 +24,7 @@ func newSetupCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "setup",
 		Short: "Initial setup wizard",
-		Long:  "Run the interactive Claw Acosmi setup wizard to configure your AI agents and channels.",
+		Long:  "Run the interactive Crab Claw（蟹爪） setup wizard to configure your AI agents and channels.",
 		RunE:  runSetupCommand,
 	}
 	cmd.Flags().String("workspace", "", "Agent workspace directory")
@@ -185,7 +185,7 @@ func newOnboardCmd() *cobra.Command {
 	cmd.Flags().String("zai-api-key", "", "ZAI API key")
 	cmd.Flags().String("xiaomi-api-key", "", "Xiaomi API key")
 	cmd.Flags().String("minimax-api-key", "", "MiniMax API key")
-	cmd.Flags().String("openacosmi-zen-api-key", "", "Claw Acosmi Zen API key")
+	cmd.Flags().String("openacosmi-zen-api-key", "", "Crab Claw Zen API key")
 	cmd.Flags().String("xai-api-key", "", "xAI API key")
 	cmd.Flags().String("qianfan-api-key", "", "Qianfan API key")
 
@@ -225,7 +225,7 @@ func runOnboardCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	cmd.Println()
-	cmd.Println(tui.HeadingStyle.Render("🧙 Claw Acosmi Onboarding"))
+	cmd.Println(tui.HeadingStyle.Render("🧙 Crab Claw（蟹爪） Onboarding"))
 	cmd.Println()
 
 	// 2. 准备 auth store
@@ -258,7 +258,7 @@ func runOnboardCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	if authChoice == AuthChoiceSkip {
-		cmd.Println(tui.MutedStyle.Render("Auth setup skipped. Run `openacosmi setup onboard` later."))
+		cmd.Println(tui.MutedStyle.Render("Auth setup skipped. Run `crabclaw setup onboard` later."))
 	} else {
 		// 5. 应用认证选择
 		prompter := &cliPrompter{cmd: cmd}
@@ -282,7 +282,7 @@ func runOnboardCommand(cmd *cobra.Command, args []string) error {
 
 	cmd.Println()
 	cmd.Println(tui.SuccessStyle.Render("✓ Onboarding complete!"))
-	cmd.Println(tui.MutedStyle.Render("  Run `openacosmi doctor` to verify your setup."))
+	cmd.Println(tui.MutedStyle.Render("  Run `crabclaw doctor` to verify your setup."))
 	return nil
 }
 

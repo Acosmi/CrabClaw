@@ -13,7 +13,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -59,6 +58,8 @@ var ShellEnvExpectedKeys = []string{
 	"DISCORD_BOT_TOKEN",
 	"SLACK_BOT_TOKEN",
 	"SLACK_APP_TOKEN",
+	"CRABCLAW_GATEWAY_TOKEN",
+	"CRABCLAW_GATEWAY_PASSWORD",
 	"OPENACOSMI_GATEWAY_TOKEN",
 	"OPENACOSMI_GATEWAY_PASSWORD",
 }
@@ -582,7 +583,7 @@ func (l *ConfigLoader) setCache(cfg *types.OpenAcosmiConfig) {
 // resolveConfigCacheMs 解析配置缓存 TTL。
 // 对应 TS: config/io.ts:559-572 — resolveConfigCacheMs(env)
 func resolveConfigCacheMs() int {
-	raw := strings.TrimSpace(os.Getenv("OPENACOSMI_CONFIG_CACHE_MS"))
+	raw := compatEnvValue("CRABCLAW_CONFIG_CACHE_MS", "OPENACOSMI_CONFIG_CACHE_MS")
 	if raw == "" {
 		return DefaultConfigCacheMs
 	}
@@ -668,7 +669,7 @@ func warnIfConfigFromFuture(cfg *types.OpenAcosmiConfig, logger *log.Logger) {
 		return
 	}
 	if cmp < 0 {
-		logger.Warn("Config was last written by a newer OpenAcosmi (%s); current version is %s.", touched, BuildVersion)
+		logger.Warn("Config was last written by a newer Crab Claw（蟹爪） build (%s); current version is %s.", touched, BuildVersion)
 	}
 }
 

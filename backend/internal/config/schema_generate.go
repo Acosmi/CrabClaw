@@ -17,7 +17,7 @@ import (
 // 返回 map[string]interface{} 形式的 draft-07 JSON Schema。
 func generateConfigSchema() map[string]interface{} {
 	schema := reflectType(reflect.TypeOf(types.OpenAcosmiConfig{}))
-	schema["title"] = "OpenAcosmiConfig"
+	schema["title"] = "Crab Claw Config"
 	schema["$schema"] = "http://json-schema.org/draft-07/schema#"
 	return schema
 }

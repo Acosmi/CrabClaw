@@ -1,11 +1,10 @@
-/// Gateway lifecycle commands for Claw Acosmi CLI.
+/// Gateway lifecycle commands for Crab Claw CLI.
 ///
 /// Provides subcommands for managing the Gateway service: start, stop,
 /// restart, status, install, uninstall, call, usage-cost, health, probe,
 /// and discover.
 ///
 /// Source: `src/cli/gateway-cli.ts`, `src/commands/gateway*.ts`
-
 pub mod call;
 pub mod discover;
 pub mod health;

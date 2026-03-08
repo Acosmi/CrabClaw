@@ -1,5 +1,6 @@
 import { render } from "lit";
 import { describe, expect, it, vi } from "vitest";
+import { createChatReadonlyRunState } from "../chat/readonly-run-state.ts";
 import type { SessionsListResult } from "../types.ts";
 import { renderChat, type ChatProps } from "./chat.ts";
 
@@ -25,6 +26,8 @@ function createProps(overrides: Partial<ChatProps> = {}): ChatProps {
     compactionStatus: null,
     messages: [],
     toolMessages: [],
+    uxMode: "classic",
+    readonlyRun: createChatReadonlyRunState("main"),
     stream: null,
     streamStartedAt: null,
     assistantAvatarUrl: null,
@@ -117,6 +120,7 @@ describe("chat view", () => {
     render(
       renderChat(
         createProps({
+          sending: true,
           canAbort: true,
           onAbort,
         }),
@@ -139,6 +143,7 @@ describe("chat view", () => {
     render(
       renderChat(
         createProps({
+          sending: true,
           canAbort: false,
           onNewSession,
         }),
@@ -153,5 +158,113 @@ describe("chat view", () => {
     newSessionButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(onNewSession).toHaveBeenCalledTimes(1);
     expect(container.textContent).not.toContain("Stop");
+  });
+
+  it("renders the codex readonly surface without the classic processing card", () => {
+    const container = document.createElement("div");
+    render(
+      renderChat(
+        createProps({
+          uxMode: "codex-readonly",
+          stream: "",
+          streamStartedAt: 1_000,
+          readonlyRun: {
+            runId: "run-1",
+            sessionKey: "main",
+            phase: "working",
+            startedAt: 1_000,
+            updatedAt: 1_100,
+            latestProgress: "Scanning the workspace and gathering context.",
+            progressPhase: "analysis",
+            draftingText: null,
+            lastToolName: "read_files",
+            activity: [
+              {
+                id: "phase:starting",
+                kind: "phase",
+                phase: "starting",
+                ts: 1_000,
+                updatedAt: 1_000,
+              },
+              {
+                id: "progress:1100",
+                kind: "progress",
+                summary: "Scanning the workspace and gathering context.",
+                progressPhase: "analysis",
+                ts: 1_100,
+                updatedAt: 1_100,
+              },
+            ],
+            toolSteps: [
+              {
+                toolCallId: "tool-1",
+                name: "read_files",
+                status: "running",
+                startedAt: 1_000,
+                updatedAt: 1_100,
+                outputPreview: null,
+              },
+            ],
+            lastError: null,
+          },
+        }),
+      ),
+      container,
+    );
+
+    expect(container.querySelector(".chat-readonly-run")).not.toBeNull();
+    expect(container.querySelector(".chat-processing-card")).toBeNull();
+    expect(container.textContent).toContain("Agent Working");
+    expect(container.textContent).toContain("Scanning the workspace and gathering context.");
+  });
+
+  it("announces readonly status changes without exposing the timer as a live region update", () => {
+    const container = document.createElement("div");
+    render(
+      renderChat(
+        createProps({
+          uxMode: "codex-readonly",
+          readonlyRun: {
+            runId: "run-2",
+            sessionKey: "main",
+            phase: "working",
+            startedAt: 1_000,
+            updatedAt: 1_100,
+            latestProgress: "Scanning the workspace and gathering context.",
+            progressPhase: "analysis",
+            draftingText: null,
+            lastToolName: "read_files",
+            activity: [
+              {
+                id: "phase:starting",
+                kind: "phase",
+                phase: "starting",
+                ts: 1_000,
+                updatedAt: 1_000,
+              },
+              {
+                id: "progress:1100",
+                kind: "progress",
+                summary: "Scanning the workspace and gathering context.",
+                progressPhase: "analysis",
+                ts: 1_100,
+                updatedAt: 1_100,
+              },
+            ],
+            toolSteps: [],
+            lastError: null,
+          },
+        }),
+      ),
+      container,
+    );
+
+    const surface = container.querySelector(".chat-readonly-run");
+    const liveStatus = container.querySelector(".chat-readonly-run__sr-status");
+    const timer = container.querySelector(".chat-readonly-run__timer");
+    expect(surface?.getAttribute("aria-live")).toBeNull();
+    expect(liveStatus?.getAttribute("role")).toBe("status");
+    expect(liveStatus?.getAttribute("aria-live")).toBe("polite");
+    expect(timer?.getAttribute("aria-hidden")).toBe("true");
   });
 });

@@ -139,7 +139,7 @@ func createHooksHTTPHandler(cfg GatewayHTTPHandlerConfig) http.HandlerFunc {
 		if r.URL.Query().Get("token") != "" {
 			SendJSON(w, http.StatusBadRequest, map[string]interface{}{
 				"error":   "invalid_request",
-				"message": "token must not be passed as a query parameter; use Authorization header or X-OpenAcosmi-Token header",
+				"message": "token must not be passed as a query parameter; use Authorization header, X-CrabClaw-Token header, or legacy X-OpenAcosmi-Token header",
 			})
 			return
 		}

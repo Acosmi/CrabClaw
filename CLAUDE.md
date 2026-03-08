@@ -1,20 +1,20 @@
-# Claw Acosmi 运行时指引
+# Crab Claw 运行时指引
 
 > 本文件会作为项目上下文自动注入主智能体提示词。
-> 内容应保持精简、稳定，并与当前 Claw Acosmi 运行时一致。
+> 内容应保持精简、稳定，并与当前 Crab Claw 运行时一致。
 > 旧版 Claude / oa-sandbox Skill 1-5 内容已归档到
 > `docs/claude/archive/2026-03-06-legacy-claude-md-oa-sandbox-skill-1-5-backup.md`。
 
 ## 作用
 
-本文件定义 Claw Acosmi 的跨任务运行时指引。
+本文件定义 Crab Claw 的跨任务运行时指引。
 它不是技能系统，不是任务跟踪表，也不是代码审计清单。
 具体工具工作流在 `docs/skills/**/SKILL.md`。
 架构说明、历史记录和迁移文档在 `docs/claude/**`。
 
 ## 运行时模型
 
-- 当前生效的是 Claw Acosmi 运行时，不是旧的 oa-sandbox 单模块工作流。
+- 当前生效的是 Crab Claw 运行时，不是旧的 oa-sandbox 单模块工作流。
 - 工具能力和安全边界以当前实现和运行时配置为准，不以旧 prose 文档为准。
 - 不要凭空发明比当前工具/运行时更严格的路径规则。
 - 不要把旧 `docs/SKILL-*.md` 引用当成当前主行为来源。
@@ -62,4 +62,4 @@
 ## 历史边界
 
 - 已归档的 oa-sandbox Skill 1-5 材料仅供历史参考。
-- 不得把它当作 Claw Acosmi 当前默认工作模型。
+- 不得把它当作 Crab Claw 当前默认工作模型。

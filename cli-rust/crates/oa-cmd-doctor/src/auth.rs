@@ -5,7 +5,6 @@
 /// and expiry status.
 ///
 /// Source: `src/commands/doctor-auth.ts`
-
 use std::collections::{HashMap, HashSet};
 
 use oa_cli_shared::command_format::format_cli_command;
@@ -105,19 +104,16 @@ fn prune_auth_profiles(
         return (cfg.clone(), false);
     }
 
-    let next_auth = if next_profiles
-        .as_ref()
-        .is_some_and(|p| !p.is_empty())
-        || pruned_order.is_some()
-    {
-        Some(AuthConfig {
-            profiles: next_profiles.filter(|p| !p.is_empty()),
-            order: pruned_order,
-            cooldowns: cfg.auth.as_ref().and_then(|a| a.cooldowns.clone()),
-        })
-    } else {
-        None
-    };
+    let next_auth =
+        if next_profiles.as_ref().is_some_and(|p| !p.is_empty()) || pruned_order.is_some() {
+            Some(AuthConfig {
+                profiles: next_profiles.filter(|p| !p.is_empty()),
+                order: pruned_order,
+                cooldowns: cfg.auth.as_ref().and_then(|a| a.cooldowns.clone()),
+            })
+        } else {
+            None
+        };
 
     let mut next_cfg = cfg.clone();
     next_cfg.auth = next_auth;
@@ -145,19 +141,18 @@ pub async fn maybe_remove_deprecated_cli_auth_profiles(
         return cfg;
     }
 
-    let mut lines = vec![
-        "Deprecated external CLI auth profiles detected (no longer supported):".to_string(),
-    ];
+    let mut lines =
+        vec!["Deprecated external CLI auth profiles detected (no longer supported):".to_string()];
     if deprecated.contains(CLAUDE_CLI_PROFILE_ID) {
         lines.push(format!(
             "- {CLAUDE_CLI_PROFILE_ID} (Anthropic): use setup-token -> {}",
-            format_cli_command("openacosmi models auth setup-token")
+            format_cli_command("crabclaw models auth setup-token")
         ));
     }
     if deprecated.contains(CODEX_CLI_PROFILE_ID) {
         lines.push(format!(
             "- {CODEX_CLI_PROFILE_ID} (OpenAI Codex): use OAuth -> {}",
-            format_cli_command("openacosmi models auth login --provider openai-codex")
+            format_cli_command("crabclaw models auth login --provider openai-codex")
         ));
     }
     note(&lines.join("\n"), Some("Auth profiles"));
@@ -206,21 +201,21 @@ fn format_auth_issue_hint(issue: &AuthIssue) -> String {
     if issue.provider == "anthropic" && issue.profile_id == CLAUDE_CLI_PROFILE_ID {
         return format!(
             "Deprecated profile. Use {} or {}.",
-            format_cli_command("openacosmi models auth setup-token"),
-            format_cli_command("openacosmi configure")
+            format_cli_command("crabclaw models auth setup-token"),
+            format_cli_command("crabclaw configure")
         );
     }
     if issue.provider == "openai-codex" && issue.profile_id == CODEX_CLI_PROFILE_ID {
         return format!(
             "Deprecated profile. Use {} or {}.",
-            format_cli_command("openacosmi models auth login --provider openai-codex"),
-            format_cli_command("openacosmi configure")
+            format_cli_command("crabclaw models auth login --provider openai-codex"),
+            format_cli_command("crabclaw configure")
         );
     }
     format!(
         "Re-auth via `{}` or `{}`.",
-        format_cli_command("openacosmi configure"),
-        format_cli_command("openacosmi onboard")
+        format_cli_command("crabclaw configure"),
+        format_cli_command("crabclaw onboard")
     )
 }
 
@@ -242,10 +237,7 @@ pub fn format_auth_issue_line(issue: &AuthIssue) -> String {
 /// Report auth profile health: cooldowns, expiring tokens, missing tokens.
 ///
 /// Source: `src/commands/doctor-auth.ts` — `noteAuthProfileHealth`
-pub async fn note_auth_profile_health(
-    _cfg: &OpenAcosmiConfig,
-    _prompter: &mut DoctorPrompter,
-) {
+pub async fn note_auth_profile_health(_cfg: &OpenAcosmiConfig, _prompter: &mut DoctorPrompter) {
     // Stub: auth-profile store is not yet wired in the Rust port.
     // When wired, this will check cooldowns, detect expired tokens,
     // and offer to refresh OAuth tokens.

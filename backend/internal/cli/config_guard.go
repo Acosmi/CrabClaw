@@ -66,7 +66,7 @@ func EnsureConfigReady(commandPath []string) error {
 		loader := config.NewConfigLoader()
 		snapshot, err := loader.ReadConfigFileSnapshot()
 		if err != nil {
-			configGuardResult = fmt.Errorf("无法读取配置: %w — 运行 'openacosmi doctor' 进行诊断", err)
+			configGuardResult = fmt.Errorf("无法读取配置: %w — 运行 'crabclaw doctor' 进行诊断", err)
 			return
 		}
 		if !snapshot.Valid {
@@ -74,7 +74,7 @@ func EnsureConfigReady(commandPath []string) error {
 			if len(snapshot.Issues) > 0 {
 				msg = fmt.Sprintf("配置文件无效: %s", snapshot.Issues[0].Message)
 			}
-			configGuardResult = fmt.Errorf("%s — 运行 'openacosmi doctor' 进行修复", msg)
+			configGuardResult = fmt.Errorf("%s — 运行 'crabclaw doctor' 进行修复", msg)
 		}
 	})
 

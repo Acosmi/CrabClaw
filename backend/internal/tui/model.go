@@ -581,7 +581,7 @@ func (m Model) renderHeader() string {
 	if m.client != nil {
 		url = m.client.Connection().URL
 	}
-	text := fmt.Sprintf("openacosmi tui - %s - agent %s - session %s", url, agentLabel, sessionLabel)
+	text := fmt.Sprintf("Crab Claw TUI - %s - agent %s - session %s", url, agentLabel, sessionLabel)
 	return HeadingStyle.Width(m.width).Render(text)
 }
 

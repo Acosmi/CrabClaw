@@ -1,11 +1,11 @@
 ---
 name: pi-dev
-description: 创宇太虚（Claw Acosmi） 开发工作流：构建、测试、调试（Rust+Go+TypeScript 混合架构）
+description: Crab Claw（蟹爪） 开发工作流：构建、测试、调试（Rust+Go+TypeScript 混合架构）
 ---
 
-# 创宇太虚（Claw Acosmi） 开发工作流
+# Crab Claw（蟹爪） 开发工作流
 
-创宇太虚（Claw Acosmi） 是 **Rust + Go + TypeScript** 混合架构：
+Crab Claw（蟹爪） 是 **Rust + Go + TypeScript** 混合架构：
 
 - **Rust**：原生沙箱（oa-sandbox）、编程子智能体（oa-coder）、持久化 Worker
 - **Go**：网关（Gateway）、Agent 运行时、记忆系统（太虚永忆）、工具层

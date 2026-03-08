@@ -148,3 +148,27 @@ func TestMultimodalRolloutDrillSequence(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadFeatureFlagsPrefersCrabClawEnv(t *testing.T) {
+	env := map[string]string{
+		"CRABCLAW_SKIP_CRON":             "1",
+		"OPENACOSMI_SKIP_CRON":           "",
+		"CRABCLAW_MULTIMODAL_CHANNELS":   "feishu",
+		"OPENACOSMI_MULTIMODAL_CHANNELS": "wecom",
+	}
+	flags := loadFeatureFlags(func(key string) string {
+		return env[key]
+	})
+	if !flags.skipCron {
+		t.Fatal("expected crabclaw skip cron env to be honored")
+	}
+	if flags.multimodalSwitch != "feishu" {
+		t.Fatalf("got multimodal switch %q, want feishu", flags.multimodalSwitch)
+	}
+	if !isMultimodalChannelEnabled("feishu", flags.multimodalAllowAll, flags.multimodalAllowedNames) {
+		t.Fatal("expected feishu enabled")
+	}
+	if isMultimodalChannelEnabled("wecom", flags.multimodalAllowAll, flags.multimodalAllowedNames) {
+		t.Fatal("expected wecom disabled")
+	}
+}

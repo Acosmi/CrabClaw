@@ -1,6 +1,12 @@
 import type { GatewayBrowserClient } from "../gateway.ts";
+import type { ChatReadonlyRunState } from "../chat/readonly-run-state.ts";
 import type { ChatAttachment } from "../ui-types.ts";
 import { extractText } from "../chat/message-extract.ts";
+import {
+  setChatReadonlyRunTerminal,
+  startChatReadonlyRun,
+  updateChatReadonlyRunFromChat,
+} from "../chat/readonly-run-state.ts";
 import { generateUUID } from "../uuid.ts";
 
 export type ChatState = {
@@ -16,6 +22,7 @@ export type ChatState = {
   chatRunId: string | null;
   chatStream: string | null;
   chatStreamStartedAt: number | null;
+  chatReadonlyRun?: ChatReadonlyRunState;
   lastError: string | null;
 };
 
@@ -124,6 +131,14 @@ export async function sendChatMessage(
   state.chatRunId = runId;
   state.chatStream = "";
   state.chatStreamStartedAt = now;
+  if ("chatReadonlyRun" in state && state.chatReadonlyRun) {
+    startChatReadonlyRun(
+      state as unknown as Parameters<typeof startChatReadonlyRun>[0],
+      runId,
+      now,
+      state.sessionKey,
+    );
+  }
 
   // Convert attachments to API format
   const apiAttachments = hasAttachments
@@ -158,6 +173,13 @@ export async function sendChatMessage(
     state.chatRunId = null;
     state.chatStream = null;
     state.chatStreamStartedAt = null;
+    if ("chatReadonlyRun" in state && state.chatReadonlyRun) {
+      setChatReadonlyRunTerminal(
+        state as unknown as Parameters<typeof setChatReadonlyRunTerminal>[0],
+        "error",
+        { runId, sessionKey: state.sessionKey, ts: Date.now(), errorMessage: error },
+      );
+    }
     state.lastError = error;
     state.chatMessages = [
       ...state.chatMessages,
@@ -224,6 +246,18 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
       if (!current || next.length >= current.length) {
         state.chatStream = next;
       }
+      if ("chatReadonlyRun" in state && state.chatReadonlyRun) {
+        updateChatReadonlyRunFromChat(
+          state as unknown as Parameters<typeof updateChatReadonlyRunFromChat>[0],
+          {
+            runId: payload.runId,
+            sessionKey: payload.sessionKey,
+            state: "delta",
+            ts: Date.now(),
+            text: next,
+          },
+        );
+      }
     }
   } else if (payload.state === "final") {
     // Bug #9 fix: immediately append the final assistant message so it's
@@ -237,15 +271,96 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
+    if ("chatReadonlyRun" in state && state.chatReadonlyRun) {
+      updateChatReadonlyRunFromChat(
+        state as unknown as Parameters<typeof updateChatReadonlyRunFromChat>[0],
+        {
+          runId: payload.runId,
+          sessionKey: payload.sessionKey,
+          state: "final",
+          ts: Date.now(),
+          text: extractText(payload.message),
+        },
+      );
+    }
   } else if (payload.state === "aborted") {
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
+    if ("chatReadonlyRun" in state && state.chatReadonlyRun) {
+      updateChatReadonlyRunFromChat(
+        state as unknown as Parameters<typeof updateChatReadonlyRunFromChat>[0],
+        {
+          runId: payload.runId,
+          sessionKey: payload.sessionKey,
+          state: "aborted",
+          ts: Date.now(),
+        },
+      );
+    }
   } else if (payload.state === "error") {
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
     state.lastError = payload.errorMessage ?? "chat error";
+    if ("chatReadonlyRun" in state && state.chatReadonlyRun) {
+      updateChatReadonlyRunFromChat(
+        state as unknown as Parameters<typeof updateChatReadonlyRunFromChat>[0],
+        {
+          runId: payload.runId,
+          sessionKey: payload.sessionKey,
+          state: "error",
+          ts: Date.now(),
+          errorMessage: payload.errorMessage ?? "chat error",
+        },
+      );
+    }
   }
   return payload.state;
+}
+
+// ── Chat model selector ──
+
+export type ChatModelState = {
+  client: GatewayBrowserClient | null;
+  connected: boolean;
+  chatModels: Array<{ id: string; name: string; provider: string; source: string }>;
+  chatCurrentModel: string | null;
+  // Also sync debugModels for agents tab
+  debugModels: unknown[];
+};
+
+export async function loadChatModels(state: ChatModelState) {
+  if (!state.client || !state.connected) return;
+  try {
+    const [listRes, defaultRes] = await Promise.all([
+      state.client.request<{ models?: Array<Record<string, unknown>> }>("models.list", {}),
+      state.client.request<{ model?: string }>("models.default.get", {}),
+    ]);
+    const rawModels = Array.isArray(listRes?.models) ? listRes.models : [];
+    state.chatModels = rawModels.map((m) => ({
+      id: String(m.id ?? ""),
+      name: String(m.name ?? m.id ?? ""),
+      provider: String(m.provider ?? ""),
+      source: String(m.source ?? "custom"),
+    }));
+    state.chatCurrentModel = defaultRes?.model ?? null;
+    // Keep debugModels in sync so agents tab doesn't need separate fetch
+    if (state.debugModels.length === 0) {
+      state.debugModels = rawModels;
+    }
+  } catch {
+    // non-critical — composer will work without model selector
+  }
+}
+
+export async function setChatModel(state: ChatModelState, model: string) {
+  if (!state.client || !state.connected) return;
+  state.chatCurrentModel = model; // optimistic update
+  try {
+    await state.client.request("models.default.set", { model });
+  } catch {
+    // revert on failure — reload from server
+    void loadChatModels(state);
+  }
 }

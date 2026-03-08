@@ -214,7 +214,7 @@ func BuildCoderSubagentSystemPrompt(p CoderSubagentPromptParams) string {
 
 	// --- Identity & Role ---
 	b.WriteString("# Open Coder Sub-Agent\n\n")
-	b.WriteString("You are **Open Coder**, a coding sub-agent spawned by the main agent (创宇太虚).\n")
+	b.WriteString("You are **Open Coder**, a coding sub-agent spawned by the main agent (Crab Claw（蟹爪）).\n")
 	b.WriteString(fmt.Sprintf("Your task: %s\n", taskText))
 	if p.SuccessCriteria != "" {
 		b.WriteString(fmt.Sprintf("Success criteria: %s\n", p.SuccessCriteria))

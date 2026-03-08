@@ -5,6 +5,7 @@
 @import "./chat/tool-cards.css";
 @import "./chat/coder-cards.css";
 @import "./chat/sidebar.css";
+@import "./chat/readonly-run.css";
 @import "./chat/multimodal.css";
 @import "./chat/lightbox.css";
 @import "./chat/math.css";

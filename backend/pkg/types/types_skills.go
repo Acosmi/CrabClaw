@@ -32,9 +32,9 @@ type SkillsStoreOAuthConfig struct {
 
 // SkillsStoreConfig 技能商店连接配置（nexus-v4 云端）
 type SkillsStoreConfig struct {
-	URL   string                  `json:"url,omitempty"`   // nexus-v4 基础 URL，如 "https://chat.acosmi.com"
-	Token string                  `json:"token,omitempty"` // JWT Bearer token (P1 REST + P2 OAuth bootstrap)
-	MCP   *MCPConnectionConfig    `json:"mcp,omitempty"`   // MCP 远程工具连接配置 (P2)
+	URL   string                  `json:"url,omitempty"`                // nexus-v4 基础 URL，如 "https://chat.acosmi.com"
+	Token string                  `json:"token,omitempty"`              // JWT Bearer token (P1 REST + P2 OAuth bootstrap)
+	MCP   *MCPConnectionConfig    `json:"mcp,omitempty"`                // MCP 远程工具连接配置 (P2)
 	OAuth *SkillsStoreOAuthConfig `json:"oauth,omitempty" yaml:"oauth"` // OAuth 2.1 + PKCE 配置 (P2)
 }
 

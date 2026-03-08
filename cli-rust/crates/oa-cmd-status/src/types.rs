@@ -1,7 +1,6 @@
-/// Status types for Claw Acosmi CLI.
+/// Status types for Crab Claw CLI.
 ///
 /// Source: `src/commands/status.types.ts`
-
 use serde::{Deserialize, Serialize};
 
 /// Describes the kind of a session (direct, group, global, unknown).

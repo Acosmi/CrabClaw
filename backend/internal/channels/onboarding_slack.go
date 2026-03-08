@@ -57,12 +57,12 @@ var SlackDmPolicyInfo = struct {
 // 对应 TS buildSlackManifest (slack.ts L44-98)。
 func BuildSlackAppManifest(botName string) string {
 	if botName == "" {
-		botName = "OpenAcosmi"
+		botName = "Crab Claw"
 	}
 	manifest := map[string]interface{}{
 		"display_information": map[string]interface{}{
 			"name":        botName,
-			"description": "AI assistant powered by OpenAcosmi",
+			"description": "AI assistant powered by Crab Claw（蟹爪）",
 		},
 		"features": map[string]interface{}{
 			"bot_user": map[string]interface{}{
@@ -134,7 +134,7 @@ type ConfigureSlackResult struct {
 // NoteSlackTokenHelp 展示 Slack token 帮助文本。
 func NoteSlackTokenHelp(prompter Prompter, botName string) {
 	if botName == "" {
-		botName = "OpenAcosmi"
+		botName = "Crab Claw"
 	}
 	prompter.Note(strings.Join([]string{
 		"1) api.slack.com/apps → Create New App → From an app manifest",
@@ -173,7 +173,7 @@ func ConfigureSlack(params ConfigureSlackParams) (*ConfigureSlackResult, error) 
 	// Bot name
 	botName := cfg.Channels.Slack.Name
 	if botName == "" {
-		botName = "OpenAcosmi"
+		botName = "Crab Claw"
 	}
 
 	// 展示 manifest

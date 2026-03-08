@@ -1,8 +1,8 @@
 <div align="center">
 
-  <img src="./logo1.png" alt="Crab Claw （螃爪）@Acosmi 创宇太虚架构图 / Architecture Diagram" width="160" />
+  <img src="./claw-crab-logo.png" alt="Crab Claw（蟹爪）架构图 / Architecture Diagram" width="160" />
   
-# <span style="color: #c9ccc6;">"Crab Claw @ Acosmi (创宇太虚)</span>
+# <span style="color: #c9ccc6;">Crab Claw（蟹爪） @ Acosmi.ai</span>
 
 **「在虚空中创建新秩序，构筑太虚之境」**<br>
 **"Creating new order in the void, building the realm of Acosmi"**<br><br>
@@ -32,15 +32,15 @@
 
 ## 🌌 愿景与破局
 
-**Claw Acosmi (创宇太虚)** 致力于打破传统 AI 开发框架的束缚。在混沌的“虚空”中，我们以底层重构的姿态，为您创建全新的秩序。这是一个真正面向未来的**多模态、强化隔离、原生分布式**的复合 Agent 联邦架构。
+**Crab Claw（蟹爪）** 致力于打破传统 AI 开发框架的束缚。在混沌的“虚空”中，我们以底层重构的姿态，为您创建全新的秩序。这是一个真正面向未来的**多模态、强化隔离、原生分布式**的复合 Agent 联邦架构。
 
-与传统的 Node.js/Python 脚本级 Agent 框架相比，创宇太虚在**系统级安全控制**、**记忆检索效率**和**技能扩展域**上实现了升维打击。
+与传统的 Node.js/Python 脚本级 Agent 框架相比，Crab Claw 在**系统级安全控制**、**记忆检索效率**和**技能扩展域**上实现了升维打击。
 
 ---
 
 ## ✨ 核心能力与架构升维
 
-通过采用跨越语言边界的深度混合架构 (`Rust` + `Go`)，创宇太虚做到了：
+通过采用跨越语言边界的深度混合架构 (`Rust` + `Go`)，Crab Claw 做到了：
 
 ### 1. 🛡️ 坚如磐石：自研 Rust 原生沙箱
 
@@ -68,10 +68,10 @@
 
 ### 4. 🪆 混沌初开：庞大的子智能体群 (Sub-Agents)
 
-创宇太虚不再是一个孤独的思考者。
+Crab Claw 不再是一个孤独的思考者。
 
 - **视觉感知智能体 (Argus)**：基于 Go+Rust 混合编译的视觉中枢，能够直视用户的桌面、感知屏幕的变化流，赋予系统真正的“视觉”与像素级多模态流解析能力。
-- **更多核心子智能体 (即将接入)**：如 Swabble、Acosmo-Code 等将陆续接入。各个子智能体将在由沙箱划定的安全通信隔离区内，进行大规模的并行工作、互相博弈与协同决策。
+- **更多核心子智能体 (即将接入)**：如 Swabble、Coder 等将陆续接入。各个子智能体将在由沙箱划定的安全通信隔离区内，进行大规模的并行工作、互相博弈与协同决策。
 - *【越维打击】*：从单一的大语言模型的纯文本处理，正式进化为具备**感知、推理、代码生成、视觉审查**的全能 Agent 兵团，在复杂的人效任务流中实现真正意义上的「分布式多核运作」。
 
 ### 5. 🔐 铜墙铁壁：安全防护等级审批制度
@@ -118,7 +118,7 @@
 
 ```bash
 # 进入项目根目录
-cd OpenAcosmi-rust+go
+cd CrabClaw
 
 # 一键安装依赖、编译并启动全部联邦服务
 make start
@@ -137,15 +137,15 @@ make start
 
 ## 🌌 Vision & Breakthrough
 
-**Claw Acosmi** is dedicated to breaking the constraints of traditional AI development frameworks. In the chaos of the "void" (Acosmism), we construct a completely new order from the ground up. This is a truly future-oriented, **multi-modal, hyper-isolated, and natively distributed** complex Agent Federation architecture.
+**Crab Claw** is dedicated to breaking the constraints of traditional AI development frameworks. In the chaos of the "void" (Acosmism), we construct a completely new order from the ground up. This is a truly future-oriented, **multi-modal, hyper-isolated, and natively distributed** complex Agent Federation architecture.
 
-Compared to legacy Node.js/Python script-level Agent frameworks, Claw Acosmi achieves a dimensional strike in **system-level security control**, **memory retrieval efficiency**, and **infinite skill expansibility**.
+Compared to legacy Node.js/Python script-level Agent frameworks, Crab Claw achieves a dimensional strike in **system-level security control**, **memory retrieval efficiency**, and **infinite skill expansibility**.
 
 ---
 
 ## ✨ Core Capabilities & Architectural Dimensional Strike
 
-By adopting a deep hybrid architecture crossing language boundaries (`Rust` + `Go`), Claw Acosmi has accomplished the following:
+By adopting a deep hybrid architecture crossing language boundaries (`Rust` + `Go`), Crab Claw has accomplished the following:
 
 ### 1. 🛡️ Rock-Solid: Self-Developed Rust Native Sandbox
 
@@ -173,10 +173,10 @@ Acosmi discards the industry-mainstream flat Tool mounting mechanism, introducin
 
 ### 4. 🪆 Dawn of Chaos: The Vast Swarm of Sub-Agents
 
-Claw Acosmi is no longer a lone thinker.
+Crab Claw is no longer a lone thinker.
 
 - **Visual Perception Agent (Argus)**: A visual nexus built on Go+Rust, capable of staring directly at the user's desktop and perceiving the stream of screen changes, granting the system true "vision" and pixel-level multi-modal stream parsing abilities.
-- **More Core Sub-Agents (Incoming)**: Agents like Swabble and Acosmo-Code will be connected sequentially. Within secure communication zones delineated by the sandbox, these sub-agents perform large-scale parallel work, mutual gaming, and collaborative decision-making.
+- **More Core Sub-Agents (Incoming)**: Agents like Swabble and Coder will be connected sequentially. Within secure communication zones delineated by the sandbox, these sub-agents perform large-scale parallel work, mutual gaming, and collaborative decision-making.
 - *[Dimensional Strike]*: Evolving from single LLM pure text processing to an omnipotent Agent Legion equipped with **perception, inference, code generation, and visual auditing**, achieving true "distributed multi-core operation" in complex workflows.
 
 ### 5. 🔐 Ironclad: Security Protection Level Approval System
@@ -223,7 +223,7 @@ This project supports cross-platform one-click startup on macOS, Windows, and Li
 
 ```bash
 # Navigate to the project root
-cd OpenAcosmi-rust+go
+cd CrabClaw
 
 # One-click install dependencies, compile, and start all federation services
 make start

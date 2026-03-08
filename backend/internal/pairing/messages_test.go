@@ -35,6 +35,9 @@ func TestBuildPairingReply(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.channel, func(t *testing.T) {
 			text := BuildPairingReply(tc.channel, tc.idLine, tc.code)
+			if !strings.Contains(text, "Crab Claw（蟹爪）") {
+				t.Errorf("missing new brand in pairing reply: %q", text)
+			}
 			if !strings.Contains(text, tc.idLine) {
 				t.Errorf("missing idLine %q", tc.idLine)
 			}
@@ -65,7 +68,7 @@ func TestBuildPairingReplyNoProfile(t *testing.T) {
 	if strings.Contains(text, "--profile") {
 		t.Error("should not contain --profile when env not set")
 	}
-	if !strings.Contains(text, "openacosmi pairing approve discord <code>") {
+	if !strings.Contains(text, "crabclaw pairing approve discord <code>") {
 		t.Error("missing base command")
 	}
 }
@@ -73,6 +76,9 @@ func TestBuildPairingReplyNoProfile(t *testing.T) {
 func TestPairingApprovedMessage(t *testing.T) {
 	if PairingApprovedMessage == "" {
 		t.Error("PairingApprovedMessage should not be empty")
+	}
+	if !strings.Contains(PairingApprovedMessage, "Crab Claw（蟹爪）") {
+		t.Error("should contain the new brand")
 	}
 	if !strings.Contains(PairingApprovedMessage, "approved") {
 		t.Error("should contain 'approved'")

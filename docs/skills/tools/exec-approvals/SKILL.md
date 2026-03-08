@@ -1,46 +1,38 @@
 ---
 name: exec-approvals
-description: "Exec 审批、白名单和沙箱逃逸提示"
+description: "Exec approvals, allowlists, and sandbox escape prompts"
 ---
 
-# Exec 审批
+# Exec approvals
 
-Exec 审批是**真实主机执行**的安全护栏，用于允许沙箱化的 Agent 在真实主机（`gateway` 或 `node`）上运行命令。可以将其视为安全联锁：只有当策略 + 白名单 +（可选）用户审批全部同意时，命令才被允许。Exec 审批是在工具策略和提权控制**之外**的额外保障（除非 elevated 设为 `full`，会跳过审批）。有效策略取 `tools.exec.*` 和审批默认值中**更严格的**；如果审批字段被省略，使用 `tools.exec` 的值。
+Exec approvals are the **companion app / node host guardrail** for letting a sandboxed agent run
+commands on a real host (`gateway` or `node`). Think of it like a safety interlock:
+commands are allowed only when policy + allowlist + (optional) user approval all agree.
+Exec approvals are **in addition** to tool policy and elevated gating (unless elevated is set to `full`, which skips approvals).
+Effective policy is the **stricter** of `tools.exec.*` and approvals defaults; if an approvals field is omitted, the `tools.exec` value is used.
 
-## 主路径
+If the companion app UI is **not available**, any request that requires a prompt is
+resolved by the **ask fallback** (default: deny).
 
-- 当前主路径是 `gateway/mac companion` 的审批治理。
-- `node host` 仍然是兼容/远端执行路径，不是本阶段默认主验收路径。
-- Go Gateway 当前仅完整实现 `exec.approvals.get/set`。
-- `exec.approvals.node.get/set` 在 Gateway 侧不再作为管理路径；node 审批文件改为节点主机本地维护。
+## Where it applies
 
-如果伴侣应用 UI **不可用**，任何需要提示的请求由**审批回退**（默认：deny）决定。
+Exec approvals are enforced locally on the execution host:
 
-## 适用范围
+- **gateway host** → Crab Claw gateway-side process on the gateway machine
+- **node host** → node runner (macOS companion app or headless node host)
 
-Exec 审批在执行主机上本地执行：
+macOS split:
 
-- **Gateway 主机** → Gateway 机器上的 `openacosmi` 进程
-- **node 主机** → node 运行器（macOS 伴侣应用或无头 node 主机）
+- **node host service** forwards `system.run` to the **macOS app** over local IPC.
+- **macOS app** enforces approvals + executes the command in UI context.
 
-当前能力边界：
+## Settings and storage
 
-- Gateway 主机审批文件可通过 `exec.approvals.get/set` 正常治理。
-- node 主机本地同样有 `~/.openacosmi/exec-approvals.json` 与 `system.execApprovals.get/set` 能力语义。
-- 不要把“node 本地有审批文件”误写成“Gateway 已可统一远程管理 node 审批”；当前设计就是 node 本地维护。
-
-macOS 分层：
-
-- **node 主机服务** 通过本地 IPC 将 `system.run` 转发到 **macOS 应用**。
-- **macOS 应用** 执行审批 + 在 UI 上下文中执行命令。
-
-## 设置和存储
-
-审批存储在执行主机上的本地 JSON 文件中：
+Approvals live in a local JSON file on the execution host:
 
 `~/.openacosmi/exec-approvals.json`
 
-示例结构：
+Example schema:
 
 ```json
 {
@@ -75,101 +67,112 @@ macOS 分层：
 }
 ```
 
-## 策略控制
+## Policy knobs
 
-### Security（`exec.security`）
+### Security (`exec.security`)
 
-- **deny**：阻止所有宿主机 exec 请求。
-- **allowlist**：仅允许白名单中的命令。
-- **full**：允许一切（等同于提权）。
+- **deny**: block all host exec requests.
+- **allowlist**: allow only allowlisted commands.
+- **full**: allow everything (equivalent to elevated).
 
-### Ask（`exec.ask`）
+### Ask (`exec.ask`)
 
-- **off**：从不提示。
-- **on-miss**：仅在白名单不匹配时提示。
-- **always**：每个命令都提示。
+- **off**: never prompt.
+- **on-miss**: prompt only when allowlist does not match.
+- **always**: prompt on every command.
 
-### Ask 回退（`askFallback`）
+### Ask fallback (`askFallback`)
 
-如果需要提示但无 UI 可达，回退决定：
+If a prompt is required but no UI is reachable, fallback decides:
 
-- **deny**：阻止。
-- **allowlist**：仅在白名单匹配时允许。
-- **full**：允许。
+- **deny**: block.
+- **allowlist**: allow only if allowlist matches.
+- **full**: allow.
 
-## 白名单（每 Agent）
+## Allowlist (per agent)
 
-白名单按**每个 Agent** 隔离。如果存在多个 Agent，在 macOS 应用中切换编辑的 Agent。模式为**不区分大小写的 Glob 匹配**。模式应解析为**二进制路径**（仅文件名的条目会被忽略）。旧版 `agents.default` 条目在加载时迁移到 `agents.main`。
+Allowlists are **per agent**. If multiple agents exist, switch which agent you’re
+editing in the macOS app. Patterns are **case-insensitive glob matches**.
+Patterns should resolve to **binary paths** (basename-only entries are ignored).
+Legacy `agents.default` entries are migrated to `agents.main` on load.
 
-示例：
+Examples:
 
 - `~/Projects/**/bin/peekaboo`
 - `~/.local/bin/*`
 - `/opt/homebrew/bin/rg`
 
-每个白名单条目跟踪：
+Each allowlist entry tracks:
 
-- **id** 用于 UI 标识的稳定 UUID（可选）
-- **上次使用**时间戳
-- **上次使用的命令**
-- **上次解析的路径**
+- **id** stable UUID used for UI identity (optional)
+- **last used** timestamp
+- **last used command**
+- **last resolved path**
 
-## 自动允许技能 CLI
+## Auto-allow skill CLIs
 
-当**自动允许技能 CLI** 启用时，已知技能引用的可执行文件在 node 上被视为白名单（macOS node 或无头 node 主机）。使用 Gateway RPC 上的 `skills.bins` 获取技能 bin 列表。如果需要严格的手动白名单请禁用此功能。
+When **Auto-allow skill CLIs** is enabled, executables referenced by known skills
+are treated as allowlisted on nodes (macOS node or headless node host). This uses
+`skills.bins` over the Gateway RPC to fetch the skill bin list. Disable this if you want strict manual allowlists.
 
-## 安全二进制（仅 stdin）
+## Safe bins (stdin-only)
 
-`tools.exec.safeBins` 定义一小组**仅 stdin** 的二进制文件（例如 `jq`），可在白名单模式下**无需**显式白名单条目运行。安全二进制会拒绝位置文件参数和路径样 Token，因此只能操作传入的流。白名单模式下不自动允许 Shell 链式操作和重定向。
+`tools.exec.safeBins` defines a small list of **stdin-only** binaries (for example `jq`)
+that can run in allowlist mode **without** explicit allowlist entries. Safe bins reject
+positional file args and path-like tokens, so they can only operate on the incoming stream.
+Shell chaining and redirections are not auto-allowed in allowlist mode.
 
-当每个顶级段都满足白名单时（包括安全二进制或技能自动允许），允许 Shell 链（`&&`、`||`、`;`）。白名单模式下仍不支持重定向。白名单解析期间拒绝命令替换（`$()` / 反引号），包括双引号内的；如果需要文字 `$()` 文本请使用单引号。
+Shell chaining (`&&`, `||`, `;`) is allowed when every top-level segment satisfies the allowlist
+(including safe bins or skill auto-allow). Redirections remain unsupported in allowlist mode.
+Command substitution (`$()` / backticks) is rejected during allowlist parsing, including inside
+double quotes; use single quotes if you need literal `$()` text.
 
-默认安全二进制：`jq`、`grep`、`cut`、`sort`、`uniq`、`head`、`tail`、`tr`、`wc`。
+Default safe bins: `jq`, `grep`, `cut`, `sort`, `uniq`, `head`, `tail`, `tr`, `wc`.
 
-## 控制 UI 编辑
+## Control UI editing
 
-使用**控制 UI → Nodes → Exec approvals** 卡片编辑默认值、每 Agent 覆盖和白名单。选择范围（默认值或某个 Agent），调整策略，添加/移除白名单模式，然后**保存**。UI 显示每个模式的**上次使用**元数据以便保持列表整洁。
+Use the **Control UI → Nodes → Exec approvals** card to edit defaults, per‑agent
+overrides, and allowlists. Pick a scope (Defaults or an agent), tweak the policy,
+add/remove allowlist patterns, then **Save**. The UI shows **last used** metadata
+per pattern so you can keep the list tidy.
 
-目标选择器选择 **Gateway**（本地审批）或 **Node**。  
-但在当前 Go Gateway 下，应默认把 **Gateway** 视为唯一完整打通的管理目标。
+The target selector chooses **Gateway** (local approvals) or a **Node**. Nodes
+must advertise `system.execApprovals.get/set` (macOS app or headless node host).
+If a node does not advertise exec approvals yet, edit its local
+`~/.openacosmi/exec-approvals.json` directly.
 
-Node 侧请区分两件事：
+CLI: `crabclaw approvals` supports gateway or node editing (see [Approvals CLI](/cli/approvals)).
 
-- node 主机本地审批能力存在
-- Gateway 不负责远程代理 node 审批管理
+## Approval flow
 
-因此当前更稳妥的做法是：
+When a prompt is required, the gateway broadcasts `exec.approval.requested` to operator clients.
+The Control UI and macOS app resolve it via `exec.approval.resolve`, then the gateway forwards the
+approved request to the node host.
 
-- Gateway 审批：用控制 UI / `exec.approvals.get/set`
-- node 审批：优先在 node 主机本地维护 `~/.openacosmi/exec-approvals.json`
+When approvals are required, the exec tool returns immediately with an approval id. Use that id to
+correlate later system events (`Exec finished` / `Exec denied`). If no decision arrives before the
+timeout, the request is treated as an approval timeout and surfaced as a denial reason.
 
-CLI：`openacosmi approvals` 当前可靠支持本地/Gateway 审批文件；`--node` 已明确不支持（参见 [审批 CLI](/cli/approvals)）。
+The confirmation dialog includes:
 
-## 审批流程
+- command + args
+- cwd
+- agent id
+- resolved executable path
+- host + policy metadata
 
-当需要提示时，Gateway 向操作者客户端广播 `exec.approval.requested`。控制 UI 和 macOS 应用通过 `exec.approval.resolve` 解决，然后 Gateway 将已批准的请求转发到 node 主机。
+Actions:
 
-当需要审批时，exec 工具立即返回审批 ID。使用该 ID 关联后续系统事件（`Exec finished` / `Exec denied`）。如果在超时前未收到决定，请求被视为审批超时并作为拒绝原因呈现。
+- **Allow once** → run now
+- **Always allow** → add to allowlist + run
+- **Deny** → block
 
-确认对话框包含：
+## Approval forwarding to chat channels
 
-- 命令 + 参数
-- 工作目录
-- Agent ID
-- 解析后的可执行文件路径
-- 主机 + 策略元数据
+You can forward exec approval prompts to any chat channel (including plugin channels) and approve
+them with `/approve`. This uses the normal outbound delivery pipeline.
 
-操作：
-
-- **允许一次** → 立即运行
-- **始终允许** → 添加到白名单 + 运行
-- **拒绝** → 阻止
-
-## 审批转发到聊天渠道
-
-您可以将 exec 审批提示转发到任何聊天渠道（包括插件渠道）并通过 `/approve` 审批。使用标准出站投递管道。
-
-配置：
+Config:
 
 ```json5
 {
@@ -178,7 +181,7 @@ CLI：`openacosmi approvals` 当前可靠支持本地/Gateway 审批文件；`--
       enabled: true,
       mode: "session", // "session" | "targets" | "both"
       agentFilter: ["main"],
-      sessionFilter: ["discord"], // 子串或正则表达式
+      sessionFilter: ["discord"], // substring or regex
       targets: [
         { channel: "slack", to: "U12345678" },
         { channel: "telegram", to: "123456789" },
@@ -188,7 +191,7 @@ CLI：`openacosmi approvals` 当前可靠支持本地/Gateway 审批文件；`--
 }
 ```
 
-在聊天中回复：
+Reply in chat:
 
 ```
 /approve <id> allow-once
@@ -196,7 +199,7 @@ CLI：`openacosmi approvals` 当前可靠支持本地/Gateway 审批文件；`--
 /approve <id> deny
 ```
 
-### macOS IPC 流程
+### macOS IPC flow
 
 ```
 Gateway -> Node Service (WS)
@@ -205,57 +208,35 @@ Gateway -> Node Service (WS)
              Mac App (UI + approvals + system.run)
 ```
 
-安全说明：
+Security notes:
 
-- Unix socket 模式 `0600`，Token 存储在 `exec-approvals.json` 中。
-- 同 UID 对等检查。
-- 质询/响应（nonce + HMAC token + 请求哈希）+ 短 TTL。
+- Unix socket mode `0600`, token stored in `exec-approvals.json`.
+- Same-UID peer check.
+- Challenge/response (nonce + HMAC token + request hash) + short TTL.
 
-## 系统事件
+## System events
 
-Exec 生命周期以系统消息呈现：
+Exec lifecycle is surfaced as system messages:
 
-- `Exec running`（仅当命令超过运行通知阈值时）
+- `Exec running` (only if the command exceeds the running notice threshold)
 - `Exec finished`
 - `Exec denied`
 
-这些在 node 报告事件后发布到 Agent 的会话。Gateway 主机 exec 审批在命令完成时发出相同的生命周期事件（可选在运行时间超过阈值时发出）。审批控制的 exec 在这些消息中复用审批 ID 作为 `runId` 以便关联。
+These are posted to the agent’s session after the node reports the event.
+Gateway-host exec approvals emit the same lifecycle events when the command finishes (and optionally when running longer than the threshold).
+Approval-gated execs reuse the approval id as the `runId` in these messages for easy correlation.
 
-## 含义
+## Implications
 
-- **full** 权力很大；尽可能优先使用白名单。
-- **ask** 让您保持在循环中同时仍允许快速审批。
-- 每 Agent 白名单防止一个 Agent 的审批泄漏到其他 Agent。
-- 审批仅适用于**已授权发送者**的宿主机 exec 请求。未授权发送者无法使用 `/exec`。
-- `/exec security=full` 是已授权操作者的会话级便利工具，设计上会跳过审批。要硬阻止宿主机 exec，将审批 security 设为 `deny` 或通过工具策略拒绝 `exec` 工具。
-- 对 `host=node` 而言，node 主机本地审批策略会生效；不要再把 Gateway 侧 node 审批读取/写入代理当成验收依赖。
+- **full** is powerful; prefer allowlists when possible.
+- **ask** keeps you in the loop while still allowing fast approvals.
+- Per-agent allowlists prevent one agent’s approvals from leaking into others.
+- Approvals only apply to host exec requests from **authorized senders**. Unauthorized senders cannot issue `/exec`.
+- `/exec security=full` is a session-level convenience for authorized operators and skips approvals by design.
+  To hard-block host exec, set approvals security to `deny` or deny the `exec` tool via tool policy.
 
-相关：
+Related:
 
-- [Exec 工具](/tools/exec)
-- [提权模式](/tools/elevated)
-- [技能](/tools/skills)
-
-## 故障树
-
-- Gateway 上的 `exec.approvals.get/set` 生效，但 node 侧行为没变：通常是你改的是 Gateway 本地审批，而 node 仍走节点主机本地文件
-- 期望通过 Gateway 管远程 node 审批：当前 `exec.approvals.node.get/set` 已明确不是管理路径，会返回不支持
-- 明明在白名单里却仍被拦：要先看解析后的真实二进制路径、shell 分段和 ask/askFallback 是否更严格
-- 需要提示但 UI 不可达：最终结果取决于 `askFallback`，不是所有场景都会弹出审批
-- 把聊天远程审批或提权审批与 exec 白名单混成一件事：这会导致制度路径和实际执法面错位
-
-## 回滚步骤
-
-- 出现异常放行或异常拒绝时，先把策略收回到更保守的 `allowlist` 或 `deny`
-- Gateway 路径先只验本地审批；涉及 node 时，改到 node 主机本地维护审批文件
-- 白名单命中异常时，先用最小命令重新验证解析后的二进制路径，不要直接放大到 `full`
-- UI/审批通道不稳定时，先确认 `askFallback` 是否符合当前制度预期
-- 若本次问题发生在兼容 node 路径，停止把 Gateway 远程代理当成修复入口
-
-## 验收清单
-
-- Gateway 主机上的 exec 审批能正确读取、修改并生效
-- 若使用 node 路径，已在 node 主机本地验证审批文件与执行行为一致
-- 白名单、ask、askFallback 三者的实际效果与制度设计一致
-- 审批事件、拒绝、完成等生命周期可被审计追踪
-- 没有再把 Gateway 远程 node 审批代理当成主验收依赖
+- [Exec tool](/tools/exec)
+- [Elevated mode](/tools/elevated)
+- [Skills](/tools/skills)

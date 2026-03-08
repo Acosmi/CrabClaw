@@ -14,7 +14,7 @@ func newStatusCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show system status",
-		Long:  "Display the status of all OpenAcosmi services, agents, and channels.",
+		Long:  "Display the status of all Crab Claw（蟹爪） services, agents, and channels.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jsonFlag, _ := cmd.Flags().GetBool("json")
 			timeout, _ := cmd.Flags().GetInt("timeout")
@@ -34,7 +34,7 @@ func newStatusCmd() *cobra.Command {
 					data, _ := json.MarshalIndent(status, "", "  ")
 					cmd.Println(string(data))
 				} else {
-					cmd.Println("📊 OpenAcosmi 状态")
+					cmd.Println("📊 Crab Claw（蟹爪）状态")
 					cmd.Println()
 					cmd.Println("  ❌ Gateway: 未运行")
 					cmd.Printf("     (%v)\n", err)
@@ -46,7 +46,7 @@ func newStatusCmd() *cobra.Command {
 				data, _ := json.MarshalIndent(result, "", "  ")
 				cmd.Println(string(data))
 			} else {
-				cmd.Println("📊 OpenAcosmi 状态")
+				cmd.Println("📊 Crab Claw（蟹爪）状态")
 				cmd.Println()
 
 				// 解析 status 结果

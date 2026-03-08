@@ -1,6 +1,6 @@
 /**
  * @file vision_bridge.cpp
- * @brief Open Acosmi 视觉处理桥接实现
+ * @brief Crab Claw（蟹爪）视觉处理桥接实现
  *
  * 实现 vision_bridge.h 中定义的 extern "C" 接口。
  * Phase 8 中将集成 OpenCV 进行实际图像处理。

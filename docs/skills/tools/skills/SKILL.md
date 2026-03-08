@@ -1,11 +1,12 @@
 ---
 name: skills
 description: 技能系统：加载路径、优先级、门控规则与配置
+tools: search_skills, lookup_skill
 ---
 
-# 技能系统（创宇太虚（Claw Acosmi））
+# 技能系统（Crab Claw（蟹爪））
 
-创宇太虚（Claw Acosmi） 使用兼容 AgentSkills 格式的技能目录向智能体注入额外能力。每个技能是一个包含 `SKILL.md` 的目录，文件包含 YAML frontmatter 元数据和 Markdown 指令。系统启动时按优先级加载技能，依据环境、配置和可执行文件可用性过滤。
+Crab Claw（蟹爪） 使用兼容 AgentSkills 格式的技能目录向智能体注入额外能力。每个技能是一个包含 `SKILL.md` 的目录，文件包含 YAML frontmatter 元数据和 Markdown 指令。系统启动时按优先级加载技能，依据环境、配置和可执行文件可用性过滤。
 
 ## 加载路径与优先级
 
@@ -31,7 +32,7 @@ description: 技能系统：加载路径、优先级、门控规则与配置
 
 ## 技能商店（nexus-v4）
 
-创宇太虚（Claw Acosmi） 内置技能商店客户端，连接 nexus-v4 MCP Server，支持浏览、拉取、刷新、链接技能：
+Crab Claw（蟹爪） 内置技能商店客户端，连接 nexus-v4 MCP Server，支持浏览、拉取、刷新、链接技能：
 
 ```
 skills.store.browse  — 按分类/关键词浏览
@@ -120,7 +121,7 @@ metadata: {"openacosmi": {"requires": {"bins": ["rg"], "env": ["MY_API_KEY"]}, "
 
 ## 环境注入（每次 Agent 运行）
 
-Agent 运行时，创宇太虚（Claw Acosmi）：
+Agent 运行时，Crab Claw（蟹爪）：
 
 1. 读取技能元数据
 2. 将 `skills.entries.<key>.env` 或 `skills.entries.<key>.apiKey` 注入到运行环境变量（如该变量尚未设置）
@@ -131,11 +132,11 @@ Agent 运行时，创宇太虚（Claw Acosmi）：
 
 ## 会话快照（性能）
 
-创宇太虚（Claw Acosmi） 在**会话开始时**对符合条件的技能拍摄快照，在同一会话的后续轮次中复用该列表。技能或配置的变更在下一个新会话生效。
+Crab Claw（蟹爪） 在**会话开始时**对符合条件的技能拍摄快照，在同一会话的后续轮次中复用该列表。技能或配置的变更在下一个新会话生效。
 
 ## Token 影响（技能索引）
 
-技能符合条件时，创宇太虚（Claw Acosmi） 将紧凑索引注入 system prompt：
+技能符合条件时，Crab Claw（蟹爪） 将紧凑索引注入 system prompt：
 
 ```
 <available_skills>

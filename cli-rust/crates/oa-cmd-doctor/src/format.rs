@@ -4,7 +4,6 @@
 /// and actionable repair hints (LaunchAgent, systemd, Windows task).
 ///
 /// Source: `src/commands/doctor-format.ts`
-
 use oa_cli_shared::command_format::format_cli_command;
 
 /// Runtime information for the gateway service.
@@ -105,7 +104,7 @@ pub fn build_gateway_runtime_hints(
     if runtime.missing_unit {
         hints.push(format!(
             "Service not installed. Run: {}",
-            format_cli_command("openacosmi gateway install")
+            format_cli_command("crabclaw gateway install")
         ));
         return hints;
     }
@@ -118,7 +117,7 @@ pub fn build_gateway_runtime_hints(
         );
         hints.push(format!(
             "Then reinstall: {}",
-            format_cli_command("openacosmi gateway install")
+            format_cli_command("crabclaw gateway install")
         ));
     }
 
@@ -130,7 +129,10 @@ pub fn build_gateway_runtime_hints(
                 hints.push("Check launchd stdout/stderr logs.".to_string());
             }
             "linux" => {
-                hints.push("Logs: journalctl --user -u openacosmi-gateway.service -n 200 --no-pager".to_string());
+                hints.push(
+                    "Logs: journalctl --user -u openacosmi-gateway.service -n 200 --no-pager"
+                        .to_string(),
+                );
             }
             _ => {}
         }

@@ -253,7 +253,7 @@ func PickWebChannel(pref string, authDir string) (string, error) {
 		choice = "web"
 	}
 	if !WebAuthExists(authDir) {
-		return "", fmt.Errorf("no WhatsApp Web session found; run `openacosmi channels login --channel whatsapp --verbose` to link")
+		return "", fmt.Errorf("no WhatsApp Web session found; run `crabclaw channels login --channel whatsapp --verbose` to link")
 	}
 	return choice, nil
 }

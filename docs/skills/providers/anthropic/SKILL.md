@@ -1,28 +1,29 @@
 ---
 name: anthropic
-description: "通过 API 密钥或 setup-token 在创宇太虚中使用 Anthropic Claude"
+description: "Use Anthropic Claude via API keys or setup-token in Crab Claw（蟹爪）"
 ---
 
 # Anthropic (Claude)
 
-Anthropic 开发 **Claude** 模型家族并通过 API 提供访问。在创宇太虚中，你可以通过 API 密钥或 **setup-token** 进行认证。
+Anthropic builds the **Claude** model family and provides access via an API.
+In Crab Claw（蟹爪） you can authenticate with an API key or a **setup-token**.
 
-## 方案 A：Anthropic API 密钥
+## Option A: Anthropic API key
 
-**适用于：** 标准 API 访问和按量计费。
-在 Anthropic 控制台创建 API 密钥。
+**Best for:** standard API access and usage-based billing.
+Create your API key in the Anthropic Console.
 
-### CLI 设置
+### CLI setup
 
 ```bash
-openacosmi onboard
-# 选择：Anthropic API key
+crabclaw onboard
+# choose: Anthropic API key
 
-# 或非交互式
-openacosmi onboard --anthropic-api-key "$ANTHROPIC_API_KEY"
+# or non-interactive
+crabclaw onboard --anthropic-api-key "$ANTHROPIC_API_KEY"
 ```
 
-### 配置示例
+### Config snippet
 
 ```json5
 {
@@ -31,19 +32,19 @@ openacosmi onboard --anthropic-api-key "$ANTHROPIC_API_KEY"
 }
 ```
 
-## 提示缓存（Anthropic API）
+## Prompt caching (Anthropic API)
 
-创宇太虚支持 Anthropic 的提示缓存功能。这是**仅 API** 功能；订阅认证不支持缓存设置。
+Crab Claw（蟹爪） supports Anthropic's prompt caching feature. This is **API-only**; subscription auth does not honor cache settings.
 
-### 配置
+### Configuration
 
-在模型配置中使用 `cacheRetention` 参数：
+Use the `cacheRetention` parameter in your model config:
 
-| 值 | 缓存时长 | 说明 |
-| --- | --- | --- |
-| `none` | 不缓存 | 禁用提示缓存 |
-| `short` | 5 分钟 | API Key 认证的默认值 |
-| `long` | 1 小时 | 扩展缓存（需要 beta 标志） |
+| Value   | Cache Duration | Description                         |
+| ------- | -------------- | ----------------------------------- |
+| `none`  | No caching     | Disable prompt caching              |
+| `short` | 5 minutes      | Default for API Key auth            |
+| `long`  | 1 hour         | Extended cache (requires beta flag) |
 
 ```json5
 {
@@ -59,53 +60,54 @@ openacosmi onboard --anthropic-api-key "$ANTHROPIC_API_KEY"
 }
 ```
 
-### 默认值
+### Defaults
 
-使用 Anthropic API Key 认证时，创宇太虚自动为所有 Anthropic 模型应用 `cacheRetention: "short"`（5 分钟缓存）。你可以在配置中显式设置 `cacheRetention` 来覆盖。
+When using Anthropic API Key authentication, Crab Claw（蟹爪） automatically applies `cacheRetention: "short"` (5-minute cache) for all Anthropic models. You can override this by explicitly setting `cacheRetention` in your config.
 
-### 旧版参数
+### Legacy parameter
 
-旧版 `cacheControlTtl` 参数仍支持向后兼容：
+The older `cacheControlTtl` parameter is still supported for backwards compatibility:
 
-- `"5m"` 映射到 `short`
-- `"1h"` 映射到 `long`
+- `"5m"` maps to `short`
+- `"1h"` maps to `long`
 
-建议迁移到新的 `cacheRetention` 参数。
+We recommend migrating to the new `cacheRetention` parameter.
 
-创宇太虚在 Anthropic API 请求中包含 `extended-cache-ttl-2025-04-11` beta 标志；如覆盖供应商头需保留它（参见 [/gateway/configuration](/gateway/configuration)）。
+Crab Claw（蟹爪） includes the `extended-cache-ttl-2025-04-11` beta flag for Anthropic API
+requests; keep it if you override provider headers (see [/gateway/configuration](/gateway/configuration)).
 
-## 方案 B：Claude setup-token
+## Option B: Claude setup-token
 
-**适用于：** 使用 Claude 订阅。
+**Best for:** using your Claude subscription.
 
-### 获取 setup-token
+### Where to get a setup-token
 
-setup-token 由 **Claude Code CLI** 创建，非 Anthropic 控制台。可在**任何机器**上运行：
+Setup-tokens are created by the **Claude Code CLI**, not the Anthropic Console. You can run this on **any machine**:
 
 ```bash
 claude setup-token
 ```
 
-将 token 粘贴到创宇太虚（向导：**Anthropic token (paste setup-token)**），或在网关主机上运行：
+Paste the token into Crab Claw（蟹爪） (wizard: **Anthropic token (paste setup-token)**), or run it on the gateway host:
 
 ```bash
-openacosmi models auth setup-token --provider anthropic
+crabclaw models auth setup-token --provider anthropic
 ```
 
-若在其他机器上生成了 token：
+If you generated the token on a different machine, paste it:
 
 ```bash
-openacosmi models auth paste-token --provider anthropic
+crabclaw models auth paste-token --provider anthropic
 ```
 
-### CLI 设置（setup-token）
+### CLI setup (setup-token)
 
 ```bash
-# 在 onboarding 期间粘贴 setup-token
-openacosmi onboard --auth-choice setup-token
+# Paste a setup-token during onboarding
+crabclaw onboard --auth-choice setup-token
 ```
 
-### 配置示例（setup-token）
+### Config snippet (setup-token)
 
 ```json5
 {
@@ -113,32 +115,35 @@ openacosmi onboard --auth-choice setup-token
 }
 ```
 
-## 备注
+## Notes
 
-- 使用 `claude setup-token` 生成 token 并粘贴，或在网关主机上运行 `openacosmi models auth setup-token`。
-- 如看到 "OAuth token refresh failed …"（Claude 订阅），使用 setup-token 重新认证。参见 [/gateway/troubleshooting#oauth-token-refresh-failed-anthropic-claude-subscription](/gateway/troubleshooting#oauth-token-refresh-failed-anthropic-claude-subscription)。
-- 认证详情和复用规则参见 [/concepts/oauth](/concepts/oauth)。
+- Generate the setup-token with `claude setup-token` and paste it, or run `crabclaw models auth setup-token` on the gateway host.
+- If you see “OAuth token refresh failed …” on a Claude subscription, re-auth with a setup-token. See [/gateway/troubleshooting#oauth-token-refresh-failed-anthropic-claude-subscription](/gateway/troubleshooting#oauth-token-refresh-failed-anthropic-claude-subscription).
+- Auth details + reuse rules are in [/concepts/oauth](/concepts/oauth).
 
-## 故障排查
+## Troubleshooting
 
-**401 错误 / token 突然失效**
+**401 errors / token suddenly invalid**
 
-- Claude 订阅认证可能过期或被撤销。重新运行 `claude setup-token` 并粘贴到**网关主机**。
-- 若 Claude CLI 登录在其他机器上，在网关主机上使用 `openacosmi models auth paste-token --provider anthropic`。
+- Claude subscription auth can expire or be revoked. Re-run `claude setup-token`
+  and paste it into the **gateway host**.
+- If the Claude CLI login lives on a different machine, use
+  `crabclaw models auth paste-token --provider anthropic` on the gateway host.
 
-**未找到供应商 "anthropic" 的 API 密钥**
+**No API key found for provider "anthropic"**
 
-- 认证是**按智能体**的。新智能体不继承主智能体的密钥。
-- 为该智能体重新运行 onboarding，或在网关主机上粘贴 setup-token / API 密钥，然后用 `openacosmi models status` 验证。
+- Auth is **per agent**. New agents don’t inherit the main agent’s keys.
+- Re-run onboarding for that agent, or paste a setup-token / API key on the
+  gateway host, then verify with `crabclaw models status`.
 
-**未找到配置 `anthropic:default` 的凭据**
+**No credentials found for profile `anthropic:default`**
 
-- 运行 `openacosmi models status` 查看当前活跃的认证配置。
-- 重新运行 onboarding，或为该配置粘贴 setup-token / API 密钥。
+- Run `crabclaw models status` to see which auth profile is active.
+- Re-run onboarding, or paste a setup-token / API key for that profile.
 
-**无可用认证配置（全部在冷却/不可用）**
+**No available auth profile (all in cooldown/unavailable)**
 
-- 检查 `openacosmi models status --json` 中的 `auth.unusableProfiles`。
-- 添加另一个 Anthropic 配置或等待冷却。
+- Check `crabclaw models status --json` for `auth.unusableProfiles`.
+- Add another Anthropic profile or wait for cooldown.
 
-更多：[/gateway/troubleshooting](/gateway/troubleshooting) 和 [/help/faq](/help/faq)。
+More: [/gateway/troubleshooting](/gateway/troubleshooting) and [/help/faq](/help/faq).

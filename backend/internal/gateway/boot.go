@@ -9,10 +9,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Acosmi/ClawAcosmi/internal/agents/models"
 	"github.com/Acosmi/ClawAcosmi/internal/agents/runner"
 	"github.com/Acosmi/ClawAcosmi/internal/argus"
 	"github.com/Acosmi/ClawAcosmi/internal/channels"
 	"github.com/Acosmi/ClawAcosmi/internal/memory/uhms"
+	"github.com/Acosmi/ClawAcosmi/internal/packages"
 	"github.com/Acosmi/ClawAcosmi/internal/sandbox"
 	"github.com/Acosmi/ClawAcosmi/pkg/mcpinstall"
 	"github.com/Acosmi/ClawAcosmi/pkg/mcpremote"
@@ -93,6 +95,17 @@ type GatewayState struct {
 
 	// Monitor 频道热更新管理器（由 server.go 在 startMonitorChannels 替代时注入）
 	channelMonitorMgr *ChannelMonitorManager
+
+	// Phase 2A: OAuth Token Manager（可选 — 仅 OAuth 配置存在时初始化）
+	authManager *mcpremote.OAuthTokenManager
+
+	// Phase 4: 托管模型目录（可选 — 仅 ManagedModels.Enabled 且已登录时初始化）
+	managedCatalog *models.ManagedModelCatalog
+
+	// Phase 3: 统一应用中心（可选 — 初始化失败不阻塞启动）
+	packageCatalog   *packages.PackageCatalog
+	packageLedger    *packages.PackageLedger
+	packageInstaller *packages.PackageInstaller
 }
 
 // managedChromeInstance is an interface for an auto-launched Chrome process.
@@ -525,6 +538,76 @@ func (s *GatewayState) UHMSVFS() *uhms.LocalVFS {
 
 // ContractStore 返回合约 VFS 持久化实例（可能为 nil）。
 func (s *GatewayState) ContractStore() *VFSContractPersistence { return s.contractStore }
+
+// AuthManager 返回 OAuth Token Manager（可能为 nil，并发安全）。
+func (s *GatewayState) AuthManager() *mcpremote.OAuthTokenManager {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.authManager
+}
+
+// SetAuthManager 设置 OAuth Token Manager。
+func (s *GatewayState) SetAuthManager(m *mcpremote.OAuthTokenManager) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.authManager = m
+}
+
+// ManagedCatalog 返回托管模型目录（可能为 nil，并发安全）。
+func (s *GatewayState) ManagedCatalog() *models.ManagedModelCatalog {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.managedCatalog
+}
+
+// SetManagedCatalog 设置托管模型目录。
+func (s *GatewayState) SetManagedCatalog(c *models.ManagedModelCatalog) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.managedCatalog = c
+}
+
+// PackageCatalog 返回统一应用中心目录（可能为 nil，并发安全）。
+func (s *GatewayState) PackageCatalog() *packages.PackageCatalog {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.packageCatalog
+}
+
+// SetPackageCatalog 设置统一应用中心目录（并发安全）。
+func (s *GatewayState) SetPackageCatalog(c *packages.PackageCatalog) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.packageCatalog = c
+}
+
+// PackageLedger 返回安装账本（可能为 nil，并发安全）。
+func (s *GatewayState) PackageLedger() *packages.PackageLedger {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.packageLedger
+}
+
+// SetPackageLedger 设置安装账本（并发安全）。
+func (s *GatewayState) SetPackageLedger(l *packages.PackageLedger) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.packageLedger = l
+}
+
+// PackageInstaller 返回安装编排器（可能为 nil，并发安全）。
+func (s *GatewayState) PackageInstaller() *packages.PackageInstaller {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.packageInstaller
+}
+
+// SetPackageInstaller 设置安装编排器（并发安全）。
+func (s *GatewayState) SetPackageInstaller(i *packages.PackageInstaller) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.packageInstaller = i
+}
 
 // StopUHMS 优雅关闭 UHMS 记忆系统。
 func (s *GatewayState) StopUHMS() {

@@ -1,4 +1,10 @@
 import { truncateText } from "./format.ts";
+import type { ChatReadonlyRunState } from "./chat/readonly-run-state.ts";
+import {
+  updateChatReadonlyRunFromLifecycle,
+  updateChatReadonlyRunFromProgress,
+  updateChatReadonlyRunFromTool,
+} from "./chat/readonly-run-state.ts";
 
 const TOOL_STREAM_LIMIT = 50;
 const TOOL_STREAM_THROTTLE_MS = 80;
@@ -29,6 +35,7 @@ export type ToolStreamEntry = {
 type ToolStreamHost = {
   sessionKey: string;
   chatRunId: string | null;
+  chatReadonlyRun: ChatReadonlyRunState;
   toolStreamById: Map<string, ToolStreamEntry>;
   toolStreamOrder: string[];
   chatToolMessages: Record<string, unknown>[];
@@ -189,6 +196,23 @@ type CompactionHost = ToolStreamHost & {
 
 const COMPACTION_TOAST_DURATION_MS = 5000;
 
+function shouldTrackReadonlyEvent(host: ToolStreamHost, payload: AgentEventPayload): boolean {
+  const sessionKey = typeof payload.sessionKey === "string" ? payload.sessionKey : undefined;
+  if (sessionKey && sessionKey !== host.sessionKey) {
+    return false;
+  }
+  if (!sessionKey && host.chatRunId && payload.runId !== host.chatRunId) {
+    return false;
+  }
+  if (host.chatRunId && payload.runId !== host.chatRunId) {
+    return false;
+  }
+  if (!host.chatRunId) {
+    return false;
+  }
+  return true;
+}
+
 export function handleCompactionEvent(host: CompactionHost, payload: AgentEventPayload) {
   const data = payload.data ?? {};
   const phase = typeof data.phase === "string" ? data.phase : "";
@@ -241,6 +265,15 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
       phase: typeof data.phase === "string" ? data.phase : undefined,
       ts: typeof payload.ts === "number" ? payload.ts : Date.now(),
     };
+    if (shouldTrackReadonlyEvent(host, payload)) {
+      updateChatReadonlyRunFromProgress(host, {
+        runId: payload.runId,
+        sessionKey: payload.sessionKey,
+        ts: typeof payload.ts === "number" ? payload.ts : Date.now(),
+        summary,
+        phase: typeof data.phase === "string" ? data.phase : undefined,
+      });
+    }
     // 超过 2 分钟无新进度事件则自动清除横幅
     if (host.agentProgressClearTimer != null) {
       window.clearTimeout(host.agentProgressClearTimer);
@@ -249,6 +282,24 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
       host.agentProgress = null;
       host.agentProgressClearTimer = null;
     }, AGENT_PROGRESS_STALE_MS);
+    return;
+  }
+
+  if (payload.stream === "lifecycle") {
+    if (!shouldTrackReadonlyEvent(host, payload)) {
+      return;
+    }
+    const data = payload.data ?? {};
+    const phase = typeof data.phase === "string" ? data.phase : "";
+    if (!phase) {
+      return;
+    }
+    updateChatReadonlyRunFromLifecycle(host, {
+      runId: payload.runId,
+      sessionKey: payload.sessionKey,
+      ts: typeof payload.ts === "number" ? payload.ts : Date.now(),
+      phase,
+    });
     return;
   }
 
@@ -286,6 +337,17 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
         : undefined;
 
   const now = Date.now();
+  updateChatReadonlyRunFromTool(host, {
+    runId: payload.runId,
+    sessionKey,
+    ts: typeof payload.ts === "number" ? payload.ts : now,
+    toolCallId,
+    name,
+    phase,
+    isError: typeof data.isError === "boolean" ? data.isError : false,
+    output: output || undefined,
+  });
+
   let entry = host.toolStreamById.get(toolCallId);
   if (!entry) {
     entry = {

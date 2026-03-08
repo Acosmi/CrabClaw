@@ -1,11 +1,11 @@
-/// Plugin management commands for Claw Acosmi CLI.
+/// Plugin management commands for Crab Claw CLI.
 ///
 /// Provides `plugins` subcommands: list, info, install, enable, disable, doctor.
 /// Delegates to Gateway RPC: `plugins.list`, `plugins.config.set`.
-
 use anyhow::Result;
 use clap::Parser;
 
+use oa_cli_shared::command_format::format_cli_command;
 use oa_cli_shared::progress::with_progress;
 use oa_config::io::load_config;
 use oa_gateway_rpc::call::{CallGatewayOptions, call_gateway};
@@ -108,10 +108,7 @@ pub async fn plugins_list_command(args: &PluginsListArgs) -> Result<()> {
                 .and_then(|e| e.as_bool())
                 .unwrap_or(false);
             let status = if enabled { "enabled" } else { "disabled" };
-            let version = plugin
-                .get("version")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let version = plugin.get("version").and_then(|v| v.as_str()).unwrap_or("");
             println!("  {id} ({status}) {version}");
         }
     } else {
@@ -154,7 +151,10 @@ pub async fn plugins_install_command(args: &PluginsInstallArgs) -> Result<()> {
         println!("  Mode: link (dev)");
     }
     println!("  (not yet implemented — use config to add plugin paths)");
-    println!("  After adding, restart the gateway: openacosmi gateway restart");
+    println!(
+        "  After adding, restart the gateway: {}",
+        format_cli_command("crabclaw gateway restart")
+    );
     Ok(())
 }
 
@@ -171,10 +171,12 @@ pub async fn plugins_enable_command(args: &PluginsEnableArgs) -> Result<()> {
         ..Default::default()
     };
 
-    let _: serde_json::Value =
-        with_progress("Enabling plugin\u{2026}", call_gateway(opts)).await?;
+    let _: serde_json::Value = with_progress("Enabling plugin\u{2026}", call_gateway(opts)).await?;
 
-    println!("Plugin '{}' enabled. Gateway restart may be required.", args.id);
+    println!(
+        "Plugin '{}' enabled. Gateway restart may be required.",
+        args.id
+    );
     Ok(())
 }
 
@@ -225,10 +227,7 @@ pub async fn plugins_doctor_command(args: &PluginsDoctorArgs) -> Result<()> {
                 println!("No plugin errors.");
             } else {
                 for err in errors {
-                    println!(
-                        "  - {}",
-                        err.as_str().unwrap_or(&err.to_string())
-                    );
+                    println!("  - {}", err.as_str().unwrap_or(&err.to_string()));
                 }
             }
         } else {

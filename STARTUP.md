@@ -1,9 +1,11 @@
-# OpenAcosmi 启动指南
+# Crab Claw（蟹爪）启动指南
+
+> 展示品牌与仓库目录已统一为 **Crab Claw（蟹爪）/ CrabClaw**；CLI 命令和状态目录仍保留 `openacosmi` 兼容标识。
 
 ## 项目结构
 
 ```
-OpenAcosmi-rust+go/
+CrabClaw/
 ├── start.command       # ⚡ macOS 双击启动
 ├── start.bat           # ⚡ Windows 双击启动
 ├── scripts/start.sh    # ⚡ 核心启动脚本 (macOS/Linux)
@@ -79,11 +81,11 @@ Ctrl+C 优雅关闭所有服务
 
 ## 🚀 根目录命令速查
 
-> 所有命令均在项目根目录 `OpenAcosmi-rust+go/` 下执行，无需 `cd` 到子目录。
+> 所有命令均在项目根目录 `CrabClaw/` 下执行，无需 `cd` 到子目录。
 
 ```bash
 # 进入项目根目录
-cd ~/Desktop/OpenAcosmi-rust+go
+cd ~/Desktop/CrabClaw
 ```
 
 | 命令 | 说明 |
@@ -137,7 +139,7 @@ Gateway 以 dev 模式启动在 `localhost:19001`。
 ```bash
 cd ui
 npm install   # 首次需要安装依赖
-npm run dev
+npm run devnpm run dev
 ```
 
 Vite 开发服务器启动在 `http://localhost:26222`，WebSocket 自动代理到 Gateway。

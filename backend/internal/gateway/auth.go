@@ -96,7 +96,7 @@ func ResolveGatewayAuth(authConfig *GatewayAuthConfig, tailscaleMode string) Res
 
 	token := cfg.Token
 	if token == "" {
-		token = os.Getenv("OPENACOSMI_GATEWAY_TOKEN")
+		token = preferredGatewayEnvValue("CRABCLAW_GATEWAY_TOKEN", "OPENACOSMI_GATEWAY_TOKEN")
 	}
 	if token == "" {
 		token = os.Getenv("CLAWDBOT_GATEWAY_TOKEN")
@@ -107,7 +107,7 @@ func ResolveGatewayAuth(authConfig *GatewayAuthConfig, tailscaleMode string) Res
 
 	password := cfg.Password
 	if password == "" {
-		password = os.Getenv("OPENACOSMI_GATEWAY_PASSWORD")
+		password = preferredGatewayEnvValue("CRABCLAW_GATEWAY_PASSWORD", "OPENACOSMI_GATEWAY_PASSWORD")
 	}
 	if password == "" {
 		password = os.Getenv("CLAWDBOT_GATEWAY_PASSWORD")
@@ -202,7 +202,7 @@ func AssertGatewayAuthConfigured(auth ResolvedGatewayAuth) error {
 			return nil
 		}
 		return &AuthConfigError{
-			Message: "gateway auth mode is token, but no token was configured (set gateway.auth.token or OPENACOSMI_GATEWAY_TOKEN)",
+			Message: "gateway auth mode is token, but no token was configured (set gateway.auth.token or CRABCLAW_GATEWAY_TOKEN / OPENACOSMI_GATEWAY_TOKEN)",
 		}
 	}
 	if auth.Mode == AuthModePassword && auth.Password == "" {

@@ -136,7 +136,7 @@ func serveBrowserExtensionDownload(w http.ResponseWriter, r *http.Request, cfg B
 	}
 
 	w.Header().Set("Content-Type", "application/zip")
-	w.Header().Set("Content-Disposition", "attachment; filename=openacosmi-browser-extension.zip")
+	w.Header().Set("Content-Disposition", "attachment; filename=crabclaw-browser-extension.zip")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", buf.Len()))
 	w.Write(buf.Bytes()) //nolint:errcheck
 }
@@ -186,7 +186,7 @@ func browserExtensionGuideHTML(relayURL string, relayPort int) string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>OpenAcosmi - 浏览器扩展安装引导</title>
+<title>Crab Claw by Acosmi - 浏览器扩展安装引导</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -338,13 +338,32 @@ func browserExtensionGuideHTML(relayURL string, relayPort int) string {
   }
   .check-result.ok { display: block; background: #d1f2d1; color: #0a5c0a; }
   .check-result.fail { display: block; background: #ffd6d6; color: #5c0a0a; }
+  .success-banner {
+    display: none;
+    background: linear-gradient(135deg, #d1f2d1, #e8f5e9);
+    border: 2px solid #30d158;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    text-align: center;
+    animation: fadeIn 0.5s ease-out;
+  }
+  .success-banner h2 { color: #0a5c0a; font-size: 20px; margin-bottom: 8px; }
+  .success-banner p { color: #1b5e20; font-size: 14px; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 </style>
 </head>
 <body>
 <div class="container">
   <div class="header">
-    <h1>OpenAcosmi Browser Extension</h1>
+    <h1>Crab Claw by Acosmi Browser Extension</h1>
     <p>让 AI Agent 控制您的 Chrome 标签页</p>
+  </div>
+
+  <!-- 连接成功 Banner（自动检测到扩展连接后显示）-->
+  <div class="success-banner" id="successBanner">
+    <h2>扩展连接成功！Extension Connected!</h2>
+    <p>浏览器扩展已成功连接到 Relay 服务器。现在可以通过 AI Agent 控制浏览器了。</p>
   </div>
 
   <!-- Relay 状态 -->
@@ -370,7 +389,7 @@ func browserExtensionGuideHTML(relayURL string, relayPort int) string {
       </div>
       <div class="tip">
         解压后会得到 <code>browser-extension/</code> 文件夹，包含 manifest.json、background.js 等文件。
-        建议放在固定位置（如 <code>~/openacosmi-extension/</code>），避免误删。
+        建议放在固定位置（如 <code>~/crabclaw-extension/</code>），避免误删。
       </div>
     </div>
   </div>
@@ -390,12 +409,18 @@ func browserExtensionGuideHTML(relayURL string, relayPort int) string {
         <li>安装成功后，点击工具栏拼图图标将扩展固定</li>
       </ol>
       <div class="btn-group">
-        <button class="btn btn-secondary" onclick="openExtensions()">打开 chrome://extensions</button>
+        <button class="btn btn-secondary" onclick="copyExtensionsURL()">
+          <span id="copyExtBtnText">复制 chrome://extensions 地址</span>
+        </button>
       </div>
-      <div id="extTip" class="check-result" style="display:none;"></div>
+      <div id="copyExtResult" class="check-result" style="display:none;"></div>
       <div class="tip">
-        Chrome 不允许程序自动安装扩展，这是浏览器的安全策略。
+        浏览器安全策略不允许网页直接打开 <code>chrome://extensions</code>，请复制后粘贴到地址栏回车。
         此操作只需执行一次，后续更新只需在扩展页面点击"重新加载"。
+      </div>
+      <div class="tip" style="margin-top:8px;background:#e8f4fd;border-left-color:#007aff;color:#003d66;">
+        <strong>Chrome 134+ 注意：</strong>开发者模式需保持开启。每次启动 Chrome 会显示一条
+        "禁用开发者模式扩展"的警告条，点击关闭即可，不影响正常使用。
       </div>
     </div>
   </div>
@@ -429,7 +454,7 @@ func browserExtensionGuideHTML(relayURL string, relayPort int) string {
     <div class="step-body">
       <ol>
         <li>打开要让 Agent 控制的网页</li>
-        <li>点击工具栏的 <strong>OpenAcosmi</strong> 扩展图标</li>
+        <li>点击工具栏的 <strong>Crab Claw by Acosmi</strong> 扩展图标</li>
         <li>在标签页列表中点击 <strong>Attach</strong></li>
         <li>看到绿色 <code>ON</code> 标记即表示就绪</li>
       </ol>
@@ -441,28 +466,42 @@ func browserExtensionGuideHTML(relayURL string, relayPort int) string {
   </div>
 
   <div class="footer">
-    <p>OpenAcosmi Browser Extension v1.0.0</p>
+    <p>Crab Claw by Acosmi Browser Extension v1.0.0</p>
     <p style="margin-top:4px;">Relay 端口: %d | 仅监听 127.0.0.1</p>
   </div>
 </div>
 
 <script>
+var _extensionConnected = false;
+
 function checkRelay() {
-  const dot = document.getElementById('relayDot');
-  const status = document.getElementById('relayStatus');
-  const result = document.getElementById('checkResult');
+  var dot = document.getElementById('relayDot');
+  var status = document.getElementById('relayStatus');
+  var result = document.getElementById('checkResult');
+  var banner = document.getElementById('successBanner');
   dot.className = 'status-dot warn';
   status.textContent = '检查中...';
 
   fetch('/browser-extension/status')
-    .then(r => r.json())
-    .then(data => {
-      if (data.port > 0) {
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.connected) {
         dot.className = 'status-dot ok';
-        status.textContent = 'Relay 运行中 (端口 ' + data.port + ')';
+        status.textContent = '扩展已连接 (端口 ' + data.port + ')';
         if (result) {
           result.className = 'check-result ok';
-          result.textContent = 'Relay 服务正常运行。扩展安装后将自动连接。';
+          result.textContent = '扩展已连接到 Relay 服务器，可以开始使用浏览器自动化。';
+        }
+        if (banner && !_extensionConnected) {
+          banner.style.display = 'block';
+          _extensionConnected = true;
+        }
+      } else if (data.port > 0) {
+        dot.className = 'status-dot ok';
+        status.textContent = 'Relay 运行中 (端口 ' + data.port + ')，等待扩展连接...';
+        if (result) {
+          result.className = 'check-result ok';
+          result.textContent = 'Relay 服务正常运行。安装扩展后将自动连接。';
         }
       } else {
         dot.className = 'status-dot err';
@@ -473,7 +512,7 @@ function checkRelay() {
         }
       }
     })
-    .catch(() => {
+    .catch(function() {
       dot.className = 'status-dot err';
       status.textContent = '无法连接';
       if (result) {
@@ -483,26 +522,36 @@ function checkRelay() {
     });
 }
 
-function openExtensions() {
-  // 无法直接打开 chrome:// 页面，用内联提示代替 alert（避免模态对话框阻塞）
-  const tip = document.getElementById('extTip');
-  if (tip) {
-    tip.className = 'check-result fail';
-    tip.textContent = '请在 Chrome 地址栏手动输入 chrome://extensions 并回车（浏览器安全策略不允许网页直接打开此地址）';
-    tip.style.display = 'block';
-  }
-}
-
-function copyText(text) {
-  navigator.clipboard.writeText(text).then(() => {
-    const btn = event.target;
-    btn.textContent = '已复制';
-    setTimeout(() => { btn.textContent = '复制'; }, 1500);
+function copyExtensionsURL() {
+  navigator.clipboard.writeText('chrome://extensions').then(function() {
+    var btnText = document.getElementById('copyExtBtnText');
+    var tip = document.getElementById('copyExtResult');
+    if (btnText) {
+      btnText.textContent = '已复制！';
+      setTimeout(function() { btnText.textContent = '复制 chrome://extensions 地址'; }, 2000);
+    }
+    if (tip) {
+      tip.className = 'check-result ok';
+      tip.textContent = '已复制！请粘贴到 Chrome 地址栏并回车。';
+      tip.style.display = 'block';
+    }
   });
 }
 
-// 页面加载时检查一次
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(function() {
+    var btn = event.target;
+    btn.textContent = '已复制';
+    setTimeout(function() { btn.textContent = '复制'; }, 1500);
+  });
+}
+
+// 页面加载时检查一次，之后每 3 秒自动轮询直到扩展连接
 checkRelay();
+var _pollTimer = setInterval(function() {
+  if (_extensionConnected) { clearInterval(_pollTimer); return; }
+  checkRelay();
+}, 3000);
 </script>
 </body>
 </html>`, relayURL, relayURL, relayPort)

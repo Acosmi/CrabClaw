@@ -103,13 +103,14 @@ const (
 
 // ManagedModelEntry 托管模型条目（从 nexus-v4 拉取）
 type ManagedModelEntry struct {
-	ID           string  `json:"id"`
-	Name         string  `json:"name"`
-	Provider     string  `json:"provider"`
-	ModelID      string  `json:"modelId"`
-	MaxTokens    int     `json:"maxTokens,omitempty"`
-	PricePerMTok float64 `json:"pricePerMTok,omitempty"` // 每百万 token 价格
-	IsDefault    bool    `json:"isDefault,omitempty"`
+	ID            string  `json:"id"`
+	Name          string  `json:"name"`
+	Provider      string  `json:"provider"`
+	ModelID       string  `json:"modelId"`
+	MaxTokens     int     `json:"maxTokens,omitempty"`
+	PricePerMTok  float64 `json:"pricePerMTok,omitempty"` // 每百万 token 价格
+	IsDefault     bool    `json:"isDefault,omitempty"`
+	ContextWindow int     `json:"contextWindow,omitempty"` // [FIX P0-L02: 上下文窗口大小]
 }
 
 // ManagedModelsConfig 托管模型配置

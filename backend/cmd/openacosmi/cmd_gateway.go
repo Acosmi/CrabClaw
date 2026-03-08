@@ -11,7 +11,7 @@ func newGatewayCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "gateway",
 		Short: "Gateway service control",
-		Long:  "Manage the OpenAcosmi WebSocket Gateway service — start, stop, restart, and status.",
+		Long:  "Manage the Crab Claw（蟹爪） WebSocket Gateway service — start, stop, restart, and status.",
 	}
 
 	cmd.AddCommand(

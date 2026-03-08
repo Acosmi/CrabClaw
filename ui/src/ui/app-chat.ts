@@ -8,6 +8,7 @@ import { resetToolStream } from "./app-tool-stream.ts";
 import { abortChatRun, loadChatHistory, sendChatMessage } from "./controllers/chat.ts";
 import { loadSessions } from "./controllers/sessions.ts";
 import { normalizeBasePath } from "./navigation.ts";
+import { createChatReadonlyRunState, type ChatReadonlyRunState } from "./chat/readonly-run-state.ts";
 import { generateUUID } from "./uuid.ts";
 
 export type ChatHost = {
@@ -22,6 +23,7 @@ export type ChatHost = {
   hello: GatewayHelloOk | null;
   chatAvatarUrl: string | null;
   refreshSessionsAfterChat: Set<string>;
+  chatReadonlyRun?: ChatReadonlyRunState;
 };
 
 // 会话下拉框不限制活跃时间，显示所有历史会话
@@ -191,6 +193,7 @@ export async function handleSendChat(
     host.chatMessage = draftToRestore;
     host.chatAttachments = [];
     host.chatRunId = null;
+    host.chatReadonlyRun = createChatReadonlyRunState(newKey);
     host.chatQueue = [];
     // 重新加载历史（新 session 为空）
     await loadChatHistory(host as unknown as Parameters<typeof loadChatHistory>[0]);

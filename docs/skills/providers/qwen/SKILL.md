@@ -1,45 +1,50 @@
 ---
 name: qwen
-description: "在创宇太虚中使用 Qwen OAuth（免费套餐）"
+description: "Use Qwen OAuth (free tier) in Crab Claw（蟹爪）"
 ---
 
 # Qwen
 
-Qwen 为 Qwen Coder 和 Qwen Vision 模型提供免费套餐 OAuth 流程（每天 2,000 次请求，受 Qwen 速率限制约束）。
+Qwen provides a free-tier OAuth flow for Qwen Coder and Qwen Vision models
+(2,000 requests/day, subject to Qwen rate limits).
 
-## 启用插件
-
-```bash
-openacosmi plugins enable qwen-portal-auth
-```
-
-启用后重启网关。
-
-## 认证
+## Enable the plugin
 
 ```bash
-openacosmi models auth login --provider qwen-portal --set-default
+crabclaw plugins enable qwen-portal-auth
 ```
 
-这会运行 Qwen device-code OAuth 流程，并将供应商条目写入你的 `models.json`（以及一个 `qwen` 别名用于快速切换）。
+Restart the Gateway after enabling.
 
-## 模型 ID
+## Authenticate
+
+```bash
+crabclaw models auth login --provider qwen-portal --set-default
+```
+
+This runs the Qwen device-code OAuth flow and writes a provider entry to your
+`models.json` (plus a `qwen` alias for quick switching).
+
+## Model IDs
 
 - `qwen-portal/coder-model`
 - `qwen-portal/vision-model`
 
-切换模型：
+Switch models with:
 
 ```bash
-openacosmi models set qwen-portal/coder-model
+crabclaw models set qwen-portal/coder-model
 ```
 
-## 复用 Qwen Code CLI 登录
+## Reuse Qwen Code CLI login
 
-若你已通过 Qwen Code CLI 登录，创宇太虚会在加载认证存储时从 `~/.qwen/oauth_creds.json` 同步凭据。你仍需有 `models.providers.qwen-portal` 条目（使用上述登录命令创建）。
+If you already logged in with the Qwen Code CLI, Crab Claw（蟹爪） will sync credentials
+from `~/.qwen/oauth_creds.json` when it loads the auth store. You still need a
+`models.providers.qwen-portal` entry (use the login command above to create one).
 
-## 备注
+## Notes
 
-- Token 自动刷新；刷新失败或访问被撤销时重新运行登录命令。
-- 默认 base URL：`https://portal.qwen.ai/v1`（若 Qwen 提供不同端点，可通过 `models.providers.qwen-portal.baseUrl` 覆盖）。
-- 供应商通用规则参见 [模型供应商](/concepts/model-providers)。
+- Tokens auto-refresh; re-run the login command if refresh fails or access is revoked.
+- Default base URL: `https://portal.qwen.ai/v1` (override with
+  `models.providers.qwen-portal.baseUrl` if Qwen provides a different endpoint).
+- See [Model providers](/concepts/model-providers) for provider-wide rules.

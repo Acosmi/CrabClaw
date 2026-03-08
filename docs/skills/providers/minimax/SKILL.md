@@ -1,65 +1,71 @@
 ---
 name: minimax
-description: "在 Claw Acosmi 中使用 MiniMax M2.1"
+description: "Use MiniMax M2.1 in Crab Claw（蟹爪）"
 ---
 
 # MiniMax
 
-MiniMax 是一家 AI 公司，构建了 **M2/M2.1** 模型系列。当前面向编程的最新版本是 **MiniMax M2.1**（2025年12月23日发布），专为复杂的真实世界任务而构建。
+MiniMax is an AI company that builds the **M2/M2.1** model family. The current
+coding-focused release is **MiniMax M2.1** (December 23, 2025), built for
+real-world complex tasks.
 
-来源：[MiniMax M2.1 发布说明](https://www.minimax.io/news/minimax-m21)
+Source: [MiniMax M2.1 release note](https://www.minimax.io/news/minimax-m21)
 
-## 模型概览 (M2.1)
+## Model overview (M2.1)
 
-MiniMax 在 M2.1 中重点改进了以下方面：
+MiniMax highlights these improvements in M2.1:
 
-- 更强的**多语言编程**能力（Rust、Java、Go、C++、Kotlin、Objective-C、TS/JS）。
-- 更好的 **Web/App 开发**和美观输出质量（包括原生移动端）。
-- 改进的**复合指令**处理能力，适用于办公风格的工作流，基于交错思考和集成约束执行构建。
-- **更简洁的回复**，Token 使用更少，迭代循环更快。
-- 更强的**工具/Agent 框架**兼容性和上下文管理（Claude Code、Droid/Factory AI、Cline、Kilo Code、Roo Code、BlackBox）。
-- 更高质量的**对话和技术写作**输出。
+- Stronger **multi-language coding** (Rust, Java, Go, C++, Kotlin, Objective-C, TS/JS).
+- Better **web/app development** and aesthetic output quality (including native mobile).
+- Improved **composite instruction** handling for office-style workflows, building on
+  interleaved thinking and integrated constraint execution.
+- **More concise responses** with lower token usage and faster iteration loops.
+- Stronger **tool/agent framework** compatibility and context management (Claude Code,
+  Droid/Factory AI, Cline, Kilo Code, Roo Code, BlackBox).
+- Higher-quality **dialogue and technical writing** outputs.
 
 ## MiniMax M2.1 vs MiniMax M2.1 Lightning
 
-- **速度：** Lightning 是 MiniMax 定价文档中的"快速"变体。
-- **成本：** 定价显示输入成本相同，但 Lightning 的输出成本更高。
-- **编程计划路由：** Lightning 后端在 MiniMax 编程计划中不能直接使用。MiniMax 会自动将大多数请求路由到 Lightning，但在流量高峰期会回退到常规 M2.1 后端。
+- **Speed:** Lightning is the “fast” variant in MiniMax’s pricing docs.
+- **Cost:** Pricing shows the same input cost, but Lightning has higher output cost.
+- **Coding plan routing:** The Lightning back-end isn’t directly available on the MiniMax
+  coding plan. MiniMax auto-routes most requests to Lightning, but falls back to the
+  regular M2.1 back-end during traffic spikes.
 
-## 选择配置方式
+## Choose a setup
 
-### MiniMax OAuth（编程计划）— 推荐
+### MiniMax OAuth (Coding Plan) — recommended
 
-**最适合：** 通过 OAuth 快速设置 MiniMax 编程计划，无需 API 密钥。
+**Best for:** quick setup with MiniMax Coding Plan via OAuth, no API key required.
 
-启用内置 OAuth 插件并进行身份验证：
-
-```bash
-openacosmi plugins enable minimax-portal-auth
-```
-
-重启 Gateway 后进行身份验证：
+Enable the bundled OAuth plugin and authenticate:
 
 ```bash
-openacosmi onboard --auth-choice minimax-portal
+crabclaw plugins enable minimax-portal-auth
 ```
 
-系统会提示您选择端点：
+Restart the Gateway, then authenticate:
 
-- **Global** - 国际用户（`api.minimax.io`）
-- **CN** - 中国用户（`api.minimaxi.com`）
+```bash
+crabclaw onboard --auth-choice minimax-portal
+```
 
-详见 [MiniMax OAuth 插件 README](https://github.com/Acosmi/Claw-Acosmi/tree/main/extensions/minimax-portal-auth)。
+You will be prompted to select an endpoint:
 
-### MiniMax M2.1（API 密钥）
+- **Global** - International users (`api.minimax.io`)
+- **CN** - Users in China (`api.minimaxi.com`)
 
-**最适合：** 使用 Anthropic 兼容 API 的托管 MiniMax。
+See [MiniMax OAuth plugin README](https://github.com/Acosmi/Claw-Acismi/tree/main/extensions/minimax-portal-auth) for details.
 
-通过 CLI 配置：
+### MiniMax M2.1 (API key)
 
-- 运行 `openacosmi configure`
-- 选择 **Model/auth**
-- 选择 **MiniMax M2.1**
+**Best for:** hosted MiniMax with Anthropic-compatible API.
+
+Configure via CLI:
+
+- Run `crabclaw configure`
+- Select **Model/auth**
+- Choose **MiniMax M2.1**
 
 ```json5
 {
@@ -89,9 +95,9 @@ openacosmi onboard --auth-choice minimax-portal
 }
 ```
 
-### MiniMax M2.1 作为后备模型（Opus 为主）
+### MiniMax M2.1 as fallback (Opus primary)
 
-**最适合：** 保持 Opus 4.6 作为主模型，故障时回退到 MiniMax M2.1。
+**Best for:** keep Opus 4.6 as primary, fail over to MiniMax M2.1.
 
 ```json5
 {
@@ -111,12 +117,13 @@ openacosmi onboard --auth-choice minimax-portal
 }
 ```
 
-### 可选：通过 LM Studio 本地运行（手动配置）
+### Optional: Local via LM Studio (manual)
 
-**最适合：** 使用 LM Studio 进行本地推理。
-我们发现在高性能硬件（如台式机/服务器）上使用 LM Studio 的本地服务器运行 MiniMax M2.1 效果很好。
+**Best for:** local inference with LM Studio.
+We have seen strong results with MiniMax M2.1 on powerful hardware (e.g. a
+desktop/server) using LM Studio's local server.
 
-通过 `openacosmi.json` 手动配置：
+Configure manually via `openacosmi.json`:
 
 ```json5
 {
@@ -150,51 +157,53 @@ openacosmi onboard --auth-choice minimax-portal
 }
 ```
 
-## 通过 `openacosmi configure` 配置
+## Configure via `crabclaw configure`
 
-使用交互式配置向导设置 MiniMax，无需手动编辑 JSON：
+Use the interactive config wizard to set MiniMax without editing JSON:
 
-1. 运行 `openacosmi configure`。
-2. 选择 **Model/auth**。
-3. 选择 **MiniMax M2.1**。
-4. 在提示时选择默认模型。
+1. Run `crabclaw configure`.
+2. Select **Model/auth**.
+3. Choose **MiniMax M2.1**.
+4. Pick your default model when prompted.
 
-## 配置选项
+## Configuration options
 
-- `models.providers.minimax.baseUrl`：推荐 `https://api.minimax.io/anthropic`（Anthropic 兼容）；`https://api.minimax.io/v1` 可选用于 OpenAI 兼容的请求体。
-- `models.providers.minimax.api`：推荐 `anthropic-messages`；`openai-completions` 可选用于 OpenAI 兼容的请求体。
-- `models.providers.minimax.apiKey`：MiniMax API 密钥（`MINIMAX_API_KEY`）。
-- `models.providers.minimax.models`：定义 `id`、`name`、`reasoning`、`contextWindow`、`maxTokens`、`cost`。
-- `agents.defaults.models`：为允许列表中的模型设置别名。
-- `models.mode`：如果想在内置模型之外添加 MiniMax，保持 `merge`。
+- `models.providers.minimax.baseUrl`: prefer `https://api.minimax.io/anthropic` (Anthropic-compatible); `https://api.minimax.io/v1` is optional for OpenAI-compatible payloads.
+- `models.providers.minimax.api`: prefer `anthropic-messages`; `openai-completions` is optional for OpenAI-compatible payloads.
+- `models.providers.minimax.apiKey`: MiniMax API key (`MINIMAX_API_KEY`).
+- `models.providers.minimax.models`: define `id`, `name`, `reasoning`, `contextWindow`, `maxTokens`, `cost`.
+- `agents.defaults.models`: alias models you want in the allowlist.
+- `models.mode`: keep `merge` if you want to add MiniMax alongside built-ins.
 
-## 注意事项
+## Notes
 
-- 模型引用格式为 `minimax/<model>`。
-- 编程计划用量 API：`https://api.minimaxi.com/v1/api/openplatform/coding_plan/remains`（需要编程计划密钥）。
-- 如需精确成本跟踪，请更新 `models.json` 中的定价值。
-- MiniMax 编程计划推荐链接（9折优惠）：[https://platform.minimax.io/subscribe/coding-plan?code=DbXJTRClnb&source=link](https://platform.minimax.io/subscribe/coding-plan?code=DbXJTRClnb&source=link)
-- 参见 [/concepts/model-providers](/concepts/model-providers) 了解 Provider 规则。
-- 使用 `openacosmi models list` 和 `openacosmi models set minimax/MiniMax-M2.1` 切换模型。
+- Model refs are `minimax/<model>`.
+- Coding Plan usage API: `https://api.minimaxi.com/v1/api/openplatform/coding_plan/remains` (requires a coding plan key).
+- Update pricing values in `models.json` if you need exact cost tracking.
+- Referral link for MiniMax Coding Plan (10% off): [https://platform.minimax.io/subscribe/coding-plan?code=DbXJTRClnb&source=link](https://platform.minimax.io/subscribe/coding-plan?code=DbXJTRClnb&source=link)
+- See [/concepts/model-providers](/concepts/model-providers) for provider rules.
+- Use `crabclaw models list` and `crabclaw models set minimax/MiniMax-M2.1` to switch.
 
-## 故障排除
+## Troubleshooting
 
-### "Unknown model: minimax/MiniMax-M2.1"
+### “Unknown model: minimax/MiniMax-M2.1”
 
-这通常意味着 **MiniMax Provider 未配置**（没有 Provider 配置项，也没有找到 MiniMax 认证配置/环境变量）。此检测问题的修复包含在 **2026.1.12** 版本中（撰写时尚未发布）。修复方法：
+This usually means the **MiniMax provider isn’t configured** (no provider entry
+and no MiniMax auth profile/env key found). A fix for this detection is in
+**2026.1.12** (unreleased at the time of writing). Fix by:
 
-- 升级到 **2026.1.12**（或从源码 `main` 分支运行），然后重启 Gateway。
-- 运行 `openacosmi configure` 并选择 **MiniMax M2.1**，或
-- 手动添加 `models.providers.minimax` 配置块，或
-- 设置 `MINIMAX_API_KEY`（或 MiniMax 认证配置），以便 Provider 可以被自动注入。
+- Upgrading to **2026.1.12** (or run from source `main`), then restarting the gateway.
+- Running `crabclaw configure` and selecting **MiniMax M2.1**, or
+- Adding the `models.providers.minimax` block manually, or
+- Setting `MINIMAX_API_KEY` (or a MiniMax auth profile) so the provider can be injected.
 
-确保模型 ID **区分大小写**：
+Make sure the model id is **case‑sensitive**:
 
 - `minimax/MiniMax-M2.1`
 - `minimax/MiniMax-M2.1-lightning`
 
-然后重新检查：
+Then recheck with:
 
 ```bash
-openacosmi models list
+crabclaw models list
 ```

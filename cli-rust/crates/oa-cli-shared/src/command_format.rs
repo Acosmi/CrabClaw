@@ -5,15 +5,15 @@
 /// variable is set.
 ///
 /// Source: `src/cli/command-format.ts`
-
+use crate::binary_name::current_cli_name;
 use regex::Regex;
 use std::sync::LazyLock;
 
-/// Regex matching a CLI invocation prefix (e.g. `npx openacosmi`, `openacosmi`).
+/// Regex matching a CLI invocation prefix (e.g. `npx openacosmi`, `crabclaw`).
 ///
 /// Source: `src/cli/command-format.ts` – `CLI_PREFIX_RE`
 static CLI_PREFIX_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^(?:pnpm|npm|bunx|npx)\s+openacosmi\b|^openacosmi\b")
+    Regex::new(r"^(?:(pnpm|npm|bunx|npx)\s+)?(?:openacosmi|crabclaw)\b")
         .expect("CLI_PREFIX_RE is a valid regex")
 });
 
@@ -27,9 +27,8 @@ static PROFILE_FLAG_RE: LazyLock<Regex> = LazyLock::new(|| {
 /// Regex detecting an existing `--dev` flag.
 ///
 /// Source: `src/cli/command-format.ts` – `DEV_FLAG_RE`
-static DEV_FLAG_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?:^|\s)--dev(?:\s|$)").expect("DEV_FLAG_RE is a valid regex")
-});
+static DEV_FLAG_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?:^|\s)--dev(?:\s|$)").expect("DEV_FLAG_RE is a valid regex"));
 
 /// Normalize a profile name: trim whitespace, return `None` for empty strings.
 ///
@@ -42,6 +41,10 @@ fn normalize_profile_name(raw: Option<&str>) -> Option<String> {
     Some(trimmed.to_string())
 }
 
+fn resolve_profile_env(primary_env: Option<&str>, legacy_env: Option<&str>) -> Option<String> {
+    normalize_profile_name(primary_env).or_else(|| normalize_profile_name(legacy_env))
+}
+
 /// Format a CLI command string for display.
 ///
 /// When the `OPENACOSMI_PROFILE` environment variable is set and the
@@ -50,7 +53,15 @@ fn normalize_profile_name(raw: Option<&str>) -> Option<String> {
 ///
 /// Source: `src/cli/command-format.ts` – `formatCliCommand`
 pub fn format_cli_command(command: &str) -> String {
-    format_cli_command_with_env(command, std::env::var("OPENACOSMI_PROFILE").ok().as_deref())
+    format_cli_command_with_env_and_cli(
+        command,
+        resolve_profile_env(
+            std::env::var("CRABCLAW_PROFILE").ok().as_deref(),
+            std::env::var("OPENACOSMI_PROFILE").ok().as_deref(),
+        )
+        .as_deref(),
+        current_cli_name(),
+    )
 }
 
 /// Format a CLI command string with an explicit profile value.
@@ -59,21 +70,37 @@ pub fn format_cli_command(command: &str) -> String {
 ///
 /// Source: `src/cli/command-format.ts` – `formatCliCommand`
 pub fn format_cli_command_with_env(command: &str, profile_env: Option<&str>) -> String {
-    let profile = match normalize_profile_name(profile_env) {
-        Some(p) => p,
-        None => return command.to_string(),
-    };
+    format_cli_command_with_env_and_cli(command, profile_env, current_cli_name())
+}
 
+/// Format a CLI command string with an explicit profile value and CLI name.
+pub fn format_cli_command_with_env_and_cli(
+    command: &str,
+    profile_env: Option<&str>,
+    cli_name: &str,
+) -> String {
     if !CLI_PREFIX_RE.is_match(command) {
         return command.to_string();
     }
 
-    if PROFILE_FLAG_RE.is_match(command) || DEV_FLAG_RE.is_match(command) {
-        return command.to_string();
+    let rewritten = CLI_PREFIX_RE
+        .replace(command, |caps: &regex::Captures<'_>| match caps.get(1) {
+            Some(pm) => format!("{} {cli_name}", pm.as_str()),
+            None => cli_name.to_string(),
+        })
+        .into_owned();
+
+    let profile = match normalize_profile_name(profile_env) {
+        Some(p) => p,
+        None => return rewritten,
+    };
+
+    if PROFILE_FLAG_RE.is_match(&rewritten) || DEV_FLAG_RE.is_match(&rewritten) {
+        return rewritten;
     }
 
     CLI_PREFIX_RE
-        .replace(command, |caps: &regex::Captures<'_>| {
+        .replace(&rewritten, |caps: &regex::Captures<'_>| {
             format!("{} --profile {profile}", &caps[0])
         })
         .into_owned()
@@ -85,55 +112,77 @@ mod tests {
 
     #[test]
     fn injects_profile_into_bare_command() {
-        let result = format_cli_command_with_env("openacosmi doctor --fix", Some("staging"));
-        assert_eq!(result, "openacosmi --profile staging doctor --fix");
+        let result = format_cli_command_with_env_and_cli(
+            "openacosmi doctor --fix",
+            Some("staging"),
+            "crabclaw",
+        );
+        assert_eq!(result, "crabclaw --profile staging doctor --fix");
     }
 
     #[test]
     fn injects_profile_into_npx_command() {
-        let result = format_cli_command_with_env("npx openacosmi status", Some("dev"));
-        assert_eq!(result, "npx openacosmi --profile dev status");
+        let result =
+            format_cli_command_with_env_and_cli("npx openacosmi status", Some("dev"), "crabclaw");
+        assert_eq!(result, "npx crabclaw --profile dev status");
     }
 
     #[test]
-    fn no_injection_without_profile() {
-        let result = format_cli_command_with_env("openacosmi status", None);
-        assert_eq!(result, "openacosmi status");
+    fn rewrites_name_without_profile() {
+        let result = format_cli_command_with_env_and_cli("openacosmi status", None, "crabclaw");
+        assert_eq!(result, "crabclaw status");
     }
 
     #[test]
     fn no_injection_with_empty_profile() {
-        let result = format_cli_command_with_env("openacosmi status", Some("  "));
-        assert_eq!(result, "openacosmi status");
+        let result =
+            format_cli_command_with_env_and_cli("openacosmi status", Some("  "), "crabclaw");
+        assert_eq!(result, "crabclaw status");
     }
 
     #[test]
     fn no_injection_when_profile_flag_present() {
-        let result =
-            format_cli_command_with_env("openacosmi --profile prod status", Some("staging"));
-        assert_eq!(result, "openacosmi --profile prod status");
+        let result = format_cli_command_with_env_and_cli(
+            "openacosmi --profile prod status",
+            Some("staging"),
+            "crabclaw",
+        );
+        assert_eq!(result, "crabclaw --profile prod status");
     }
 
     #[test]
     fn no_injection_when_dev_flag_present() {
-        let result = format_cli_command_with_env("openacosmi --dev status", Some("staging"));
-        assert_eq!(result, "openacosmi --dev status");
+        let result = format_cli_command_with_env_and_cli(
+            "openacosmi --dev status",
+            Some("staging"),
+            "crabclaw",
+        );
+        assert_eq!(result, "crabclaw --dev status");
     }
 
     #[test]
     fn no_injection_for_non_cli_command() {
-        let result = format_cli_command_with_env("ls -la", Some("staging"));
+        let result = format_cli_command_with_env_and_cli("ls -la", Some("staging"), "crabclaw");
         assert_eq!(result, "ls -la");
     }
 
     #[test]
     fn normalize_profile_name_trims() {
-        assert_eq!(normalize_profile_name(Some("  prod  ")), Some("prod".to_string()));
+        assert_eq!(
+            normalize_profile_name(Some("  prod  ")),
+            Some("prod".to_string())
+        );
     }
 
     #[test]
     fn normalize_profile_name_none_for_empty() {
         assert_eq!(normalize_profile_name(Some("")), None);
         assert_eq!(normalize_profile_name(None), None);
+    }
+
+    #[test]
+    fn resolve_profile_env_prefers_crabclaw() {
+        let resolved = resolve_profile_env(Some("crab"), Some("open"));
+        assert_eq!(resolved.as_deref(), Some("crab"));
     }
 }

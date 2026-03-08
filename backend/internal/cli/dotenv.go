@@ -19,8 +19,8 @@ func LoadDotEnv(quiet bool) {
 	// 1. 加载当前工作目录的 .env
 	loadDotEnvFile(".env", quiet)
 
-	// 2. 加载全局 fallback: ~/.openacosmi/.env（或 OPENACOSMI_STATE_DIR/.env）
-	globalDir := os.Getenv("OPENACOSMI_STATE_DIR")
+	// 2. 加载全局 fallback: ~/.openacosmi/.env（或 CRABCLAW_STATE_DIR / OPENACOSMI_STATE_DIR 下的 .env）
+	globalDir := envValueCompat("CRABCLAW_STATE_DIR", "OPENACOSMI_STATE_DIR")
 	if globalDir == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {

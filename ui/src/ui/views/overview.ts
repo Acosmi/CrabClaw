@@ -47,13 +47,13 @@ export function renderOverview(props: OverviewProps) {
         <div class="muted" style="margin-top: 8px">
           ${t("overview.authRequired")}
           <div style="margin-top: 6px">
-            <span class="mono">openacosmi dashboard --no-open</span> ${t("overview.openControlUi")}<br />
-            <span class="mono">openacosmi doctor --generate-gateway-token</span> ${t("overview.setToken")}
+            <span class="mono">crabclaw dashboard --no-open</span> ${t("overview.openControlUi")}<br />
+            <span class="mono">crabclaw doctor --generate-gateway-token</span> ${t("overview.setToken")}
           </div>
           <div style="margin-top: 6px">
             <a
               class="session-link"
-              href="https://github.com/Acosmi/ClawAcosmi/tree/main/docs/skills/web"
+              href="https://github.com/Acosmi/CrabClaw/tree/main/docs/skills/web"
               target="_blank"
               rel="noreferrer"
               title=${t("overview.docsControlUiAuthTitle")}
@@ -69,7 +69,7 @@ export function renderOverview(props: OverviewProps) {
         <div style="margin-top: 6px">
           <a
             class="session-link"
-            href="https://github.com/Acosmi/ClawAcosmi/tree/main/docs/skills/web"
+            href="https://github.com/Acosmi/CrabClaw/tree/main/docs/skills/web"
             target="_blank"
             rel="noreferrer"
             title="Control UI auth docs (opens in new tab)"
@@ -102,7 +102,7 @@ export function renderOverview(props: OverviewProps) {
         <div style="margin-top: 6px">
           <a
             class="session-link"
-            href="https://github.com/Acosmi/ClawAcosmi/tree/main/docs/skills/gateway/tailscale"
+            href="https://github.com/Acosmi/CrabClaw/tree/main/docs/skills/gateway/tailscale"
             target="_blank"
             rel="noreferrer"
             title=${t("overview.docsTailscaleTitle")}
@@ -111,7 +111,7 @@ export function renderOverview(props: OverviewProps) {
           <span class="muted"> · </span>
           <a
             class="session-link"
-            href="https://github.com/Acosmi/ClawAcosmi/tree/main/docs/skills/web/control-ui"
+            href="https://github.com/Acosmi/CrabClaw/tree/main/docs/skills/web/control-ui"
             target="_blank"
             rel="noreferrer"
             title=${t("overview.docsInsecureHttpTitle")}

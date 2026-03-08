@@ -1,4 +1,4 @@
-/// Device pairing and token management commands for Claw Acosmi CLI.
+/// Device pairing and token management commands for Crab Claw CLI.
 ///
 /// Provides subcommands: list, approve, reject, rotate, revoke.
 ///

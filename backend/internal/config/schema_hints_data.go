@@ -397,7 +397,7 @@ var fieldLabels = map[string]string{
 
 // fieldHelp 对应 TS FIELD_HELP (226 条)
 var fieldHelp = map[string]string{
-	"meta.lastTouchedVersion":                                       "Auto-set when OpenAcosmi writes the config.",
+	"meta.lastTouchedVersion":                                       "Auto-set when Crab Claw（蟹爪） writes the config.",
 	"meta.lastTouchedAt":                                            "ISO timestamp of the last config write (auto-set).",
 	"update.channel":                                                "Update channel for git + npm installs (\"stable\", \"beta\", or \"dev\").",
 	"update.checkOnStart":                                           "Check for npm updates when the gateway starts (default: true).",
@@ -509,7 +509,7 @@ var fieldHelp = map[string]string{
 	"agents.defaults.memorySearch.query.hybrid.candidateMultiplier": "Multiplier for candidate pool size (default: 4).",
 	"agents.defaults.memorySearch.cache.enabled":                    "Cache chunk embeddings in SQLite to speed up reindexing and frequent updates (default: true).",
 	"memory":                                                   "Memory backend configuration (global).",
-	"memory.backend":                                           "Memory backend (\"builtin\" for OpenAcosmi embeddings, \"qmd\" for QMD sidecar).",
+	"memory.backend":                                           "Memory backend (\"builtin\" for Crab Claw（蟹爪） embeddings, \"qmd\" for QMD sidecar).",
 	"memory.citations":                                         "Default citation behavior (\"auto\", \"on\", or \"off\").",
 	"memory.qmd.command":                                       "Path to the qmd binary (default: resolves from PATH).",
 	"memory.qmd.includeDefaultMemory":                          "Whether to automatically index MEMORY.md + memory/**/*.md (default: true).",
@@ -547,7 +547,7 @@ var fieldHelp = map[string]string{
 	"plugins.entries":                                          "Per-plugin settings keyed by plugin id (enable/disable + config payloads).",
 	"plugins.entries.*.enabled":                                "Overrides plugin enable/disable for this entry (restart required).",
 	"plugins.entries.*.config":                                 "Plugin-defined config payload (schema is provided by the plugin).",
-	"plugins.installs":                                         "CLI-managed install metadata (used by `openacosmi plugins update` to locate install sources).",
+	"plugins.installs":                                         "CLI-managed install metadata (used by `crabclaw plugins update` to locate install sources).",
 	"plugins.installs.*.source":                                "Install source (\"npm\", \"archive\", or \"path\").",
 	"plugins.installs.*.spec":                                  "Original npm spec used for install (if source is npm).",
 	"plugins.installs.*.sourcePath":                            "Original archive/path used for install (if any).",

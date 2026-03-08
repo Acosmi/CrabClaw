@@ -22,7 +22,7 @@ func newDoctorCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "doctor",
 		Short: "System health diagnostics",
-		Long:  "Run diagnostic checks on the OpenAcosmi installation — auth, config, services, sandbox, and security.",
+		Long:  "Run diagnostic checks on the Crab Claw（蟹爪） installation — auth, config, services, sandbox, and security.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jsonFlag, _ := cmd.Flags().GetBool("json")
 			minimal, _ := cmd.Flags().GetBool("minimal")
@@ -71,7 +71,7 @@ func newDoctorCmd() *cobra.Command {
 			// ---------- 检查 3: Auth Profiles ----------
 			authProfilesPath := filepath.Join(stateDir, "auth-profiles.json")
 			if _, statErr := os.Stat(authProfilesPath); os.IsNotExist(statErr) {
-				add("AuthProfiles", "warn", "未找到（可能未登录，运行 'openacosmi setup' 初始化）")
+				add("AuthProfiles", "warn", "未找到（可能未登录，运行 'crabclaw setup' 初始化）")
 			} else {
 				raw, readErr := os.ReadFile(authProfilesPath)
 				if readErr != nil {
@@ -124,7 +124,7 @@ func newDoctorCmd() *cobra.Command {
 			// ---------- 检查 5: Device Auth ----------
 			deviceAuthPath := filepath.Join(stateDir, "identity", "device-auth.json")
 			if _, statErr := os.Stat(deviceAuthPath); os.IsNotExist(statErr) {
-				add("DeviceAuth", "warn", "未认证（运行 'openacosmi setup' 完成认证）")
+				add("DeviceAuth", "warn", "未认证（运行 'crabclaw setup' 完成认证）")
 			} else {
 				add("DeviceAuth", "ok", "认证文件存在")
 			}
@@ -252,7 +252,7 @@ func newDoctorCmd() *cobra.Command {
 				data, _ := json.MarshalIndent(results, "", "  ")
 				cmd.Println(string(data))
 			} else {
-				cmd.Println("🩺 OpenAcosmi 诊断报告")
+				cmd.Println("🩺 Crab Claw（蟹爪）诊断报告")
 				cmd.Println()
 				failCount, warnCount := 0, 0
 				for _, r := range results {

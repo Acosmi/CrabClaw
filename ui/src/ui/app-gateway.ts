@@ -17,6 +17,12 @@ import {
   setLastActiveSessionKey,
 } from "./app-settings.ts";
 import { handleAgentEvent, resetToolStream, type AgentEventPayload } from "./app-tool-stream.ts";
+import {
+  isReadonlyRunActive,
+  resetChatReadonlyRun,
+  setChatReadonlyRunTerminal,
+  startChatReadonlyRun,
+} from "./chat/readonly-run-state.ts";
 import { loadAgents } from "./controllers/agents.ts";
 import { loadChannels } from "./controllers/channels.ts";
 import { loadAssistantIdentity } from "./controllers/assistant-identity.ts";
@@ -90,6 +96,9 @@ type GatewayHost = {
   assistantAgentId: string | null;
   sessionKey: string;
   chatRunId: string | null;
+  chatStream?: string | null;
+  chatStreamStartedAt?: number | null;
+  chatReadonlyRun?: import("./chat/readonly-run-state.ts").ChatReadonlyRunState;
   refreshSessionsAfterChat: Set<string>;
   execApprovalQueue: ExecApprovalRequest[];
   execApprovalError: string | null;
@@ -180,6 +189,29 @@ async function maybeAutoStartSetupWizard(host: GatewayHost) {
   await app.handleStartWizardV2();
 }
 
+function handleInterruptedChatRun(host: GatewayHost, message: string) {
+  const hadActiveRun =
+    Boolean(host.chatRunId) ||
+    Boolean(host.chatStream) ||
+    isReadonlyRunActive(host.chatReadonlyRun);
+  host.chatRunId = null;
+  host.chatStream = null;
+  host.chatStreamStartedAt = null;
+  resetToolStream(host as unknown as Parameters<typeof resetToolStream>[0]);
+  if (!hadActiveRun || !host.chatReadonlyRun) {
+    return;
+  }
+  setChatReadonlyRunTerminal(
+    host as unknown as Parameters<typeof setChatReadonlyRunTerminal>[0],
+    "error",
+    {
+      sessionKey: host.sessionKey,
+      ts: Date.now(),
+      errorMessage: message,
+    },
+  );
+}
+
 export function connectGateway(host: GatewayHost) {
   host.lastError = null;
   host.hello = null;
@@ -205,9 +237,16 @@ export function connectGateway(host: GatewayHost) {
       host.chatRunId = null;
       (host as unknown as { chatStream: string | null }).chatStream = null;
       (host as unknown as { chatStreamStartedAt: number | null }).chatStreamStartedAt = null;
+      if (host.chatReadonlyRun) {
+        resetChatReadonlyRun(host as unknown as Parameters<typeof resetChatReadonlyRun>[0]);
+      }
       resetToolStream(host as unknown as Parameters<typeof resetToolStream>[0]);
       void loadAssistantIdentity(host as unknown as OpenAcosmiApp);
       void loadAgents(host as unknown as OpenAcosmiApp);
+      // Load models for chat composer selector
+      void import("./controllers/chat.ts").then((m) =>
+        m.loadChatModels(host as any),
+      );
       void loadNodes(host as unknown as OpenAcosmiApp, { quiet: true });
       void loadDevices(host as unknown as OpenAcosmiApp, { quiet: true });
       void loadChannels(host as unknown as OpenAcosmiApp, false);
@@ -231,9 +270,11 @@ export function connectGateway(host: GatewayHost) {
     },
     onClose: ({ code, reason }) => {
       host.connected = false;
+      const detail = reason || "no reason";
+      handleInterruptedChatRun(host, `disconnected (${code}): ${detail}`);
       // Code 1012 = Service Restart (expected during config saves, don't show as error)
       if (code !== 1012) {
-        const msg = `disconnected (${code}): ${reason || "no reason"}`;
+        const msg = `disconnected (${code}): ${detail}`;
         host.lastError = msg;
         const app = host as unknown as OpenAcosmiApp;
         if (typeof app.addNotification === "function") {
@@ -451,10 +492,21 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
             (app as unknown as { chatStream: string | null }).chatStream ?? "";
           (app as unknown as { chatStreamStartedAt: number | null }).chatStreamStartedAt =
             (app as unknown as { chatStreamStartedAt: number | null }).chatStreamStartedAt ?? Date.now();
+          if (app.chatReadonlyRun) {
+            startChatReadonlyRun(
+              app as unknown as Parameters<typeof startChatReadonlyRun>[0],
+              app.chatRunId,
+              (app as unknown as { chatStreamStartedAt: number | null }).chatStreamStartedAt ?? Date.now(),
+              app.sessionKey,
+            );
+          }
         } else if (role === "assistant" && app.chatRunId?.startsWith("remote-")) {
           app.chatRunId = null;
           (app as unknown as { chatStream: string | null }).chatStream = null;
           (app as unknown as { chatStreamStartedAt: number | null }).chatStreamStartedAt = null;
+          if (app.chatReadonlyRun) {
+            resetChatReadonlyRun(app as unknown as Parameters<typeof resetChatReadonlyRun>[0]);
+          }
         }
       }
 

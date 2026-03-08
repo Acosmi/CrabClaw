@@ -12,34 +12,91 @@ import (
 	"strings"
 )
 
+type featureFlags struct {
+	skipCron               bool
+	skipChannels           bool
+	skipBrowserControl     bool
+	skipCanvasHost         bool
+	skipProviders          bool
+	multimodalSwitch       string
+	multimodalAllowAll     bool
+	multimodalAllowedNames map[string]bool
+}
+
+func loadFeatureFlags(getenv func(string) string) featureFlags {
+	switchValue := firstFeatureEnvValue(
+		getenv,
+		"CRABCLAW_MULTIMODAL_CHANNELS",
+		"OPENACOSMI_MULTIMODAL_CHANNELS",
+	)
+	allowAll, allowList := parseMultimodalChannelsSwitch(switchValue)
+	return featureFlags{
+		skipCron: firstFeatureEnvValue(getenv, "CRABCLAW_SKIP_CRON", "OPENACOSMI_SKIP_CRON") != "",
+		skipChannels: firstFeatureEnvValue(
+			getenv,
+			"CRABCLAW_SKIP_CHANNELS",
+			"OPENACOSMI_SKIP_CHANNELS",
+		) != "",
+		skipBrowserControl: firstFeatureEnvValue(
+			getenv,
+			"CRABCLAW_SKIP_BROWSER_CONTROL_SERVER",
+			"OPENACOSMI_SKIP_BROWSER_CONTROL_SERVER",
+		) != "",
+		skipCanvasHost: firstFeatureEnvValue(
+			getenv,
+			"CRABCLAW_SKIP_CANVAS_HOST",
+			"OPENACOSMI_SKIP_CANVAS_HOST",
+		) != "",
+		skipProviders: firstFeatureEnvValue(
+			getenv,
+			"CRABCLAW_SKIP_PROVIDERS",
+			"OPENACOSMI_SKIP_PROVIDERS",
+		) != "",
+		multimodalSwitch:       switchValue,
+		multimodalAllowAll:     allowAll,
+		multimodalAllowedNames: allowList,
+	}
+}
+
+func firstFeatureEnvValue(getenv func(string) string, keys ...string) string {
+	for _, key := range keys {
+		if value := strings.TrimSpace(getenv(key)); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+var loadedFeatureFlags = loadFeatureFlags(os.Getenv)
+
 // SkipCron 跳过 cron 调度器启动。
 // 对应 TS OPENACOSMI_SKIP_CRON 环境变量。
-var SkipCron = os.Getenv("OPENACOSMI_SKIP_CRON") != ""
+var SkipCron = loadedFeatureFlags.skipCron
 
 // SkipChannels 跳过通道子系统启动（WhatsApp/Telegram/Discord 等）。
 // 对应 TS OPENACOSMI_SKIP_CHANNELS 环境变量。
-var SkipChannels = os.Getenv("OPENACOSMI_SKIP_CHANNELS") != ""
+var SkipChannels = loadedFeatureFlags.skipChannels
 
 // SkipBrowserControl 跳过浏览器控制服务器启动。
 // 对应 TS OPENACOSMI_SKIP_BROWSER_CONTROL_SERVER 环境变量。
-var SkipBrowserControl = os.Getenv("OPENACOSMI_SKIP_BROWSER_CONTROL_SERVER") != ""
+var SkipBrowserControl = loadedFeatureFlags.skipBrowserControl
 
 // SkipCanvasHost 跳过 Canvas 主机启动。
 // 对应 TS OPENACOSMI_SKIP_CANVAS_HOST 环境变量。
-var SkipCanvasHost = os.Getenv("OPENACOSMI_SKIP_CANVAS_HOST") != ""
+var SkipCanvasHost = loadedFeatureFlags.skipCanvasHost
 
 // SkipProviders 跳过 provider 初始化（仅用于测试）。
 // 对应 TS OPENACOSMI_SKIP_PROVIDERS 环境变量。
-var SkipProviders = os.Getenv("OPENACOSMI_SKIP_PROVIDERS") != ""
+var SkipProviders = loadedFeatureFlags.skipProviders
 
 // MultimodalChannelsSwitch 控制多模态渠道灰度开关。
 // 语义：
 //   - 空 / all / * : 全量启用（默认）
 //   - none / off / false / disabled / 0 : 全量禁用（快速回滚）
 //   - feishu,dingtalk,wecom : 仅启用指定渠道（灰度）
-var MultimodalChannelsSwitch = os.Getenv("OPENACOSMI_MULTIMODAL_CHANNELS")
+var MultimodalChannelsSwitch = loadedFeatureFlags.multimodalSwitch
 
-var multimodalAllowAll, multimodalAllowList = parseMultimodalChannelsSwitch(MultimodalChannelsSwitch)
+var multimodalAllowAll, multimodalAllowList = loadedFeatureFlags.multimodalAllowAll, loadedFeatureFlags.multimodalAllowedNames
 
 // IsMultimodalChannelEnabled 返回指定渠道是否启用多模态分发。
 // channel 建议使用：feishu / dingtalk / wecom。

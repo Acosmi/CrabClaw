@@ -20,6 +20,9 @@ func TestTranslationWithParams(t *testing.T) {
 	if !strings.Contains(result, "1.0.0") {
 		t.Errorf("参数替换失败，结果: %s", result)
 	}
+	if !strings.Contains(result, "Crab Claw（蟹爪）") {
+		t.Errorf("启动文案应包含新品牌，结果: %s", result)
+	}
 	if !strings.Contains(result, "启动") {
 		t.Errorf("中文翻译应包含'启动'，结果: %s", result)
 	}
@@ -29,12 +32,18 @@ func TestLanguageSwitch(t *testing.T) {
 	Init(LangZhCN)
 
 	zhResult := T("app.shutdown", nil)
+	if !strings.Contains(zhResult, "Crab Claw（蟹爪）") {
+		t.Errorf("中文翻译应包含新品牌，结果: %s", zhResult)
+	}
 	if !strings.Contains(zhResult, "关闭") {
 		t.Errorf("中文翻译应包含'关闭'，结果: %s", zhResult)
 	}
 
 	SetLang(LangEnUS)
 	enResult := T("app.shutdown", nil)
+	if !strings.Contains(enResult, "Crab Claw（蟹爪）") {
+		t.Errorf("英文翻译应包含新品牌，结果: %s", enResult)
+	}
 	if !strings.Contains(enResult, "shut down") {
 		t.Errorf("英文翻译应包含'shut down'，结果: %s", enResult)
 	}
@@ -105,7 +114,7 @@ func TestTf(t *testing.T) {
 // TestInitFromEnv_ZhCN 验证中文环境变量检测
 func TestInitFromEnv_ZhCN(t *testing.T) {
 	// 保存并恢复环境变量
-	for _, k := range []string{"OPENACOSMI_LANG", "LC_ALL", "LANG"} {
+	for _, k := range []string{"CRABCLAW_LANG", "OPENACOSMI_LANG", "LC_ALL", "LANG"} {
 		old := os.Getenv(k)
 		defer os.Setenv(k, old)
 		os.Unsetenv(k)
@@ -120,7 +129,7 @@ func TestInitFromEnv_ZhCN(t *testing.T) {
 
 // TestInitFromEnv_EnUS 验证英文环境变量检测
 func TestInitFromEnv_EnUS(t *testing.T) {
-	for _, k := range []string{"OPENACOSMI_LANG", "LC_ALL", "LANG"} {
+	for _, k := range []string{"CRABCLAW_LANG", "OPENACOSMI_LANG", "LC_ALL", "LANG"} {
 		old := os.Getenv(k)
 		defer os.Setenv(k, old)
 		os.Unsetenv(k)
@@ -133,9 +142,9 @@ func TestInitFromEnv_EnUS(t *testing.T) {
 	}
 }
 
-// TestInitFromEnv_Priority 验证 OPENACOSMI_LANG > LC_ALL > LANG 优先级
+// TestInitFromEnv_Priority 验证 CRABCLAW_LANG > OPENACOSMI_LANG > LC_ALL > LANG 优先级
 func TestInitFromEnv_Priority(t *testing.T) {
-	for _, k := range []string{"OPENACOSMI_LANG", "LC_ALL", "LANG"} {
+	for _, k := range []string{"CRABCLAW_LANG", "OPENACOSMI_LANG", "LC_ALL", "LANG"} {
 		old := os.Getenv(k)
 		defer os.Setenv(k, old)
 		os.Unsetenv(k)
@@ -143,15 +152,16 @@ func TestInitFromEnv_Priority(t *testing.T) {
 
 	os.Setenv("LANG", "en_US.UTF-8")
 	os.Setenv("OPENACOSMI_LANG", "zh-CN")
+	os.Setenv("CRABCLAW_LANG", "en-US")
 	InitFromEnv()
-	if GetLang() != LangZhCN {
-		t.Errorf("OPENACOSMI_LANG 应优先于 LANG，实际: %s", GetLang())
+	if GetLang() != LangEnUS {
+		t.Errorf("CRABCLAW_LANG 应优先于 OPENACOSMI_LANG 和 LANG，实际: %s", GetLang())
 	}
 }
 
 // TestInitFromEnv_Default 验证无环境变量时默认中文
 func TestInitFromEnv_Default(t *testing.T) {
-	for _, k := range []string{"OPENACOSMI_LANG", "LC_ALL", "LANG"} {
+	for _, k := range []string{"CRABCLAW_LANG", "OPENACOSMI_LANG", "LC_ALL", "LANG"} {
 		old := os.Getenv(k)
 		defer os.Setenv(k, old)
 		os.Unsetenv(k)

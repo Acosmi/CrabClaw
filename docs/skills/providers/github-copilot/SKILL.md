@@ -1,46 +1,58 @@
 ---
 name: github-copilot
-description: "从创宇太虚使用设备流登录 GitHub Copilot"
+description: "Sign in to GitHub Copilot from Crab Claw（蟹爪） using the device flow"
 ---
 
 # GitHub Copilot
 
-## 什么是 GitHub Copilot？
+## What is GitHub Copilot?
 
-GitHub Copilot 是 GitHub 的 AI 编码助手。它为你的 GitHub 账户和计划提供 Copilot 模型访问。创宇太虚可以通过两种方式使用 Copilot 作为模型供应商。
+GitHub Copilot is GitHub's AI coding assistant. It provides access to Copilot
+models for your GitHub account and plan. Crab Claw（蟹爪） can use Copilot as a model
+provider in two different ways.
 
-## 在创宇太虚中使用 Copilot 的两种方式
+## Two ways to use Copilot in Crab Claw（蟹爪）
 
-### 1）内置 GitHub Copilot 供应商（`github-copilot`）
+### 1) Built-in GitHub Copilot provider (`github-copilot`)
 
-使用原生设备登录流获取 GitHub token，然后在创宇太虚运行时将其交换为 Copilot API token。这是**默认**且最简单的方式，不需要 VS Code。
+Use the native device-login flow to obtain a GitHub token, then exchange it for
+Copilot API tokens when Crab Claw（蟹爪） runs. This is the **default** and simplest path
+because it does not require VS Code.
 
-### 2）Copilot Proxy 插件（`copilot-proxy`）
+### 2) Copilot Proxy plugin (`copilot-proxy`)
 
-使用 **Copilot Proxy** VS Code 扩展作为本地桥接。创宇太虚与代理的 `/v1` 端点通信并使用你在那里配置的模型列表。当你已在 VS Code 中运行 Copilot Proxy 或需要通过它路由时选择此方式。需要启用插件并保持 VS Code 扩展运行。
+Use the **Copilot Proxy** VS Code extension as a local bridge. Crab Claw（蟹爪） talks to
+the proxy’s `/v1` endpoint and uses the model list you configure there. Choose
+this when you already run Copilot Proxy in VS Code or need to route through it.
+You must enable the plugin and keep the VS Code extension running.
 
-## CLI 设置
+Use GitHub Copilot as a model provider (`github-copilot`). The login command runs
+the GitHub device flow, saves an auth profile, and updates your config to use that
+profile.
 
-```bash
-openacosmi models auth login-github-copilot
-```
-
-系统会提示你访问一个 URL 并输入一次性代码。在完成前保持终端打开。
-
-### 可选标志
-
-```bash
-openacosmi models auth login-github-copilot --profile-id github-copilot:work
-openacosmi models auth login-github-copilot --yes
-```
-
-## 设置默认模型
+## CLI setup
 
 ```bash
-openacosmi models set github-copilot/gpt-4o
+crabclaw models auth login-github-copilot
 ```
 
-### 配置示例
+You'll be prompted to visit a URL and enter a one-time code. Keep the terminal
+open until it completes.
+
+### Optional flags
+
+```bash
+crabclaw models auth login-github-copilot --profile-id github-copilot:work
+crabclaw models auth login-github-copilot --yes
+```
+
+## Set a default model
+
+```bash
+crabclaw models set github-copilot/gpt-4o
+```
+
+### Config snippet
 
 ```json5
 {
@@ -48,8 +60,10 @@ openacosmi models set github-copilot/gpt-4o
 }
 ```
 
-## 备注
+## Notes
 
-- 需要交互式 TTY；直接在终端中运行。
-- Copilot 模型可用性取决于你的计划；若模型被拒绝，尝试其他 ID（例如 `github-copilot/gpt-4.1`）。
-- 登录会将 GitHub token 存储在认证配置存储中，并在创宇太虚运行时将其交换为 Copilot API token。
+- Requires an interactive TTY; run it directly in a terminal.
+- Copilot model availability depends on your plan; if a model is rejected, try
+  another ID (for example `github-copilot/gpt-4.1`).
+- The login stores a GitHub token in the auth profile store and exchanges it for a
+  Copilot API token when Crab Claw（蟹爪） runs.

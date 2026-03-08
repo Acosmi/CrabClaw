@@ -27,15 +27,15 @@ import (
 func newLogsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logs",
-		Short: "View gateway logs",
-		Long: `View and stream Claw Acosmi gateway logs.
+		Short: "View Crab Claw（蟹爪） gateway logs",
+		Long: `View and stream Crab Claw（蟹爪） gateway logs.
 
 Examples:
-  openacosmi logs                    # Show last 100 lines
-  openacosmi logs --tail 50          # Show last 50 lines
-  openacosmi logs -f                 # Stream logs (follow mode)
-  openacosmi logs --level warn       # Show only warn+ level logs
-  openacosmi logs --level error -f   # Stream errors only`,
+  crabclaw logs                    # Show last 100 lines
+  crabclaw logs --tail 50          # Show last 50 lines
+  crabclaw logs -f                 # Stream logs (follow mode)
+  crabclaw logs --level warn       # Show only warn+ level logs
+  crabclaw logs --level error -f   # Stream errors only`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			follow, _ := cmd.Flags().GetBool("follow")
 			tail, _ := cmd.Flags().GetInt("tail")

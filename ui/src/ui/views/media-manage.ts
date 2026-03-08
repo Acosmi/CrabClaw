@@ -1,10 +1,11 @@
 // views/media-manage.ts — 媒体运营管理页面（独立侧栏入口）
-// 子 tab 导航 + 按 tab 分发到各面板渲染函数
+// 轻苹果风壳层 + 子 tab 分发，保留现有媒体控制器与业务面板。
 
-import { html, nothing } from "lit";
-import type { TemplateResult } from "lit";
+import { html, nothing, type TemplateResult } from "lit";
 import type { AppViewState } from "../app-view-state.ts";
 import { t } from "../i18n.ts";
+import { openMediaManageWindow } from "../media-manage-window.ts";
+import { pathForTab } from "../navigation.ts";
 import {
   renderConfigPanel,
   renderPatrolPanel,
@@ -17,9 +18,17 @@ import {
   renderPublishDetailModal,
   renderDraftEditModal,
 } from "./media-dashboard.ts";
-import { toggleMediaTool, toggleMediaSource, updateMediaConfig } from "../controllers/media-dashboard.ts";
+import {
+  toggleMediaTool,
+  toggleMediaSource,
+  updateMediaConfig,
+  type MediaSourceInfo,
+  type MediaToolInfo,
+} from "../controllers/media-dashboard.ts";
 
-export type MediaSubTab = "overview" | "llm" | "sources" | "tools" | "drafts" | "publish" | "patrol" | "strategy";
+export type MediaSubTab = "overview" | "llm" | "sources" | "tools" | "strategy" | "drafts" | "publish" | "patrol";
+
+const MEDIA_SUBTAB_QUERY = "mediaSubTab";
 
 const SUB_TABS: { id: MediaSubTab; labelKey: string }[] = [
   { id: "overview", labelKey: "media.subtab.overview" },
@@ -32,124 +41,7 @@ const SUB_TABS: { id: MediaSubTab; labelKey: string }[] = [
   { id: "patrol", labelKey: "media.subtab.patrol" },
 ];
 
-export function renderMediaManage(state: AppViewState): TemplateResult {
-  const activeSubTab = (state.mediaManageSubTab || "overview") as MediaSubTab;
-
-  const setSubTab = (tab: MediaSubTab) => {
-    state.mediaManageSubTab = tab;
-    (state as any).requestUpdate?.();
-  };
-
-  return html`
-    <section class="card">
-      <div class="row" style="justify-content: space-between;">
-        <div>
-          <div class="card-title">${t("media.manage.title")}</div>
-          <div class="card-sub">${t("nav.sub.media")}</div>
-        </div>
-      </div>
-
-      <div class="agent-tabs" style="margin-top: 16px;">
-        ${SUB_TABS.map(
-          (tab) => html`
-            <button
-              class="agent-tab ${activeSubTab === tab.id ? "active" : ""}"
-              @click=${() => setSubTab(tab.id)}
-            >
-              ${t(tab.labelKey)}
-            </button>
-          `,
-        )}
-      </div>
-
-      <div style="margin-top: 16px;">
-        ${dispatchSubTab(activeSubTab, state)}
-      </div>
-    </section>
-
-    ${renderDraftDetailModal(state)}
-    ${renderPublishDetailModal(state)}
-    ${renderDraftEditModal(state)}
-  `;
-}
-
-function dispatchSubTab(tab: MediaSubTab, state: AppViewState): TemplateResult | typeof nothing {
-  switch (tab) {
-    case "overview":
-      return renderOverviewTab(state);
-    case "llm":
-      return renderConfigPanel(state);
-    case "sources":
-      return renderSourcesTab(state);
-    case "tools":
-      return renderToolsTab(state);
-    case "drafts":
-      return renderDraftsPanel(state);
-    case "publish":
-      return renderPublishPanel(state);
-    case "patrol":
-      return renderPatrolTab(state);
-    case "strategy":
-      return renderStrategyTab(state);
-    default:
-      return nothing;
-  }
-}
-
-// ---------- Overview 子 tab ----------
-
-function renderOverviewTab(state: AppViewState): TemplateResult {
-  const config = state.mediaConfig;
-  const isConfigured = config?.status === "configured";
-  const toolCount = config?.tools?.length ?? 0;
-  const sourceCount = config?.trending_sources?.length ?? 0;
-  const draftCount = state.mediaDrafts?.length ?? 0;
-
-  return html`
-    <div style="display:flex;flex-direction:column;gap:16px;">
-      ${renderProgressBanner(state)}
-      ${renderHeartbeatPanel(state.mediaHeartbeat)}
-
-      <div class="media-stat-grid">
-        <div class="media-stat-card">
-          <div class="media-stat-value">${toolCount}</div>
-          <div class="media-stat-label">${t("media.subtab.tools")}</div>
-        </div>
-        <div class="media-stat-card">
-          <div class="media-stat-value">${sourceCount}</div>
-          <div class="media-stat-label">${t("media.subtab.sources")}</div>
-        </div>
-        <div class="media-stat-card">
-          <div class="media-stat-value">${draftCount}</div>
-          <div class="media-stat-label">${t("media.subtab.drafts")}</div>
-        </div>
-        <div class="media-stat-card">
-          <div class="${isConfigured ? "media-stat-value" : "media-stat-value media-stat-value--warn"}">
-            ${isConfigured ? "LLM" : "—"}
-          </div>
-          <div class="media-stat-label">${t("media.subtab.llm")}</div>
-        </div>
-      </div>
-
-      ${!isConfigured ? html`
-        <div class="callout" style="display:flex;align-items:center;gap:12px;">
-          <span>${t("media.overview.notConfigured")}</span>
-          <button
-            class="btn primary"
-            @click=${() => {
-              state.mediaManageSubTab = "llm";
-              (state as any).requestUpdate?.();
-            }}
-          >
-            ${t("media.overview.configureNow")}
-          </button>
-        </div>
-      ` : nothing}
-    </div>
-  `;
-}
-
-// ---------- Tools 子 tab ----------
+const SUB_TAB_IDS = new Set<MediaSubTab>(SUB_TABS.map((tab) => tab.id));
 
 const TOOL_ICONS: Record<string, string> = {
   trending_topics: "📊",
@@ -169,8 +61,380 @@ const TOOL_LABELS: Record<string, string> = {
   report_progress: "进度汇报",
 };
 
-// 可切换的工具（media_publish / social_interact）
 const TOGGLEABLE_TOOLS = new Set(["media_publish", "social_interact"]);
+
+const ALL_SOURCES = ["weibo", "baidu", "zhihu"] as const;
+
+const SOURCE_LABELS: Record<string, string> = {
+  weibo: "微博热搜",
+  baidu: "百度热搜",
+  zhihu: "知乎热榜",
+};
+
+function isToolEnabled(tool: Pick<MediaToolInfo, "enabled" | "status">): boolean {
+  return tool.enabled !== false && tool.status !== "disabled";
+}
+
+function isSourceEnabled(source: Pick<MediaSourceInfo, "enabled" | "status">): boolean {
+  if (typeof source.enabled === "boolean") {
+    return source.enabled;
+  }
+  return source.status !== "disabled";
+}
+
+function toolStatusMeta(tool: Pick<MediaToolInfo, "enabled" | "status" | "configured" | "scope">): {
+  label: string;
+  chipClass: string;
+} {
+  if (!isToolEnabled(tool)) {
+    return { label: "未启用", chipClass: "chip-muted" };
+  }
+  switch (tool.status) {
+    case "configured":
+      return { label: "已配置", chipClass: "chip-ok" };
+    case "needs_configuration":
+      return { label: "待配置", chipClass: "chip-warn" };
+    case "builtin":
+      return { label: "核心能力", chipClass: "chip-muted" };
+    default:
+      if (tool.scope === "shared") {
+        return { label: "运行时提供", chipClass: "chip-muted" };
+      }
+      return { label: "已启用", chipClass: "chip-muted" };
+  }
+}
+
+function isMediaSubTab(value: string | null | undefined): value is MediaSubTab {
+  return Boolean(value && SUB_TAB_IDS.has(value as MediaSubTab));
+}
+
+function normalizeMediaSubTab(value: string | null | undefined): MediaSubTab {
+  return isMediaSubTab(value) ? value : "overview";
+}
+
+function readMediaSubTabFromUrl(): MediaSubTab | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const value = new URL(window.location.href).searchParams.get(MEDIA_SUBTAB_QUERY);
+  return isMediaSubTab(value) ? value : null;
+}
+
+function syncMediaSubTabInUrl(basePath: string, tab: MediaSubTab) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const url = new URL(window.location.href);
+  url.pathname = pathForTab("media", basePath);
+  if (tab === "overview") {
+    url.searchParams.delete(MEDIA_SUBTAB_QUERY);
+  } else {
+    url.searchParams.set(MEDIA_SUBTAB_QUERY, tab);
+  }
+  window.history.replaceState({}, "", url.toString());
+}
+
+export function buildMediaManageUrl(basePath: string, tab: MediaSubTab = "overview"): string {
+  const targetPath = pathForTab("media", basePath);
+  if (typeof window === "undefined") {
+    return tab === "overview"
+      ? targetPath
+      : `${targetPath}?${MEDIA_SUBTAB_QUERY}=${encodeURIComponent(tab)}`;
+  }
+  const url = new URL(targetPath, window.location.href);
+  if (tab !== "overview") {
+    url.searchParams.set(MEDIA_SUBTAB_QUERY, tab);
+  }
+  return url.toString();
+}
+
+function formatTimestamp(timestamp: number | null | undefined): string {
+  if (!timestamp) {
+    return "—";
+  }
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(timestamp);
+  } catch {
+    return new Date(timestamp).toLocaleString();
+  }
+}
+
+function renderTagList(items: string[], emptyLabel = "—"): TemplateResult {
+  if (items.length === 0) {
+    return html`<span class="media-manage__meta-empty">${emptyLabel}</span>`;
+  }
+  return html`
+    <div class="media-manage__tag-list">
+      ${items.map((item) => html`<span class="media-manage__tag">${item}</span>`)}
+    </div>
+  `;
+}
+
+export function renderMediaManage(state: AppViewState): TemplateResult {
+  const activeSubTab = readMediaSubTabFromUrl() ?? normalizeMediaSubTab(state.mediaManageSubTab);
+  const config = state.mediaConfig;
+  const isConfigured = config?.status === "configured";
+  const toolCount = (config?.tools ?? []).filter((tool: MediaToolInfo) =>
+    tool.scope === "shared" ? tool.enabled !== false : isToolEnabled(tool),
+  ).length;
+  const sourceCount = config?.enabled_sources?.length
+    ?? (config?.trending_sources ?? []).filter((source: MediaSourceInfo) => isSourceEnabled(source)).length;
+  const draftCount = state.mediaDrafts?.length ?? 0;
+  const publisherCount = config?.publishers?.length ?? 0;
+  const provider = config?.llm?.provider || "—";
+  const model = config?.llm?.model || "—";
+  const autoSpawnCount = state.mediaHeartbeat?.autoSpawnCount ?? 0;
+  const activeSubTabLabel = t(SUB_TABS.find((tab) => tab.id === activeSubTab)?.labelKey || "media.subtab.overview");
+
+  const setSubTab = (tab: MediaSubTab) => {
+    state.mediaManageSubTab = tab;
+    syncMediaSubTabInUrl(state.basePath, tab);
+    (state as { requestUpdate?: () => void }).requestUpdate?.();
+  };
+
+  const configureLlm = () => setSubTab("llm");
+
+  return html`
+    <section class="media-manage">
+      <div class="media-manage__shell">
+        <div class="media-manage__hero">
+          <div class="media-manage__hero-copy">
+            <div class="media-manage__eyebrow">${t("nav.tab.media")}</div>
+            <div class="media-manage__headline-row">
+              <div>
+                <h1 class="media-manage__headline">${t("media.manage.title")}</h1>
+                <p class="media-manage__lede">${t("media.manage.subtitle")}</p>
+              </div>
+              <span class="media-manage__hero-badge ${isConfigured ? "is-ready" : "is-warning"}">
+                <span class="media-manage__hero-badge-dot"></span>
+                ${isConfigured ? t("media.manage.statusReady") : t("media.manage.statusSetup")}
+              </span>
+            </div>
+
+            <p class="media-manage__summary">${t("media.manage.summary")}</p>
+
+            <div class="media-manage__hero-actions">
+              <button class="btn primary" @click=${configureLlm}>
+                ${t("media.manage.configureModel")}
+              </button>
+              <button
+                class="btn"
+                @click=${() => {
+                  void openMediaManageWindow(buildMediaManageUrl(state.basePath, activeSubTab), activeSubTab, "media-page");
+                }}
+              >
+                ${t("media.manage.openWindow")}
+              </button>
+            </div>
+          </div>
+
+          <div class="media-manage__hero-panel">
+            <div class="media-manage__hero-metrics">
+              <div class="media-manage__hero-metric">
+                <span>${t("media.subtab.tools")}</span>
+                <strong>${toolCount}</strong>
+              </div>
+              <div class="media-manage__hero-metric">
+                <span>${t("media.subtab.sources")}</span>
+                <strong>${sourceCount}</strong>
+              </div>
+              <div class="media-manage__hero-metric">
+                <span>${t("media.subtab.drafts")}</span>
+                <strong>${draftCount}</strong>
+              </div>
+              <div class="media-manage__hero-metric">
+                <span>${t("media.manage.publishers")}</span>
+                <strong>${publisherCount}</strong>
+              </div>
+            </div>
+
+            <div class="media-manage__hero-facts">
+              <div class="media-manage__hero-fact">
+                <span>${t("media.subtab.llm")}</span>
+                <strong>${provider}</strong>
+                <small>${model}</small>
+              </div>
+              <div class="media-manage__hero-fact">
+                <span>${t("media.manage.nextPatrol")}</span>
+                <strong>${formatTimestamp(state.mediaHeartbeat?.nextPatrolAt)}</strong>
+                <small>${t("media.heartbeat.lastPatrol")} ${formatTimestamp(state.mediaHeartbeat?.lastPatrolAt)}</small>
+              </div>
+              <div class="media-manage__hero-fact">
+                <span>${t("media.heartbeat.autoSpawnCount")}</span>
+                <strong>${autoSpawnCount}</strong>
+                <small>${t("media.manage.currentWindow")} · ${activeSubTabLabel}</small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="media-manage__subtabs" role="tablist" aria-label=${t("media.manage.title")}>
+          ${SUB_TABS.map(
+            (tab) => html`
+              <button
+                class="media-manage__subtab ${activeSubTab === tab.id ? "is-active" : ""}"
+                @click=${() => setSubTab(tab.id)}
+              >
+                ${t(tab.labelKey)}
+              </button>
+            `,
+          )}
+        </div>
+
+        <div class="media-manage__content">
+          ${dispatchSubTab(activeSubTab, state, {
+            configureLlm,
+            openInWindow: () => openMediaManageWindow(
+              buildMediaManageUrl(state.basePath, activeSubTab),
+              activeSubTab,
+              "media-page",
+            ),
+          })}
+        </div>
+      </div>
+    </section>
+
+    ${renderDraftDetailModal(state)}
+    ${renderPublishDetailModal(state)}
+    ${renderDraftEditModal(state)}
+  `;
+}
+
+function dispatchSubTab(
+  tab: MediaSubTab,
+  state: AppViewState,
+  actions: {
+    configureLlm: () => void;
+    openInWindow: () => void;
+  },
+): TemplateResult | typeof nothing {
+  switch (tab) {
+    case "overview":
+      return renderOverviewTab(state, actions);
+    case "llm":
+      return html`<div class="media-manage__panel-stack">${renderConfigPanel(state)}</div>`;
+    case "sources":
+      return renderSourcesTab(state);
+    case "tools":
+      return renderToolsTab(state);
+    case "strategy":
+      return renderStrategyTab(state);
+    case "drafts":
+      return html`<div class="media-manage__panel-stack">${renderDraftsPanel(state)}</div>`;
+    case "publish":
+      return html`<div class="media-manage__panel-stack">${renderPublishPanel(state)}</div>`;
+    case "patrol":
+      return renderPatrolTab(state);
+    default:
+      return nothing;
+  }
+}
+
+function renderOverviewTab(
+  state: AppViewState,
+  actions: {
+    configureLlm: () => void;
+    openInWindow: () => void;
+  },
+): TemplateResult {
+  const config = state.mediaConfig;
+  const isConfigured = config?.status === "configured";
+  const toolNames = (config?.tools ?? [])
+    .filter((tool: MediaToolInfo) => tool.scope !== "shared" && isToolEnabled(tool))
+    .map((tool: MediaToolInfo) => TOOL_LABELS[tool.name] || tool.name);
+  const sourceNames = (config?.enabled_sources?.length
+    ? (config.enabled_sources as string[])
+    : (config?.trending_sources ?? [])
+        .filter((source: MediaSourceInfo) => isSourceEnabled(source))
+        .map((source: MediaSourceInfo) => source.name))
+    .map((name: string) => SOURCE_LABELS[name] || name);
+  const publishers = config?.publishers ?? [];
+
+  return html`
+    <div class="media-manage__overview">
+      <div class="media-manage__overview-grid">
+        <section class="media-glass-card media-glass-card--highlight">
+          <div class="media-glass-card__eyebrow">${t("media.manage.runbook")}</div>
+          <h2 class="media-glass-card__title">
+            ${isConfigured ? t("media.manage.statusReady") : t("media.manage.statusSetup")}
+          </h2>
+          <p class="media-glass-card__body">
+            ${isConfigured
+              ? `${config?.llm?.provider || "LLM"} · ${config?.llm?.model || "—"}`
+              : t("media.overview.notConfigured")}
+          </p>
+          <div class="media-glass-card__actions">
+            <button class="btn primary" @click=${actions.configureLlm}>
+              ${t("media.manage.configureModel")}
+            </button>
+            <button class="btn" @click=${actions.openInWindow}>
+              ${t("media.manage.openWindow")}
+            </button>
+          </div>
+        </section>
+
+        ${renderOverviewStat(t("media.subtab.tools"), String(config?.tools?.length ?? 0))}
+        ${renderOverviewStat(t("media.subtab.sources"), String(config?.trending_sources?.length ?? 0))}
+        ${renderOverviewStat(t("media.subtab.drafts"), String(state.mediaDrafts?.length ?? 0))}
+        ${renderOverviewStat(t("media.heartbeat.autoSpawnCount"), String(state.mediaHeartbeat?.autoSpawnCount ?? 0))}
+      </div>
+
+      <div class="media-manage__cockpit">
+        <section class="media-glass-card">
+          <div class="media-glass-card__eyebrow">${t("media.manage.toolsReady")}</div>
+          <div class="media-glass-card__body">
+            ${renderTagList(toolNames)}
+          </div>
+        </section>
+
+        <section class="media-glass-card">
+          <div class="media-glass-card__eyebrow">${t("media.manage.sourceMix")}</div>
+          <div class="media-glass-card__body">
+            ${renderTagList(sourceNames)}
+          </div>
+        </section>
+
+        <section class="media-glass-card">
+          <div class="media-glass-card__eyebrow">${t("media.manage.outputLane")}</div>
+          <div class="media-glass-card__body">
+            ${renderTagList(publishers)}
+          </div>
+        </section>
+      </div>
+
+      ${!isConfigured
+        ? html`
+            <div class="callout" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <span>${t("media.overview.notConfigured")}</span>
+              <button class="btn primary" @click=${actions.configureLlm}>
+                ${t("media.overview.configureNow")}
+              </button>
+            </div>
+          `
+        : nothing}
+
+      <div class="media-manage__panel-stack">
+        ${renderProgressBanner(state)}
+        ${renderHeartbeatPanel(state.mediaHeartbeat)}
+      </div>
+    </div>
+  `;
+}
+
+function renderOverviewStat(label: string, value: string): TemplateResult {
+  return html`
+    <section class="media-glass-card media-glass-card--stat">
+      <div class="media-glass-card__eyebrow">${label}</div>
+      <div class="media-glass-card__value">${value}</div>
+    </section>
+  `;
+}
+
 
 function renderToolsTab(state: AppViewState): TemplateResult {
   const config = state.mediaConfig;
@@ -178,114 +442,146 @@ function renderToolsTab(state: AppViewState): TemplateResult {
     return html`<div class="muted">${t("common.loading")}</div>`;
   }
 
-  const allTools = config.tools || [];
-  const mediaTools = allTools.filter((ti: any) => ti.scope !== "shared");
-  const sharedTools = allTools.filter((ti: any) => ti.scope === "shared");
+  const mediaTools = (config.tools || []).filter((tool: { scope?: string }) => tool.scope !== "shared");
+  const sharedTools = (config.tools || []).filter((tool: { scope?: string }) => tool.scope === "shared");
 
-  const renderToolCard = (tool: any, toggleable: boolean) => {
-    const name = tool.name;
-    const enabled = tool.enabled;
+  const renderToolCard = (tool: MediaToolInfo, toggleable: boolean) => {
+    const enabled = isToolEnabled(tool);
+    const badge = toolStatusMeta(tool);
     return html`
-      <div class="media-tool-card ${enabled ? "" : "media-tool-card--disabled"}">
-        <span class="media-tool-icon">${TOOL_ICONS[name] || "🔧"}</span>
-        <div style="flex:1;min-width:0;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span class="media-tool-name">${TOOL_LABELS[name] || name}</span>
-            ${enabled
-              ? html`<span class="chip chip-ok" style="font-size:10px;">已启用</span>`
-              : html`<span class="chip chip-muted" style="font-size:10px;">未启用</span>`}
+      <section class="media-manage__toggle-card ${enabled ? "" : "is-muted"}">
+        <div class="media-manage__toggle-icon">${TOOL_ICONS[tool.name] || "🔧"}</div>
+        <div class="media-manage__toggle-copy">
+          <div class="media-manage__toggle-title-row">
+            <strong>${TOOL_LABELS[tool.name] || tool.name}</strong>
+            <span class="chip ${badge.chipClass}">
+              ${badge.label}
+            </span>
           </div>
-          <div class="media-tool-desc">
-            ${tool.description || TOOL_LABELS[name] || name}
-          </div>
-          ${toggleable ? html`
-            <label class="media-tool-toggle">
-              <input
-                type="checkbox"
-                .checked=${enabled}
-                @change=${(e: Event) => {
-                  const checked = (e.target as HTMLInputElement).checked;
-                  void toggleMediaTool(state, name, checked);
-                }}
-              />
-              ${enabled ? "启用中" : "已关闭"}
-            </label>
-          ` : nothing}
+          <p>${tool.description || TOOL_LABELS[tool.name] || tool.name}</p>
+
+          ${toggleable
+            ? html`
+                <label class="media-manage__switch-row">
+                  <input
+                    type="checkbox"
+                    .checked=${enabled}
+                    @change=${(event: Event) => {
+                      const checked = (event.target as HTMLInputElement).checked;
+                      void toggleMediaTool(state, tool.name, checked);
+                    }}
+                  />
+                  <span>${enabled ? "启用中" : "已关闭"}</span>
+                </label>
+              `
+            : html`
+                <div class="media-manage__switch-row media-manage__switch-row--static">
+                  <span>${tool.scope === "shared"
+                    ? "共享能力，随运行环境自动提供"
+                    : tool.status === "builtin"
+                      ? "核心能力，默认可用，不依赖单独账号配置"
+                      : tool.status === "needs_configuration"
+                        ? "需要先补齐媒体账号或发布目标"
+                        : "能力已接入，可直接参与媒体流程"}</span>
+                </div>
+              `}
         </div>
-      </div>
+      </section>
     `;
   };
 
   return html`
-    <div style="display:flex;flex-direction:column;gap:16px;">
-      <div class="media-section-title">媒体专属工具</div>
-      <div class="media-tool-grid">
-        ${mediaTools.map((tool: any) => renderToolCard(tool, TOGGLEABLE_TOOLS.has(tool.name)))}
-      </div>
-      ${sharedTools.length > 0 ? html`
-        <div class="media-section-title media-section-title--spaced">共享工具（运行时自动获得）</div>
-        <div class="media-tool-grid">
-          ${sharedTools.map((tool: any) => renderToolCard(tool, false))}
+    <div class="media-manage__panel-stack">
+      <section class="media-glass-card">
+        <div class="media-glass-card__header">
+          <div>
+            <div class="media-glass-card__eyebrow">${t("media.subtab.tools")}</div>
+            <div class="media-glass-card__body">${t("media.manage.summary")}</div>
+          </div>
         </div>
-      ` : nothing}
+
+        <div class="media-manage__collection-grid">
+          ${mediaTools.map((tool: MediaToolInfo) =>
+            renderToolCard(tool, TOGGLEABLE_TOOLS.has(tool.name)),
+          )}
+        </div>
+      </section>
+
+      ${sharedTools.length > 0
+        ? html`
+            <section class="media-glass-card">
+              <div class="media-glass-card__header">
+                <div>
+                  <div class="media-glass-card__eyebrow">共享工具</div>
+                  <div class="media-glass-card__body">这些能力由主运行时提供，媒体子智能体会按需自动调用。</div>
+                </div>
+              </div>
+              <div class="media-manage__collection-grid">
+                ${sharedTools.map((tool: MediaToolInfo) =>
+                  renderToolCard(tool, false),
+                )}
+              </div>
+            </section>
+          `
+        : nothing}
     </div>
   `;
 }
 
-// ---------- Sources 子 tab ----------
-
-const ALL_SOURCES = ["weibo", "baidu", "zhihu"] as const;
-const SOURCE_LABELS: Record<string, string> = {
-  weibo: "微博热搜",
-  baidu: "百度热搜",
-  zhihu: "知乎热榜",
-};
-
 function renderSourcesTab(state: AppViewState): TemplateResult {
   const config = state.mediaConfig;
-  // 语义: enabled_sources_configured=false (nil) → 全部启用
-  //        enabled_sources_configured=true, trending_sources=[] → 全部禁用
-  //        enabled_sources_configured=true, trending_sources=[...] → 仅列出的启用
-  const sourcesConfigured = config?.enabled_sources_configured === true;
-  const registeredSources = (config?.trending_sources || []).map((si: any) => si.name);
-  const allEnabled = !sourcesConfigured; // nil = 全部启用
+  if (!config) {
+    return html`<div class="muted">${t("common.loading")}</div>`;
+  }
+
+  const registeredSources = Array.isArray(config.enabled_sources)
+    ? config.enabled_sources
+    : (config.trending_sources || [])
+        .filter((source: MediaSourceInfo) => isSourceEnabled(source))
+        .map((source: MediaSourceInfo) => source.name);
+  const hasExplicitConfig = config.enabled_sources_configured === true;
+  const allEnabled = !hasExplicitConfig;
 
   return html`
-    <div style="display:flex;flex-direction:column;gap:16px;">
-      <div class="card media-source-panel">
-        <div class="media-source-title">热点来源开关</div>
-        ${allEnabled ? html`
-          <div class="media-source-status">当前为默认模式：全部来源已启用</div>
-        ` : nothing}
-        <div class="media-source-grid">
+    <div class="media-manage__panel-stack">
+      <section class="media-glass-card">
+        <div class="media-glass-card__header">
+          <div>
+            <div class="media-glass-card__eyebrow">${t("media.subtab.sources")}</div>
+            <div class="media-glass-card__body">${t("media.manage.sourcesHint")}</div>
+          </div>
+        </div>
+
+        <div class="media-manage__collection-grid">
           ${ALL_SOURCES.map((name) => {
-            const enabled = allEnabled || registeredSources.includes(name);
+            const source = (config.trending_sources || []).find((entry: MediaSourceInfo) => entry.name === name);
+            const enabled = source ? isSourceEnabled(source) : (allEnabled || registeredSources.includes(name));
             return html`
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
-                <input
-                  type="checkbox"
-                  .checked=${enabled}
-                  @change=${(e: Event) => {
-                    const checked = (e.target as HTMLInputElement).checked;
-                    void toggleMediaSource(state, name, checked);
-                  }}
-                />
-                ${SOURCE_LABELS[name] || name}
+              <label class="media-manage__source-card ${enabled ? "" : "is-muted"}">
+                <div class="media-manage__source-card-head">
+                  <strong>${SOURCE_LABELS[name] || name}</strong>
+                  <input
+                    type="checkbox"
+                    .checked=${enabled}
+                    @change=${(event: Event) => {
+                      const checked = (event.target as HTMLInputElement).checked;
+                      void toggleMediaSource(state, name, checked);
+                    }}
+                  />
+                </div>
+                <span>${enabled
+                  ? hasExplicitConfig ? "当前参与热点抓取" : "默认启用，尚未显式配置"
+                  : hasExplicitConfig ? "已从抓取名单移除" : "当前未启用"}</span>
               </label>
             `;
           })}
         </div>
-        <div class="media-source-hint">
-          取消勾选将禁用该来源的热点抓取（需重启子系统生效）。
-          首次修改后将切换为显式配置模式。
-        </div>
-      </div>
+      </section>
+
       ${renderTrendingPanel(state)}
     </div>
   `;
 }
-
-// ---------- Strategy 子 tab ----------
 
 function renderStrategyTab(state: AppViewState): TemplateResult {
   const config = state.mediaConfig;
@@ -375,12 +671,11 @@ function renderStrategyTab(state: AppViewState): TemplateResult {
   `;
 }
 
-// ---------- Patrol 子 tab ----------
-
 function renderPatrolTab(state: AppViewState): TemplateResult {
   return html`
-    <div style="display:flex;flex-direction:column;gap:16px;">
+    <div class="media-manage__panel-stack">
       ${renderPatrolPanel(state)}
+      ${renderProgressBanner(state)}
       ${renderHeartbeatPanel(state.mediaHeartbeat)}
     </div>
   `;

@@ -174,7 +174,7 @@ func FormatElevatedUnavailableMessage(
 	)
 	if sessionKey != "" {
 		lines = append(lines,
-			fmt.Sprintf("See: `openacosmi sandbox explain --session %s`", sessionKey))
+			fmt.Sprintf("See: `crabclaw sandbox explain --session %s`", sessionKey))
 	}
 	return strings.Join(lines, "\n")
 }

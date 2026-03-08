@@ -335,7 +335,7 @@ func registerBuiltinCommands() {
 	RegisterCommand(&ChatCommandDefinition{
 		Key:         "restart",
 		NativeName:  "restart",
-		Description: "Restart OpenAcosmi.",
+		Description: "Restart Crab Claw（蟹爪）.",
 		TextAliases: []string{"/restart"},
 		Scope:       CommandScopeBoth,
 		Category:    CategoryTools,

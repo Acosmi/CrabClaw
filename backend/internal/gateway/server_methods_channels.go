@@ -157,6 +157,12 @@ func handleChannelsSave(ctx *MethodHandlerContext) {
 	}, nil)
 }
 
+// emailAccountHealthInfo 邮箱账号运行时状态（Phase 9 内部辅助）
+type emailAccountHealthInfo struct {
+	running   bool
+	lastError string
+}
+
 // ---------- channels.status ----------
 // 对应 TS channels.ts L69-236
 // 返回频道状态快照（频道列表、UI 目录、账户状态）。
@@ -192,6 +198,7 @@ func handleChannelsStatus(ctx *MethodHandlerContext) {
 	channelOrder := []string{
 		"wecom", "dingtalk", "feishu",
 		"telegram", "discord", "slack", "whatsapp", "signal", "imessage",
+		"email",
 	}
 	channelLabels := map[string]string{
 		"telegram": "Telegram",
@@ -203,6 +210,7 @@ func handleChannelsStatus(ctx *MethodHandlerContext) {
 		"wecom":    "企业微信",
 		"dingtalk": "钉钉",
 		"feishu":   "飞书",
+		"email":    "邮箱",
 	}
 
 	// Phase 5: 从 ChannelManager 获取运行时快照
@@ -266,6 +274,69 @@ func handleChannelsStatus(ctx *MethodHandlerContext) {
 		}
 		if cfg.Channels.WeCom != nil {
 			buildStatus("wecom", cfg.Channels.WeCom.CorpID != "" && cfg.Channels.WeCom.Secret != "")
+		}
+
+		// Email: 多账号模式 — 每个账号独立状态
+		if cfg.Channels.Email != nil && channels.IsAccountEnabled(cfg.Channels.Email.Enabled) {
+			emailCfg := cfg.Channels.Email
+			configured := emailCfg.Accounts != nil && len(emailCfg.Accounts) > 0
+			emailStatus := map[string]interface{}{"configured": configured}
+
+			var emailAcctInfos []map[string]interface{}
+			if configured {
+				// 从运行时快照读取各账号状态
+				var healthMap map[string]*emailAccountHealthInfo
+				if runtimeSnap != nil {
+					if accts, ok := runtimeSnap.Accounts[channels.ChannelEmail]; ok {
+						healthMap = make(map[string]*emailAccountHealthInfo, len(accts))
+						for acctID, snap := range accts {
+							healthMap[acctID] = &emailAccountHealthInfo{
+								running:   snap.Status == "running",
+								lastError: snap.Error,
+							}
+						}
+					}
+				}
+
+				hasRunning := false
+				for acctID, acctCfg := range emailCfg.Accounts {
+					info := map[string]interface{}{
+						"accountId":  acctID,
+						"configured": true,
+						"enabled":    channels.IsAccountEnabled(acctCfg.Enabled),
+					}
+					if acctCfg.Address != "" {
+						info["address"] = acctCfg.Address
+					}
+					if acctCfg.Provider != "" {
+						info["provider"] = string(acctCfg.Provider)
+					}
+					if healthMap != nil {
+						if h, ok := healthMap[acctID]; ok {
+							info["running"] = h.running
+							info["connected"] = h.running
+							if h.lastError != "" {
+								info["lastError"] = h.lastError
+							}
+							if h.running {
+								hasRunning = true
+							}
+						}
+					}
+					emailAcctInfos = append(emailAcctInfos, info)
+				}
+				emailStatus["running"] = hasRunning
+				emailStatus["connected"] = hasRunning
+			}
+			channelsMap["email"] = emailStatus
+			if len(emailAcctInfos) > 0 {
+				channelAccounts["email"] = emailAcctInfos
+			} else {
+				channelAccounts["email"] = []map[string]interface{}{}
+			}
+			if emailCfg.DefaultAccount != "" {
+				channelDefaultAccountId["email"] = emailCfg.DefaultAccount
+			}
 		}
 	}
 

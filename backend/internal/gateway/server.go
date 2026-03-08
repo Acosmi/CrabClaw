@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
@@ -27,6 +28,7 @@ import (
 	"github.com/Acosmi/ClawAcosmi/internal/browser"
 	"github.com/Acosmi/ClawAcosmi/internal/channels"
 	"github.com/Acosmi/ClawAcosmi/internal/channels/dingtalk"
+	emailchannel "github.com/Acosmi/ClawAcosmi/internal/channels/email"
 	"github.com/Acosmi/ClawAcosmi/internal/channels/feishu"
 	"github.com/Acosmi/ClawAcosmi/internal/channels/website"
 	"github.com/Acosmi/ClawAcosmi/internal/channels/wechat_mp"
@@ -39,6 +41,8 @@ import (
 	"github.com/Acosmi/ClawAcosmi/internal/media"
 	"github.com/Acosmi/ClawAcosmi/internal/memory/uhms"
 	"github.com/Acosmi/ClawAcosmi/internal/memory/uhms/vectoradapter"
+	"github.com/Acosmi/ClawAcosmi/internal/packages"
+	"github.com/Acosmi/ClawAcosmi/internal/plugins"
 	"github.com/Acosmi/ClawAcosmi/internal/sandbox"
 	applog "github.com/Acosmi/ClawAcosmi/pkg/log"
 	"github.com/Acosmi/ClawAcosmi/pkg/mcpremote"
@@ -51,9 +55,11 @@ import (
 
 // GatewayServerOptions 网关启动选项。
 type GatewayServerOptions struct {
-	ControlUIDir string
-	BindMode     BindMode
-	BindHost     string
+	ControlUIDir   string
+	ControlUIFS    fs.FS  // 嵌入式前端文件系统（桌面端使用）
+	ControlUIIndex string // 入口文件名，默认 "index.html"
+	BindMode       BindMode
+	BindHost       string
 }
 
 // GatewayRuntime 网关运行时，持有 server/state 引用及关闭方法。
@@ -318,6 +324,29 @@ func (a *mediaSenderAdapter) SendMedia(ctx context.Context, channelID, to string
 		MediaMimeType: mimeType,
 	})
 	return err
+}
+
+// ---------- Email Sender → Agent 适配器 ----------
+
+// emailSenderAdapter 将 EmailPlugin 适配为 runner 包的 EmailSender 接口。
+type emailSenderAdapter struct {
+	plugin *emailchannel.EmailPlugin
+}
+
+func (a *emailSenderAdapter) SendEmail(ctx context.Context, to, subject, body, account, sessionKey, cc string) (string, error) {
+	result, err := a.plugin.SendMessage(channels.OutboundSendParams{
+		Ctx:        ctx,
+		AccountID:  account,
+		To:         to,
+		Subject:    subject,
+		Text:       body,
+		Cc:         cc,
+		SessionKey: sessionKey,
+	})
+	if err != nil {
+		return "", err
+	}
+	return result.MessageID, nil
 }
 
 // ---------- Bocha Search → Agent 适配器 ----------
@@ -971,8 +1000,8 @@ const coldStartIdentity = `
 [Cold Start — 首次对话]
 这是系统重启后的第一次对话，无历史上下文。
 如果用户发来问候（你好/hi/hello），请做一次完整自我介绍（3-5 句话）：
-  - 你的名字：创宇太虚（Claw Acosmi）
-  - 你是什么：运行于 Claw Acosmi 的多模态 AI 代理
+  - 你的名字：Crab Claw（蟹爪）
+  - 你是什么：运行于 Crab Claw（蟹爪） 的多模态 AI 代理
   - 你能做什么：截屏分析、执行命令、搜索网页、读写文件、发送消息、管理记忆等
   - 你的接入渠道：飞书、网页、API
   - 用一句话邀请用户告诉你需要做什么
@@ -1135,7 +1164,10 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 	registry.RegisterAll(ImageHandlers())          // Phase E: 图片理解 Fallback 方法
 	registry.RegisterAll(MediaHandlers())          // Phase 5+6: 媒体子系统方法
 	registry.RegisterAll(PluginsHandlers())        // 插件中心
+	registry.RegisterAll(PackagesHandlers())       // P3: 统一应用中心
+	registry.RegisterAll(EmailHandlers())          // P10: 邮箱连接验证
 	registry.RegisterAll(TaskKanbanHandlers())     // 任务看板
+	registry.RegisterAll(AuthHandlers())           // P2: OAuth 认证
 	if state.ArgusBridge() != nil {
 		RegisterArgusDynamicMethods(registry, state.ArgusBridge()) // Argus 动态工具方法
 	}
@@ -1436,6 +1468,16 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 	if channelMgr := state.ChannelMgr(); channelMgr != nil {
 		attemptRunner.MediaSender = &mediaSenderAdapter{channelMgr: channelMgr}
 		slog.Info("media sender configured for agent")
+	}
+
+	// EmailSender 注入 — Email Plugin 存在时自动启用 send_email 工具
+	if channelMgr := state.ChannelMgr(); channelMgr != nil {
+		if ep := channelMgr.GetPlugin(channels.ChannelEmail); ep != nil {
+			if emailPlugin, ok := ep.(*emailchannel.EmailPlugin); ok {
+				attemptRunner.EmailSender = &emailSenderAdapter{plugin: emailPlugin}
+				slog.Info("email sender configured for agent")
+			}
+		}
 	}
 
 	// MediaSubsystem 注入 — 媒体工具子系统（可选，初始化失败不影响主流程）
@@ -2816,6 +2858,111 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 			}
 		}
 
+		// ---------- Email Channel 注册 ----------
+		if loadedCfg.Channels.Email != nil && channels.IsAccountEnabled(loadedCfg.Channels.Email.Enabled) {
+			emailPlugin := emailchannel.NewEmailPlugin(loadedCfg)
+			emailPlugin.StoreRoot = storePath
+
+			// 注入多模态消息分发回调（Phase 5 完成后由 threading/inbound bridge 调用）
+			emailPlugin.DispatchMultimodalFunc = func(channel, accountID, chatID, userID string, msg *channels.ChannelMessage) *channels.DispatchReply {
+				// chatID 已由 threading.go ResolveSessionKey 生成完整 session key（如 email:acct:thread:hash）
+				// 直接使用，不再包装 — 修 M2: 避免双重 "email:" 前缀
+				sessionKey := chatID
+
+				var resolvedSessionId string
+				if sessionStore != nil {
+					entry := sessionStore.LoadSessionEntry(sessionKey)
+					if entry == nil {
+						newId := fmt.Sprintf("session_%d", time.Now().UnixNano())
+						entry = &SessionEntry{
+							SessionKey: sessionKey,
+							SessionId:  newId,
+							Label:      fmt.Sprintf("邮箱:%s", userID),
+							Channel:    "email",
+						}
+						sessionStore.Save(entry)
+						slog.Info("email: auto-created session", "sessionKey", sessionKey, "sessionId", newId)
+					}
+					resolvedSessionId = entry.SessionId
+					sessionStore.RecordSessionMeta(sessionKey, InboundMeta{
+						Channel:     "email",
+						DisplayName: userID,
+					})
+				}
+
+				text := ""
+				if msg != nil {
+					text = msg.Text
+				}
+
+				msgCtx := &autoreply.MsgContext{
+					Body:        text,
+					ChannelType: channel,
+					ChannelID:   chatID,
+					SenderID:    userID,
+					AccountID:   accountID,
+					SessionID:   resolvedSessionId,
+					SessionKey:  sessionKey,
+				}
+
+				bc := state.Broadcaster()
+				if bc != nil {
+					ts := time.Now().UnixMilli()
+					userPayload := map[string]interface{}{
+						"sessionKey": sessionKey,
+						"channel":    "email",
+						"role":       "user",
+						"text":       text,
+						"from":       userID,
+						"chatId":     chatID,
+						"ts":         ts,
+					}
+					bc.Broadcast("chat.message", userPayload, nil)
+					bc.Broadcast("channel.message.incoming", userPayload, nil)
+				}
+
+				result := DispatchInboundMessage(context.Background(), DispatchInboundParams{
+					MsgCtx:     msgCtx,
+					SessionKey: sessionKey,
+					Dispatcher: pipelineDispatcher,
+					OnProgress: buildMsgContextProgressCallback(state, msgCtx),
+				})
+
+				var replyText string
+				if result.Error != nil {
+					slog.Error("email dispatch error", "error", result.Error, "chatID", chatID)
+					replyText = fmt.Sprintf("处理失败: %s", result.Error.Error())
+				} else {
+					replyText = CombineReplyPayloads(result.Replies)
+				}
+
+				if replyText == "" {
+					return nil
+				}
+
+				// 广播 assistant 回复到前端
+				if bc != nil {
+					bc.Broadcast("chat.message", map[string]interface{}{
+						"sessionKey": sessionKey,
+						"channel":    "email",
+						"role":       "assistant",
+						"text":       replyText,
+						"chatId":     chatID,
+						"ts":         time.Now().UnixMilli(),
+						"state":      "final",
+					}, nil)
+				}
+
+				return &channels.DispatchReply{Text: replyText}
+			}
+
+			channelMgr.RegisterPlugin(emailPlugin)
+			slog.Info("channel: email plugin registered")
+
+			// Email 使用多账号模式，直接启动所有配置的账号
+			emailPlugin.StartAllAccounts()
+		}
+
 		// 启动已配置的频道
 		pluginChannels := []channels.ChannelID{channels.ChannelFeishu, channels.ChannelDingTalk, channels.ChannelWeCom}
 		if loadedCfg.Channels.WeChatMP != nil && loadedCfg.Channels.WeChatMP.Enabled {
@@ -2959,6 +3106,81 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 		attemptRunner.RemoteMCPBridge = &remoteMCPBridgeAdapter{bridge: remoteMCPBridge}
 	}
 
+	// ---------- 4i-pre. Phase 2A: OAuth AuthManager 初始化 ----------
+	// [FIX-01: 使用 FileTokenStore 初始化 AuthManager，启动时 Load 不阻塞]
+	{
+		tokenPath := ResolveAuthTokenPath()
+		fileStore := mcpremote.NewFileTokenStore(tokenPath)
+		oauthCfg := mcpremote.OAuthConfig{}
+		if loadedCfg != nil && loadedCfg.Skills != nil && loadedCfg.Skills.Store != nil {
+			storeCfg := loadedCfg.Skills.Store
+			if storeCfg.Token != "" {
+				oauthCfg.StaticToken = storeCfg.Token
+			}
+			if storeCfg.OAuth != nil {
+				oauthCfg.OAuthEnabled = true
+				oauthCfg.IssuerURL = storeCfg.OAuth.IssuerURL
+				oauthCfg.ClientID = storeCfg.OAuth.ClientID
+			}
+		}
+		authMgr := mcpremote.NewOAuthTokenManager(oauthCfg, fileStore)
+		state.SetAuthManager(authMgr)
+		slog.Info("gateway: auth manager initialized", "tokenPath", tokenPath)
+	}
+
+	// ---------- 4i. Phase 4: 托管模型目录初始化（仅 ManagedModels.Enabled 时）----------
+	if loadedCfg != nil && loadedCfg.Models != nil &&
+		loadedCfg.Models.ManagedModels != nil && loadedCfg.Models.ManagedModels.Enabled {
+		catalogURL := loadedCfg.Models.ManagedModels.CatalogURL
+		if catalogURL != "" {
+			// [FIX-01: tokenProvider stub 替换为 AuthManager.GetAccessToken()]
+			tokenProvider := func() (string, error) {
+				if authMgr := state.AuthManager(); authMgr != nil {
+					return authMgr.GetAccessToken()
+				}
+				return "", fmt.Errorf("auth not configured — login via auth.login.start first")
+			}
+			mc := models.NewManagedModelCatalog(catalogURL, tokenProvider)
+			state.SetManagedCatalog(mc)
+			slog.Info("gateway: managed model catalog initialized", "url", catalogURL)
+		}
+	}
+
+	// ---------- 4j. Phase 3: 统一应用中心初始化（失败不阻塞启动）----------
+	{
+		ledgerPath := filepath.Join(config.ResolveStateDir(), "packages", "installs.json")
+		pkgLedger := packages.NewPackageLedger(ledgerPath)
+		state.SetPackageLedger(pkgLedger)
+
+		docsSkillsDir := skills.ResolveDocsSkillsDir("")
+
+		pluginLoader := func() []plugins.PluginCandidate {
+			result := plugins.DiscoverPlugins("", nil)
+			return result.Candidates
+		}
+
+		skillLoader := func() []skills.SkillEntry {
+			if loadedCfg == nil {
+				return nil
+			}
+			aid := scope.ResolveDefaultAgentId(loadedCfg)
+			wsDir := scope.ResolveAgentWorkspaceDir(loadedCfg, aid)
+			bDir := skills.ResolveBundledSkillsDir("")
+			return skills.LoadSkillEntries(wsDir, "", bDir, loadedCfg)
+		}
+
+		pkgCatalog := packages.NewPackageCatalog(skillStoreClient, skillLoader, pluginLoader, pkgLedger)
+		state.SetPackageCatalog(pkgCatalog)
+
+		catalogDetail := func(id string) (*types.PackageCatalogItem, error) {
+			return pkgCatalog.Detail(context.Background(), id)
+		}
+		pkgInstaller := packages.NewPackageInstaller(skillStoreClient, docsSkillsDir, pkgLedger, catalogDetail)
+		state.SetPackageInstaller(pkgInstaller)
+
+		slog.Info("gateway: unified package center initialized", "ledger", ledgerPath)
+	}
+
 	// ---------- 5. 创建 HTTP 路由 ----------
 	wsConfig := WsServerConfig{
 		Auth:               auth,
@@ -3056,18 +3278,36 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 		HandleToolsInvoke(w, r, toolsCfg)
 	})
 
-	// Control UI 静态文件
-	if opts.ControlUIDir != "" {
-		fs := http.FileServer(http.Dir(opts.ControlUIDir))
-		mux.Handle("/ui/", http.StripPrefix("/ui/", fs))
+	// Control UI 静态文件（支持目录模式或嵌入式 FS 模式）
+	if handler, ok := newControlUIHandler(opts.ControlUIDir, opts.ControlUIFS, opts.ControlUIIndex); ok {
+		mux.Handle("/ui/", http.StripPrefix("/ui", handler))
+	} else if opts.ControlUIDir != "" {
+		fsHandler := http.FileServer(http.Dir(opts.ControlUIDir))
+		mux.Handle("/ui/", http.StripPrefix("/ui/", fsHandler))
 	}
+
+	// 浏览器扩展安装引导页
+	RegisterBrowserExtensionRoutes(mux, BrowserExtensionHandlerConfig{
+		GetRelayInfo: func() *RelayStatusInfo {
+			relay := state.extensionRelay
+			if relay == nil {
+				return nil
+			}
+			return &RelayStatusInfo{
+				Port:      relay.Port(),
+				Token:     relay.AuthToken(),
+				RelayURL:  fmt.Sprintf("ws://127.0.0.1:%d/ws", relay.Port()),
+				Connected: relay.Port() > 0,
+			}
+		},
+	})
 
 	// Phase 5: 频道 webhook HTTP 路由
 	mux.HandleFunc("/channels/feishu/webhook", ChannelWebhookFeishu(channelMgr))
 	mux.HandleFunc("/channels/wecom/callback", ChannelWebhookWeCom(channelMgr))
 
 	// Issue 6: Root path handler — prevents 404 for "/"
-	hasControlUI := opts.ControlUIDir != ""
+	hasControlUI := hasControlUISource(opts.ControlUIDir, opts.ControlUIFS)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// Only handle exact "/" path; net/http routes unmatched paths to "/"
 		if r.URL.Path != "/" {
@@ -3079,7 +3319,7 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 			return
 		}
 		SendJSON(w, http.StatusOK, map[string]interface{}{
-			"name":    "Claw Acosmi Gateway",
+			"name":    "Crab Claw Gateway",
 			"version": cli.Version,
 			"status":  "ok",
 		})
@@ -3097,29 +3337,29 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 	httpServer := NewGatewayHTTPServer(serverCfg, mux)
 
 	// ---------- 5a. 功能开关（SKIP_* 系列）----------
-	// 对应 TS server.impl.ts 启动顺序第 4-7 步的 OPENACOSMI_SKIP_* 控制逻辑。
+	// 对应 TS server.impl.ts 启动顺序第 4-7 步的 CRABCLAW_SKIP_* / OPENACOSMI_SKIP_* 控制逻辑。
 	// 各子系统在未来接入时须先检查对应 flag 再执行 Start()。
 	if config.SkipCron {
-		slog.Info("gateway: OPENACOSMI_SKIP_CRON set — cron scheduler will not start")
+		slog.Info("gateway: CRABCLAW_SKIP_CRON / OPENACOSMI_SKIP_CRON set — cron scheduler will not start")
 	}
 	if config.SkipChannels {
-		slog.Info("gateway: OPENACOSMI_SKIP_CHANNELS set — channel subsystem will not start")
+		slog.Info("gateway: CRABCLAW_SKIP_CHANNELS / OPENACOSMI_SKIP_CHANNELS set — channel subsystem will not start")
 	}
 	if config.SkipBrowserControl {
-		slog.Info("gateway: OPENACOSMI_SKIP_BROWSER_CONTROL_SERVER set — browser control server will not start")
+		slog.Info("gateway: CRABCLAW_SKIP_BROWSER_CONTROL_SERVER / OPENACOSMI_SKIP_BROWSER_CONTROL_SERVER set — browser control server will not start")
 	}
 	if config.SkipCanvasHost {
-		slog.Info("gateway: OPENACOSMI_SKIP_CANVAS_HOST set — canvas host will not start")
+		slog.Info("gateway: CRABCLAW_SKIP_CANVAS_HOST / OPENACOSMI_SKIP_CANVAS_HOST set — canvas host will not start")
 	}
 	if config.SkipProviders {
-		slog.Info("gateway: OPENACOSMI_SKIP_PROVIDERS set — provider initialization skipped")
+		slog.Info("gateway: CRABCLAW_SKIP_PROVIDERS / OPENACOSMI_SKIP_PROVIDERS set — provider initialization skipped")
 	}
 	mmSwitch := strings.TrimSpace(config.MultimodalChannelsSwitch)
 	if mmSwitch == "" {
 		mmSwitch = "all (default)"
 	}
 	slog.Info("gateway: multimodal rollout switch",
-		"env", "OPENACOSMI_MULTIMODAL_CHANNELS",
+		"env", "CRABCLAW_MULTIMODAL_CHANNELS / OPENACOSMI_MULTIMODAL_CHANNELS",
 		"value", mmSwitch)
 
 	// ---------- 5b. 启动维护计时器（gateway.tick 广播） ----------
@@ -3183,9 +3423,9 @@ func RunGatewayBlocking(port int, opts GatewayServerOptions) error {
 }
 
 // resolveDefaultStorePath 解析默认存储路径。
-// 顺序: $OPENACOSMI_STORE_PATH → ~/.openacosmi/store
+// 顺序: $CRABCLAW_STORE_PATH → $OPENACOSMI_STORE_PATH → ~/.openacosmi/store
 func resolveDefaultStorePath() string {
-	if v := os.Getenv("OPENACOSMI_STORE_PATH"); v != "" {
+	if v := preferredGatewayEnvValue("CRABCLAW_STORE_PATH", "OPENACOSMI_STORE_PATH"); v != "" {
 		return v
 	}
 	home, err := os.UserHomeDir()

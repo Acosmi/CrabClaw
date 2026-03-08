@@ -5,7 +5,8 @@
 /// completion for the first time.
 ///
 /// Source: `src/commands/doctor-completion.ts`
-
+use oa_cli_shared::binary_name::current_cli_name;
+use oa_cli_shared::command_format::format_cli_command;
 use oa_terminal::note::note;
 
 use crate::prompter::{DoctorOptions, DoctorPrompter};
@@ -67,7 +68,7 @@ pub struct ShellCompletionStatus {
     pub cache_exists: bool,
     /// Path where the cache file should live.
     pub cache_path: String,
-    /// True if the profile uses the slow `source <(openacosmi completion ...)` pattern.
+    /// True if the profile uses the slow `source <(crabclaw completion ...)` pattern.
     pub uses_slow_pattern: bool,
 }
 
@@ -93,7 +94,7 @@ pub async fn check_shell_completion_status() -> ShellCompletionStatus {
 ///
 /// Source: `src/commands/doctor-completion.ts` — `generateCompletionCache`
 async fn generate_completion_cache() -> bool {
-    // Stub: the real implementation would spawn `openacosmi completion --write-state`.
+    // Stub: the real implementation would spawn `crabclaw completion --write-state`.
     false
 }
 
@@ -106,6 +107,8 @@ async fn generate_completion_cache() -> bool {
 /// Source: `src/commands/doctor-completion.ts` — `doctorShellCompletion`
 pub async fn doctor_shell_completion(prompter: &DoctorPrompter, options: &DoctorOptions) {
     let status = check_shell_completion_status().await;
+    let write_state_cmd = format_cli_command("crabclaw completion --write-state");
+    let cli_name = current_cli_name();
 
     // ── Slow dynamic pattern → upgrade ──
     if status.uses_slow_pattern {
@@ -127,7 +130,9 @@ pub async fn doctor_shell_completion(prompter: &DoctorPrompter, options: &Doctor
             let generated = generate_completion_cache().await;
             if !generated {
                 note(
-                    "Failed to generate completion cache. Run `openacosmi completion --write-state` manually.",
+                    &format!(
+                        "Failed to generate completion cache. Run `{write_state_cmd}` manually."
+                    ),
                     Some("Shell completion"),
                 );
                 return;
@@ -167,7 +172,9 @@ pub async fn doctor_shell_completion(prompter: &DoctorPrompter, options: &Doctor
             );
         } else {
             note(
-                "Failed to regenerate completion cache. Run `openacosmi completion --write-state` manually.",
+                &format!(
+                    "Failed to regenerate completion cache. Run `{write_state_cmd}` manually."
+                ),
                 Some("Shell completion"),
             );
         }
@@ -189,7 +196,7 @@ pub async fn doctor_shell_completion(prompter: &DoctorPrompter, options: &Doctor
 
         let should_install = prompter
             .confirm(
-                &format!("Enable {shell_name} shell completion for openacosmi?"),
+                &format!("Enable {shell_name} shell completion for {cli_name}?"),
                 true,
             )
             .await;
@@ -198,7 +205,9 @@ pub async fn doctor_shell_completion(prompter: &DoctorPrompter, options: &Doctor
             let generated = generate_completion_cache().await;
             if !generated {
                 note(
-                    "Failed to generate completion cache. Run `openacosmi completion --write-state` manually.",
+                    &format!(
+                        "Failed to generate completion cache. Run `{write_state_cmd}` manually."
+                    ),
                     Some("Shell completion"),
                 );
                 return;

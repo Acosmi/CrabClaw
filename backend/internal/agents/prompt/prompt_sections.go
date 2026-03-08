@@ -136,10 +136,12 @@ func buildSafetySection() string {
 }
 
 func buildCLISection() string {
-	return "## Claw Acosmi CLI Quick Reference\n" +
-		"Claw Acosmi is controlled via subcommands. Do not invent commands.\n" +
-		"To manage the Gateway daemon: openacosmi gateway status|start|stop|restart\n" +
-		"If unsure, ask the user to run `openacosmi help`."
+	return "## Crab Claw（蟹爪） CLI Quick Reference\n" +
+		"Crab Claw（蟹爪） is controlled via subcommands. Do not invent commands.\n" +
+		"Prefer the Rust CLI entrypoint `crabclaw`; the legacy `openacosmi` name remains a compatibility alias.\n" +
+		"To manage the Gateway daemon: crabclaw gateway status|start|stop|restart\n" +
+		"If a skill or older doc still shows `openacosmi ...`, translate it to the equivalent `crabclaw ...` command unless you are explicitly discussing compatibility paths, env vars, or protocol identifiers.\n" +
+		"If unsure, ask the user to run `crabclaw help`."
 }
 
 func buildBootContextSection(brief string) string {
@@ -178,6 +180,7 @@ func buildSkillsSectionFull(skillsPrompt string, isMinimal bool, readToolName st
 		"- If a skill clearly applies: call `lookup_skill` to get its content, then follow it.\n"+
 		"- If no skill applies: directly use your available tools to complete the task. Do NOT search repeatedly.\n"+
 		"- Never spend more than 1 tool call on skill lookup. If the first search finds nothing useful, proceed without skills.\n"+
+		"- When a skill still references `openacosmi` commands, treat `crabclaw` as the primary Rust CLI name and keep `openacosmi` only for explicit compatibility cases.\n"+
 		"%s", trimmed)
 }
 
@@ -185,11 +188,11 @@ func buildSelfUpdateSection(hasGateway, isMinimal bool) string {
 	if !hasGateway || isMinimal {
 		return ""
 	}
-	return "## Claw Acosmi Self-Update\n" +
+	return "## Crab Claw（蟹爪） Self-Update\n" +
 		"Get Updates (self-update) is ONLY allowed when the user explicitly asks for it.\n" +
 		"Do not run config.apply or update.run unless the user explicitly requests; if not explicit, ask first.\n" +
 		"Actions: config.get, config.schema, config.apply (validate + write full config, then restart), update.run.\n" +
-		"After restart, Claw Acosmi pings the last active session automatically."
+		"After restart, Crab Claw（蟹爪） pings the last active session automatically."
 }
 
 func buildModelAliasesSection(lines []string, isMinimal bool) string {

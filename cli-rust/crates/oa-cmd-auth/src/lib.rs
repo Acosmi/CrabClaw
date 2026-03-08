@@ -1,4 +1,4 @@
-/// Authentication and OAuth commands for Claw Acosmi CLI.
+/// Authentication and OAuth commands for Crab Claw CLI.
 ///
 /// This crate implements the auth-choice wizard flows, API key management,
 /// OAuth flows (OpenAI Codex, Chutes, plugin providers), and provider-specific

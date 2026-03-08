@@ -9,20 +9,20 @@ import (
 
 // PairingApprovedMessage 配对批准确认消息。
 // 对齐 TS PAIRING_APPROVED_MESSAGE。
-const PairingApprovedMessage = "✅ OpenAcosmi access approved. Send a message to start chatting."
+const PairingApprovedMessage = "✅ Crab Claw（蟹爪） access approved. Send a message to start chatting."
 
 // BuildPairingReply 构建配对回复文本。
 // 对齐 TS buildPairingReply({ channel, idLine, code })。
 func BuildPairingReply(channel, idLine, code string) string {
 	return strings.Join([]string{
-		"OpenAcosmi: access not configured.",
+		"Crab Claw（蟹爪）: access not configured.",
 		"",
 		idLine,
 		"",
 		"Pairing code: " + code,
 		"",
 		"Ask the bot owner to approve with:",
-		formatCliCommand("openacosmi pairing approve " + channel + " <code>"),
+		formatCliCommand("crabclaw pairing approve " + channel + " <code>"),
 	}, "\n")
 }
 
@@ -33,9 +33,9 @@ func formatCliCommand(cmd string) string {
 	if profile == "" {
 		return cmd
 	}
-	const prefix = "openacosmi "
+	const prefix = "crabclaw "
 	if strings.HasPrefix(cmd, prefix) {
-		return "openacosmi --profile " + profile + " " + cmd[len(prefix):]
+		return "crabclaw --profile " + profile + " " + cmd[len(prefix):]
 	}
 	return cmd
 }

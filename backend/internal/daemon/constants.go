@@ -9,16 +9,24 @@ import (
 // 对应 TS: constants.ts
 const (
 	// Gateway 服务标签
-	GatewayLaunchAgentLabel   = "ai.openacosmi.gateway"
-	GatewaySystemdServiceName = "openacosmi-gateway"
-	GatewayWindowsTaskName    = "OpenAcosmi Gateway"
-	GatewayServiceMarker      = "openacosmi"
-	GatewayServiceKind        = "gateway"
+	GatewayLaunchAgentLabel     = "ai.openacosmi.gateway"
+	GatewayLaunchAgentLabelV2   = "ai.crabclaw.gateway"
+	GatewaySystemdServiceName   = "openacosmi-gateway"
+	GatewaySystemdServiceNameV2 = "crabclaw-gateway"
+	GatewayWindowsTaskName      = "OpenAcosmi Gateway"
+	GatewayWindowsTaskNameV2    = "Crab Claw Gateway"
+	GatewayDisplayName          = "Crab Claw Gateway"
+	GatewayServiceMarker        = "openacosmi"
+	GatewayServiceKind          = "gateway"
 
 	// Node 服务标签
 	NodeLaunchAgentLabel      = "ai.openacosmi.node"
+	NodeLaunchAgentLabelV2    = "ai.crabclaw.node"
 	NodeSystemdServiceName    = "openacosmi-node"
+	NodeSystemdServiceNameV2  = "crabclaw-node"
 	NodeWindowsTaskName       = "OpenAcosmi Node"
+	NodeWindowsTaskNameV2     = "Crab Claw Node"
+	NodeDisplayName           = "Crab Claw Node Host"
 	NodeServiceMarker         = "openacosmi"
 	NodeServiceKind           = "node"
 	NodeWindowsTaskScriptName = "node.cmd"
@@ -92,6 +100,43 @@ func ResolveGatewayWindowsTaskName(profile string) string {
 	return fmt.Sprintf("OpenAcosmi Gateway (%s)", normalized)
 }
 
+func resolveGatewayWindowsTaskNameV2(profile string) string {
+	normalized := NormalizeGatewayProfile(profile)
+	if normalized == "" {
+		return GatewayWindowsTaskNameV2
+	}
+	return fmt.Sprintf("%s (%s)", GatewayWindowsTaskNameV2, normalized)
+}
+
+func ResolveCompatibleGatewayLaunchAgentLabels(profile string) []string {
+	normalized := NormalizeGatewayProfile(profile)
+	if normalized == "" {
+		return []string{GatewayLaunchAgentLabel, GatewayLaunchAgentLabelV2}
+	}
+	return []string{
+		fmt.Sprintf("ai.openacosmi.%s", normalized),
+		fmt.Sprintf("ai.crabclaw.%s", normalized),
+	}
+}
+
+func ResolveCompatibleGatewaySystemdServiceNames(profile string) []string {
+	suffix := ResolveGatewayProfileSuffix(profile)
+	if suffix == "" {
+		return []string{GatewaySystemdServiceName, GatewaySystemdServiceNameV2}
+	}
+	return []string{
+		GatewaySystemdServiceName + suffix,
+		GatewaySystemdServiceNameV2 + suffix,
+	}
+}
+
+func ResolveCompatibleGatewayWindowsTaskNames(profile string) []string {
+	return []string{
+		ResolveGatewayWindowsTaskName(profile),
+		resolveGatewayWindowsTaskNameV2(profile),
+	}
+}
+
 // FormatGatewayServiceDescription 格式化服务描述
 // 对应 TS: constants.ts formatGatewayServiceDescription
 func FormatGatewayServiceDescription(profile, version string) string {
@@ -106,9 +151,9 @@ func FormatGatewayServiceDescription(profile, version string) string {
 		parts = append(parts, "v"+trimmedVersion)
 	}
 	if len(parts) == 0 {
-		return "OpenAcosmi Gateway"
+		return GatewayDisplayName
 	}
-	return fmt.Sprintf("OpenAcosmi Gateway (%s)", strings.Join(parts, ", "))
+	return fmt.Sprintf("%s (%s)", GatewayDisplayName, strings.Join(parts, ", "))
 }
 
 // ResolveNodeLaunchAgentLabel 返回 Node 服务的 launchd 标签
@@ -126,14 +171,26 @@ func ResolveNodeWindowsTaskName() string {
 	return NodeWindowsTaskName
 }
 
+func ResolveCompatibleNodeLaunchAgentLabels() []string {
+	return []string{NodeLaunchAgentLabel, NodeLaunchAgentLabelV2}
+}
+
+func ResolveCompatibleNodeSystemdServiceNames() []string {
+	return []string{NodeSystemdServiceName, NodeSystemdServiceNameV2}
+}
+
+func ResolveCompatibleNodeWindowsTaskNames() []string {
+	return []string{NodeWindowsTaskName, NodeWindowsTaskNameV2}
+}
+
 // FormatNodeServiceDescription 格式化 Node 服务描述
 // 对应 TS: constants.ts formatNodeServiceDescription
 func FormatNodeServiceDescription(version string) string {
 	trimmed := strings.TrimSpace(version)
 	if trimmed == "" {
-		return "OpenAcosmi Node Host"
+		return NodeDisplayName
 	}
-	return fmt.Sprintf("OpenAcosmi Node Host (v%s)", trimmed)
+	return fmt.Sprintf("%s (v%s)", NodeDisplayName, trimmed)
 }
 
 // NeedsNodeRuntimeMigration 检查审计问题中是否需要 Node 运行时迁移

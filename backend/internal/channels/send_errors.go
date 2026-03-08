@@ -18,6 +18,7 @@ const (
 	SendErrUnauthorized       SendErrorCode = "unauthorized"
 	SendErrUnavailable        SendErrorCode = "unavailable"
 	SendErrUpstream           SendErrorCode = "upstream_error"
+	SendErrRateLimited        SendErrorCode = "rate_limited"
 )
 
 // SendError 标准化渠道发送错误。

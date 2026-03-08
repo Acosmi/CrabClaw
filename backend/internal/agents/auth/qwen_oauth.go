@@ -63,7 +63,7 @@ func RefreshQwenPortalCredentials(ctx context.Context, client *http.Client, cred
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusBadRequest {
-		return nil, fmt.Errorf("Qwen OAuth refresh token 已过期或无效，请使用 `openacosmi models auth login --provider qwen-portal` 重新认证")
+		return nil, fmt.Errorf("Qwen OAuth refresh token 已过期或无效，请使用 `crabclaw models auth login --provider qwen-portal` 重新认证")
 	}
 
 	if resp.StatusCode != http.StatusOK {

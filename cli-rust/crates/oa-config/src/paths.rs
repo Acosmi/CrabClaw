@@ -6,14 +6,16 @@
 /// `OPENACOSMI_GATEWAY_PORT`, `OPENACOSMI_NIX_MODE`, and `OPENACOSMI_OAUTH_DIR`.
 ///
 /// Source: `src/config/paths.ts`
-
 use std::env;
 use std::path::{Path, PathBuf};
 
 use oa_types::config::OpenAcosmiConfig;
 
-/// Default state directory name under the user's home directory.
+/// Current default write state directory name under the user's home directory.
 pub const NEW_STATE_DIRNAME: &str = ".openacosmi";
+
+/// New-brand compatibility state directory name used during dual-read migration.
+pub const COMPATIBILITY_STATE_DIRNAME: &str = ".crabclaw";
 
 /// Default config file name.
 pub const CONFIG_FILENAME: &str = "openacosmi.json";
@@ -30,17 +32,42 @@ pub const DEFAULT_GATEWAY_PORT: u16 = 19001;
 /// OAuth credentials filename.
 const OAUTH_FILENAME: &str = "oauth.json";
 
+fn preferred_env_value(keys: &[&str]) -> Option<String> {
+    for key in keys {
+        if let Ok(value) = env::var(key) {
+            let trimmed = value.trim().to_string();
+            if !trimmed.is_empty() {
+                return Some(trimmed);
+            }
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+fn preferred_env_value_from_map(
+    values: &std::collections::HashMap<&str, &str>,
+    keys: &[&str],
+) -> Option<String> {
+    for key in keys {
+        if let Some(value) = values.get(key) {
+            let trimmed = value.trim().to_string();
+            if !trimmed.is_empty() {
+                return Some(trimmed);
+            }
+        }
+    }
+    None
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 
 /// Resolve the home directory, preferring `OPENACOSMI_HOME` over `dirs::home_dir`.
 fn resolve_home_dir() -> PathBuf {
-    if let Ok(home) = env::var("OPENACOSMI_HOME") {
-        let trimmed = home.trim().to_string();
-        if !trimmed.is_empty() {
-            return PathBuf::from(trimmed);
-        }
+    if let Some(home) = preferred_env_value(&["CRABCLAW_HOME", "OPENACOSMI_HOME"]) {
+        return PathBuf::from(home);
     }
     dirs::home_dir().unwrap_or_else(|| PathBuf::from("."))
 }
@@ -59,15 +86,33 @@ fn resolve_user_path(input: &str) -> PathBuf {
         let rest = rest.strip_prefix('/').unwrap_or(rest);
         return home.join(rest);
     }
-    PathBuf::from(trimmed).canonicalize().unwrap_or_else(|_| PathBuf::from(trimmed))
+    PathBuf::from(trimmed)
+        .canonicalize()
+        .unwrap_or_else(|_| PathBuf::from(trimmed))
 }
 
 fn new_state_dir() -> PathBuf {
     resolve_home_dir().join(NEW_STATE_DIRNAME)
 }
 
+fn compatibility_state_dir() -> PathBuf {
+    resolve_home_dir().join(COMPATIBILITY_STATE_DIRNAME)
+}
+
+fn new_state_dir_for_home(home: &Path) -> PathBuf {
+    home.join(NEW_STATE_DIRNAME)
+}
+
+fn compatibility_state_dir_for_home(home: &Path) -> PathBuf {
+    home.join(COMPATIBILITY_STATE_DIRNAME)
+}
+
 fn legacy_state_dirs() -> Vec<PathBuf> {
     let home = resolve_home_dir();
+    legacy_state_dirs_for_home(&home)
+}
+
+fn legacy_state_dirs_for_home(home: &Path) -> Vec<PathBuf> {
     LEGACY_STATE_DIRNAMES
         .iter()
         .map(|name| home.join(name))
@@ -82,31 +127,20 @@ fn legacy_state_dirs() -> Vec<PathBuf> {
 ///
 /// Precedence:
 /// 1. `OPENACOSMI_STATE_DIR` environment variable
-/// 2. Existing `~/.openacosmi` directory
-/// 3. First existing legacy state directory
-/// 4. Default `~/.openacosmi` (even if it doesn't exist yet)
+/// 2. Existing `~/.crabclaw` directory containing managed state
+/// 3. Existing `~/.openacosmi` directory
+/// 4. First existing legacy state directory
+/// 5. Default `~/.openacosmi` (keep old default write path unchanged)
 pub fn resolve_state_dir() -> PathBuf {
     // Check explicit override
-    if let Ok(val) = env::var("OPENACOSMI_STATE_DIR") {
-        let trimmed = val.trim().to_string();
-        if !trimmed.is_empty() {
-            return resolve_user_path(&trimmed);
-        }
+    if let Some(val) = preferred_env_value(&["CRABCLAW_STATE_DIR", "OPENACOSMI_STATE_DIR"]) {
+        return resolve_user_path(&val);
     }
 
+    let compat_dir = compatibility_state_dir();
     let new_dir = new_state_dir();
-    if new_dir.exists() {
-        return new_dir;
-    }
 
-    // Check legacy directories
-    for dir in legacy_state_dirs() {
-        if dir.exists() {
-            return dir;
-        }
-    }
-
-    new_dir
+    choose_existing_state_dir(&compat_dir, &new_dir, &legacy_state_dirs()).unwrap_or(new_dir)
 }
 
 /// Resolve the canonical config file path within a given state directory.
@@ -114,11 +148,8 @@ pub fn resolve_state_dir() -> PathBuf {
 /// Respects `OPENACOSMI_CONFIG_PATH` override, otherwise returns
 /// `<state_dir>/openacosmi.json`.
 pub fn resolve_canonical_config_path(state_dir: &Path) -> PathBuf {
-    if let Ok(val) = env::var("OPENACOSMI_CONFIG_PATH") {
-        let trimmed = val.trim().to_string();
-        if !trimmed.is_empty() {
-            return resolve_user_path(&trimmed);
-        }
+    if let Some(val) = preferred_env_value(&["CRABCLAW_CONFIG_PATH", "OPENACOSMI_CONFIG_PATH"]) {
+        return resolve_user_path(&val);
     }
     state_dir.join(CONFIG_FILENAME)
 }
@@ -129,33 +160,23 @@ pub fn resolve_canonical_config_path(state_dir: &Path) -> PathBuf {
 /// explicit path, state-dir candidates, new+legacy dir candidates.
 fn resolve_default_config_candidates() -> Vec<PathBuf> {
     // If explicit config path is set, use only that
-    if let Ok(val) = env::var("OPENACOSMI_CONFIG_PATH") {
-        let trimmed = val.trim().to_string();
-        if !trimmed.is_empty() {
-            return vec![resolve_user_path(&trimmed)];
-        }
+    if let Some(val) = preferred_env_value(&["CRABCLAW_CONFIG_PATH", "OPENACOSMI_CONFIG_PATH"]) {
+        return vec![resolve_user_path(&val)];
     }
 
     let mut candidates = Vec::new();
 
     // If state dir override exists, add candidates from there
-    if let Ok(val) = env::var("OPENACOSMI_STATE_DIR") {
-        let trimmed = val.trim().to_string();
-        if !trimmed.is_empty() {
-            let resolved = resolve_user_path(&trimmed);
-            candidates.push(resolved.join(CONFIG_FILENAME));
-            for name in LEGACY_CONFIG_FILENAMES {
-                candidates.push(resolved.join(name));
-            }
+    if let Some(val) = preferred_env_value(&["CRABCLAW_STATE_DIR", "OPENACOSMI_STATE_DIR"]) {
+        let resolved = resolve_user_path(&val);
+        candidates.push(resolved.join(CONFIG_FILENAME));
+        for name in LEGACY_CONFIG_FILENAMES {
+            candidates.push(resolved.join(name));
         }
     }
 
-    // Add default directories: new state dir + legacy state dirs
-    let default_dirs = {
-        let mut dirs = vec![new_state_dir()];
-        dirs.extend(legacy_state_dirs());
-        dirs
-    };
+    // Add default directories: compatibility state dir + current default state dir + legacy
+    let default_dirs = resolve_default_state_dirs(&resolve_home_dir());
 
     for dir in default_dirs {
         candidates.push(dir.join(CONFIG_FILENAME));
@@ -173,19 +194,14 @@ fn resolve_default_config_candidates() -> Vec<PathBuf> {
 /// This is the primary entry point for determining which config file to use.
 pub fn resolve_config_path() -> PathBuf {
     // If explicit override, use it directly
-    if let Ok(val) = env::var("OPENACOSMI_CONFIG_PATH") {
-        let trimmed = val.trim().to_string();
-        if !trimmed.is_empty() {
-            return resolve_user_path(&trimmed);
-        }
+    if let Some(val) = preferred_env_value(&["CRABCLAW_CONFIG_PATH", "OPENACOSMI_CONFIG_PATH"]) {
+        return resolve_user_path(&val);
     }
 
     let state_dir = resolve_state_dir();
 
     // If OPENACOSMI_STATE_DIR is set, look within that dir
-    let state_override = env::var("OPENACOSMI_STATE_DIR")
-        .ok()
-        .filter(|v| !v.trim().is_empty());
+    let state_override = preferred_env_value(&["CRABCLAW_STATE_DIR", "OPENACOSMI_STATE_DIR"]);
 
     // Build candidates from the state dir
     let mut candidates = vec![state_dir.join(CONFIG_FILENAME)];
@@ -215,6 +231,87 @@ pub fn resolve_config_path() -> PathBuf {
 
     // Fallback: canonical path
     resolve_canonical_config_path(&state_dir)
+}
+
+fn state_dir_has_managed_content(dir: &Path) -> bool {
+    if !dir.is_dir() {
+        return false;
+    }
+
+    const MARKERS: &[&str] = &[
+        CONFIG_FILENAME,
+        "credentials",
+        "sessions",
+        "agents",
+        "memory",
+        "extensions",
+        "logs",
+        "exec-approvals.json",
+        "oauth.json",
+    ];
+
+    MARKERS.iter().any(|marker| dir.join(marker).exists())
+}
+
+fn choose_existing_state_dir(
+    compat_dir: &Path,
+    current_dir: &Path,
+    legacy_dirs: &[PathBuf],
+) -> Option<PathBuf> {
+    if state_dir_has_managed_content(compat_dir) {
+        return Some(compat_dir.to_path_buf());
+    }
+    if current_dir.exists() {
+        return Some(current_dir.to_path_buf());
+    }
+    if compat_dir.exists() {
+        return Some(compat_dir.to_path_buf());
+    }
+    for dir in legacy_dirs {
+        if dir.exists() {
+            return Some(dir.clone());
+        }
+    }
+    None
+}
+
+fn resolve_default_state_dirs(home: &Path) -> Vec<PathBuf> {
+    let mut dirs = vec![
+        compatibility_state_dir_for_home(home),
+        new_state_dir_for_home(home),
+    ];
+    dirs.extend(legacy_state_dirs_for_home(home));
+    dirs
+}
+
+#[cfg(test)]
+fn resolve_config_path_for_home(home: &Path) -> PathBuf {
+    let compat_dir = compatibility_state_dir_for_home(home);
+    let current_dir = new_state_dir_for_home(home);
+    let state_dir =
+        choose_existing_state_dir(&compat_dir, &current_dir, &legacy_state_dirs_for_home(home))
+            .unwrap_or(current_dir.clone());
+
+    let mut candidates = vec![state_dir.join(CONFIG_FILENAME)];
+    for name in LEGACY_CONFIG_FILENAMES {
+        candidates.push(state_dir.join(name));
+    }
+    if let Some(found) = candidates.iter().find(|candidate| candidate.exists()) {
+        return found.clone();
+    }
+
+    let mut all_candidates = Vec::new();
+    for dir in resolve_default_state_dirs(home) {
+        all_candidates.push(dir.join(CONFIG_FILENAME));
+        for name in LEGACY_CONFIG_FILENAMES {
+            all_candidates.push(dir.join(name));
+        }
+    }
+    if let Some(found) = all_candidates.iter().find(|candidate| candidate.exists()) {
+        return found.clone();
+    }
+
+    state_dir.join(CONFIG_FILENAME)
 }
 
 /// Resolve the gateway lock directory (ephemeral, in temp dir).
@@ -257,11 +354,8 @@ fn resolve_unix_uid() -> u32 {
 /// 1. `OPENACOSMI_OAUTH_DIR` environment variable
 /// 2. `<state_dir>/credentials`
 pub fn resolve_oauth_dir(state_dir: &Path) -> PathBuf {
-    if let Ok(val) = env::var("OPENACOSMI_OAUTH_DIR") {
-        let trimmed = val.trim().to_string();
-        if !trimmed.is_empty() {
-            return resolve_user_path(&trimmed);
-        }
+    if let Some(val) = preferred_env_value(&["CRABCLAW_OAUTH_DIR", "OPENACOSMI_OAUTH_DIR"]) {
+        return resolve_user_path(&val);
     }
     state_dir.join("credentials")
 }
@@ -281,8 +375,9 @@ pub fn resolve_oauth_path(state_dir: &Path) -> PathBuf {
 /// 3. [`DEFAULT_GATEWAY_PORT`] (19001)
 pub fn resolve_gateway_port(cfg: Option<&OpenAcosmiConfig>) -> u16 {
     // Check env var
-    if let Ok(raw) = env::var("OPENACOSMI_GATEWAY_PORT") {
-        let trimmed = raw.trim().to_string();
+    if let Some(trimmed) =
+        preferred_env_value(&["CRABCLAW_GATEWAY_PORT", "OPENACOSMI_GATEWAY_PORT"])
+    {
         if let Ok(parsed) = trimmed.parse::<u16>() {
             if parsed > 0 {
                 return parsed;
@@ -304,15 +399,89 @@ pub fn resolve_gateway_port(cfg: Option<&OpenAcosmiConfig>) -> u16 {
     DEFAULT_GATEWAY_PORT
 }
 
+#[cfg(test)]
+mod path_tests {
+    use super::*;
+    use std::collections::HashMap;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_dir(label: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("oa-config-{label}-{nanos}"));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("create temp dir");
+        dir
+    }
+
+    #[test]
+    fn resolve_state_dir_prefers_crabclaw_when_it_contains_managed_state() {
+        let tmp = unique_temp_dir("prefer-crab");
+        let crab = tmp.join(COMPATIBILITY_STATE_DIRNAME);
+        let old = tmp.join(NEW_STATE_DIRNAME);
+        fs::create_dir_all(crab.join("credentials")).expect("create crab state");
+        fs::create_dir_all(old.join("credentials")).expect("create old state");
+
+        let resolved = choose_existing_state_dir(&crab, &old, &legacy_state_dirs_for_home(&tmp))
+            .expect("state dir");
+
+        assert_eq!(resolved, crab);
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn resolve_state_dir_keeps_openacosmi_when_crabclaw_is_empty() {
+        let tmp = unique_temp_dir("keep-open");
+        let crab = tmp.join(COMPATIBILITY_STATE_DIRNAME);
+        let old = tmp.join(NEW_STATE_DIRNAME);
+        fs::create_dir_all(&crab).expect("create empty crab dir");
+        fs::create_dir_all(old.join("sessions")).expect("create old state");
+
+        let resolved = choose_existing_state_dir(&crab, &old, &legacy_state_dirs_for_home(&tmp))
+            .expect("state dir");
+
+        assert_eq!(resolved, old);
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn resolve_config_path_prefers_crabclaw_config_when_present() {
+        let tmp = unique_temp_dir("config-prefers-crab");
+        let crab_cfg = tmp.join(COMPATIBILITY_STATE_DIRNAME).join(CONFIG_FILENAME);
+        let old_cfg = tmp.join(NEW_STATE_DIRNAME).join(CONFIG_FILENAME);
+        fs::create_dir_all(crab_cfg.parent().expect("crab parent")).expect("create crab dir");
+        fs::create_dir_all(old_cfg.parent().expect("old parent")).expect("create old dir");
+        fs::write(&old_cfg, b"{}").expect("write old config");
+        fs::write(&crab_cfg, b"{}").expect("write crab config");
+
+        let resolved = resolve_config_path_for_home(&tmp);
+
+        assert_eq!(resolved, crab_cfg);
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn preferred_env_value_prefers_crabclaw_prefix() {
+        let values = HashMap::from([
+            ("OPENACOSMI_STATE_DIR", "/tmp/old"),
+            ("CRABCLAW_STATE_DIR", "/tmp/new"),
+        ]);
+        let resolved =
+            preferred_env_value_from_map(&values, &["CRABCLAW_STATE_DIR", "OPENACOSMI_STATE_DIR"]);
+        assert_eq!(resolved.as_deref(), Some("/tmp/new"));
+    }
+}
+
 /// Check if running in Nix mode.
 ///
 /// When `OPENACOSMI_NIX_MODE=1`, the gateway is running under Nix.
 /// In this mode, no auto-install flows should be attempted and
 /// config is managed externally.
 pub fn is_nix_mode() -> bool {
-    env::var("OPENACOSMI_NIX_MODE")
-        .ok()
-        .is_some_and(|v| v.trim() == "1")
+    preferred_env_value(&["CRABCLAW_NIX_MODE", "OPENACOSMI_NIX_MODE"]).is_some_and(|v| v == "1")
 }
 
 #[cfg(test)]

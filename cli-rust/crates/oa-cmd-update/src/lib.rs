@@ -1,4 +1,4 @@
-/// Self-update and channel management commands for Claw Acosmi CLI.
+/// Self-update and channel management commands for Crab Claw CLI.
 ///
 /// Provides subcommands: run (default), status, wizard.
 ///

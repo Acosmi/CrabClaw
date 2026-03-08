@@ -67,7 +67,7 @@ func buildMessagingSection(isMinimal bool, available map[string]bool, messageToo
 		"## Messaging",
 		"- Reply in current session → automatically routes to the source channel.",
 		"- Cross-session messaging → use sessions_send(sessionKey, message)",
-		"- Never use exec/curl for provider messaging; Claw Acosmi handles all routing internally.",
+		"- Never use exec/curl for provider messaging; Crab Claw（蟹爪） handles all routing internally.",
 	}
 	if available["message"] {
 		lines = append(lines, "### message tool")
@@ -100,10 +100,10 @@ func buildDocsSection(docsPath string, isMinimal bool) string {
 		return ""
 	}
 	return fmt.Sprintf("## Documentation\n"+
-		"Claw Acosmi docs: %s\n"+
-		"Source: https://github.com/Acosmi/ClawAcosmi\n"+
-		"For Claw Acosmi behavior, commands, config, or architecture: consult local docs first.\n"+
-		"When diagnosing issues, run `openacosmi status` yourself when possible; only ask the user if you lack access (e.g., sandboxed).", dp)
+		"Crab Claw（蟹爪） docs: %s\n"+
+		"Source: https://github.com/Acosmi/CrabClaw\n"+
+		"For Crab Claw（蟹爪） behavior, commands, config, or architecture: consult local docs first.\n"+
+		"When diagnosing issues, run `crabclaw status` yourself when possible; if only the compatibility alias exists, fall back to `openacosmi status`. Only ask the user if you lack access (e.g., sandboxed).", dp)
 }
 
 func buildSilentRepliesSection() string {
@@ -128,7 +128,7 @@ func buildHeartbeatsSection(heartbeatPrompt string) string {
 	return "## Heartbeats\n" + line + "\n" +
 		"If you receive a heartbeat poll (a user message matching the heartbeat prompt above), and there is nothing that needs attention, reply exactly:\n" +
 		"HEARTBEAT_OK\n" +
-		"Claw Acosmi treats a leading/trailing \"HEARTBEAT_OK\" as a heartbeat ack (and may discard it).\n" +
+		"Crab Claw（蟹爪） treats a leading/trailing \"HEARTBEAT_OK\" as a heartbeat ack (and may discard it).\n" +
 		"If something needs attention, do NOT include \"HEARTBEAT_OK\"; reply with the alert text instead."
 }
 

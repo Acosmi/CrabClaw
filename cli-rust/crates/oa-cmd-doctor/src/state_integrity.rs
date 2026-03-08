@@ -1,12 +1,12 @@
 /// State directory integrity checks.
 ///
-/// Verifies that the state directory (`~/.openacosmi`), sessions directory,
+/// Verifies that the active state directory (`~/.crabclaw` or `~/.openacosmi`),
+/// sessions directory,
 /// session store directory, and OAuth directory exist and are writable.
 /// Detects permission issues, multiple state directories, and missing
 /// session transcripts.
 ///
 /// Source: `src/commands/doctor-state-integrity.ts`
-
 use std::path::{Path, PathBuf};
 
 use oa_config::paths::resolve_state_dir;
@@ -67,7 +67,9 @@ fn shorten_home_path(path: &Path) -> String {
 ///
 /// Source: `src/commands/doctor-state-integrity.ts` — `findOtherStateDirs`
 fn find_other_state_dirs(state_dir: &Path) -> Vec<PathBuf> {
-    let resolved = state_dir.canonicalize().unwrap_or_else(|_| state_dir.to_path_buf());
+    let resolved = state_dir
+        .canonicalize()
+        .unwrap_or_else(|_| state_dir.to_path_buf());
     let roots: Vec<&str> = if cfg!(target_os = "macos") {
         vec!["/Users"]
     } else if cfg!(target_os = "linux") {
@@ -89,12 +91,18 @@ fn find_other_state_dirs(state_dir: &Path) -> Vec<PathBuf> {
             if name.to_string_lossy().starts_with('.') {
                 continue;
             }
-            let candidate = entry.path().join(".openacosmi");
-            if candidate.canonicalize().unwrap_or_else(|_| candidate.clone()) == resolved {
-                continue;
-            }
-            if exists_dir(&candidate) {
-                found.push(candidate);
+            for dirname in [".crabclaw", ".openacosmi"] {
+                let candidate = entry.path().join(dirname);
+                if candidate
+                    .canonicalize()
+                    .unwrap_or_else(|_| candidate.clone())
+                    == resolved
+                {
+                    continue;
+                }
+                if exists_dir(&candidate) {
+                    found.push(candidate);
+                }
             }
         }
     }
@@ -150,9 +158,7 @@ pub async fn note_state_integrity(
 
     // ── State directory writability ──
     if state_dir_exists && !can_write_dir(&state_dir) {
-        warnings.push(format!(
-            "- State directory not writable ({display_state})."
-        ));
+        warnings.push(format!("- State directory not writable ({display_state})."));
     }
 
     // ── Permissions (non-Windows) ──
@@ -176,9 +182,8 @@ pub async fn note_state_integrity(
                     let perms = std::fs::Permissions::from_mode(0o700);
                     match std::fs::set_permissions(&state_dir, perms) {
                         Ok(()) => {
-                            changes.push(format!(
-                                "- Tightened permissions on {display_state} to 700"
-                            ));
+                            changes
+                                .push(format!("- Tightened permissions on {display_state} to 700"));
                         }
                         Err(e) => {
                             warnings.push(format!(
@@ -202,10 +207,7 @@ pub async fn note_state_integrity(
             if !exists_dir(dir) {
                 warnings.push(format!("- CRITICAL: {label} missing ({display})."));
                 let create = prompter
-                    .confirm_skip_in_non_interactive(
-                        &format!("Create {label} at {display}?"),
-                        true,
-                    )
+                    .confirm_skip_in_non_interactive(&format!("Create {label} at {display}?"), true)
                     .await;
                 if create {
                     match ensure_dir(dir) {
@@ -254,7 +256,7 @@ pub fn note_workspace_backup_tip(workspace_dir: &Path) {
     note(
         &[
             "- Tip: back up the workspace in a private git repo (GitHub or GitLab).",
-            "- Keep ~/.openacosmi out of git; it contains credentials and session history.",
+            "- Keep ~/.crabclaw and ~/.openacosmi out of git; they contain credentials and session history.",
             "- Details: /concepts/agent-workspace#git-backup-recommended",
         ]
         .join("\n"),
@@ -284,7 +286,9 @@ mod tests {
 
     #[test]
     fn ensure_dir_creates_nested() {
-        let tmp = std::env::temp_dir().join("oa-doctor-ensure-test").join("nested");
+        let tmp = std::env::temp_dir()
+            .join("oa-doctor-ensure-test")
+            .join("nested");
         let _ = std::fs::remove_dir_all(tmp.parent().unwrap_or(Path::new(".")));
         assert!(ensure_dir(&tmp).is_ok());
         assert!(tmp.is_dir());
@@ -294,10 +298,10 @@ mod tests {
     #[test]
     fn shorten_home_path_works() {
         let home = dirs::home_dir().unwrap_or_default();
-        let path = home.join(".openacosmi").join("config.json");
+        let path = home.join(".crabclaw").join("config.json");
         let shortened = shorten_home_path(&path);
         assert!(shortened.starts_with('~'));
-        assert!(shortened.contains(".openacosmi"));
+        assert!(shortened.contains(".crabclaw"));
     }
 
     #[test]

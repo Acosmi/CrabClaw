@@ -47,6 +47,7 @@ members = [
     "crates/oa-cmd-voicecall",
     "crates/oa-cmd-webhooks",
     "crates/oa-cmd-skills",
+    "crates/oa-cmd-packages",
     "crates/oa-cmd-plugins",
     "crates/oa-cmd-security",
     "crates/oa-cmd-hooks",
@@ -177,6 +178,7 @@ oa-cmd-update = { path = "crates/oa-cmd-update" }
 oa-cmd-voicecall = { path = "crates/oa-cmd-voicecall" }
 oa-cmd-webhooks = { path = "crates/oa-cmd-webhooks" }
 oa-cmd-skills = { path = "crates/oa-cmd-skills" }
+oa-cmd-packages = { path = "crates/oa-cmd-packages" }
 oa-cmd-plugins = { path = "crates/oa-cmd-plugins" }
 oa-cmd-security = { path = "crates/oa-cmd-security" }
 oa-cmd-hooks = { path = "crates/oa-cmd-hooks" }

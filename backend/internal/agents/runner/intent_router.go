@@ -297,6 +297,7 @@ var tierToolAllowlist = map[intentTier]map[string]bool{
 		"web_search":        true,
 		"browser":           true,
 		"send_media":        true,
+		"send_email":        true,
 		"spawn_coder_agent": true,
 		"spawn_media_agent": true,
 		"search_skills":     true,
@@ -392,6 +393,7 @@ This task involves visual or browser interaction.
 - For desktop application interaction (native apps, not web): use 'spawn_argus_agent' to delegate to 灵瞳 sub-agent.
 - For full desktop screenshots (not web): use 'argus_capture_screen' directly.
 - Rule: if the target is a URL or web page, use 'browser'. Only use argus for native desktop apps.
+- If the browser tool returns 'not available', tell the user to visit the browser extension setup guide at /browser-extension/ on the Gateway to install the Chrome extension. Include the full URL in your reply.
 - Complex multimodal tasks may go through plan confirmation — wait for user approval before executing.`
 	default:
 		return ""

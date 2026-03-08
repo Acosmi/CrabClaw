@@ -98,6 +98,38 @@ export type BrowserToolConfig = {
   configured: boolean;
 };
 
+// -- App Center (packages) types -------------------------------------------
+
+export type PackageKind = "skill" | "plugin" | "bundle";
+
+export type PackageCatalogItem = {
+  id: string;
+  kind: PackageKind;
+  key: string;
+  name: string;
+  description: string;
+  icon: string;
+  version: string;
+  author: string;
+  tags: string[];
+  isInstalled: boolean;
+  installedAt?: string;
+};
+
+export type PackageCatalogBrowseResult = {
+  items: PackageCatalogItem[];
+  total: number;
+};
+
+export type PackageInstallRecord = {
+  id: string;
+  kind: PackageKind;
+  key: string;
+  version: string;
+  source: string;
+  installedAt: string;
+};
+
 export type WhatsAppSelf = {
   e164?: string | null;
   jid?: string | null;

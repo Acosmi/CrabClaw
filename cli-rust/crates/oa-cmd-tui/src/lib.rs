@@ -1,4 +1,4 @@
-/// Terminal UI commands for Claw Acosmi CLI.
+/// Terminal UI commands for Crab Claw CLI.
 ///
 /// Provides subcommand: launch (opens TUI connected to Gateway).
 ///

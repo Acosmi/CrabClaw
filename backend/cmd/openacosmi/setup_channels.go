@@ -632,7 +632,7 @@ func NoteChannelPrimer(prompter tui.WizardPrompter, statuses []ChannelStatusEntr
 
 	lines := []string{
 		"DM security: default is pairing; unknown DMs get a pairing code.",
-		"Approve with: openacosmi pairing approve <channel> <code>",
+		"Approve with: crabclaw pairing approve <channel> <code>",
 		`Public DMs require dmPolicy="open" + allowFrom=["*"].`,
 		`Multi-user DMs: set session.dmScope="per-channel-peer" to isolate sessions.`,
 		"Docs: https://docs.openacosmi.dev/start/pairing",

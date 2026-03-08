@@ -1,33 +1,38 @@
 ---
 name: moonshot
-description: "配置 Moonshot K2 与 Kimi Coding（独立供应商 + 密钥）"
+description: "Configure Moonshot K2 vs Kimi Coding (separate providers + keys)"
 ---
 
 # Moonshot AI (Kimi)
 
-Moonshot 提供兼容 OpenAI 端点的 Kimi API。将供应商配置为 `moonshot/kimi-k2.5` 作为默认模型，或使用 Kimi Coding 的 `kimi-coding/k2p5`。
+Moonshot provides the Kimi API with OpenAI-compatible endpoints. Configure the
+provider and set the default model to `moonshot/kimi-k2.5`, or use
+Kimi Coding with `kimi-coding/k2p5`.
 
-当前 Kimi K2 模型 ID：
+Current Kimi K2 model IDs:
+
+{/_moonshot-kimi-k2-ids:start_/ && null}
 
 - `kimi-k2.5`
 - `kimi-k2-0905-preview`
 - `kimi-k2-turbo-preview`
 - `kimi-k2-thinking`
 - `kimi-k2-thinking-turbo`
+  {/_moonshot-kimi-k2-ids:end_/ && null}
 
 ```bash
-openacosmi onboard --auth-choice moonshot-api-key
+crabclaw onboard --auth-choice moonshot-api-key
 ```
 
-Kimi Coding：
+Kimi Coding:
 
 ```bash
-openacosmi onboard --auth-choice kimi-code-api-key
+crabclaw onboard --auth-choice kimi-code-api-key
 ```
 
-注意：Moonshot 和 Kimi Coding 是独立的供应商。密钥不可互换，端点不同，模型引用也不同（Moonshot 使用 `moonshot/...`，Kimi Coding 使用 `kimi-coding/...`）。
+Note: Moonshot and Kimi Coding are separate providers. Keys are not interchangeable, endpoints differ, and model refs differ (Moonshot uses `moonshot/...`, Kimi Coding uses `kimi-coding/...`).
 
-## 配置示例（Moonshot API）
+## Config snippet (Moonshot API)
 
 ```json5
 {
@@ -124,9 +129,10 @@ openacosmi onboard --auth-choice kimi-code-api-key
 }
 ```
 
-## 备注
+## Notes
 
-- Moonshot 模型引用使用 `moonshot/<modelId>`。Kimi Coding 模型引用使用 `kimi-coding/<modelId>`。
-- 如需可在 `models.providers` 中覆盖定价和上下文元数据。
-- 若 Moonshot 发布了模型的不同上下文限制，相应调整 `contextWindow`。
-- 国际端点使用 `https://api.moonshot.ai/v1`，中国端点使用 `https://api.moonshot.cn/v1`。
+- Moonshot model refs use `moonshot/<modelId>`. Kimi Coding model refs use `kimi-coding/<modelId>`.
+- Override pricing and context metadata in `models.providers` if needed.
+- If Moonshot publishes different context limits for a model, adjust
+  `contextWindow` accordingly.
+- Use `https://api.moonshot.ai/v1` for the international endpoint, and `https://api.moonshot.cn/v1` for the China endpoint.

@@ -5,13 +5,13 @@
 /// Handles both quickstart (single-channel) and advanced (multi-channel) flows.
 ///
 /// Source: `src/commands/onboard-channels.ts`
-
 use std::collections::HashMap;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
+use oa_cli_shared::command_format::format_cli_command;
 use oa_types::config::OpenAcosmiConfig;
 
 /// Action to take on an already-configured channel.
@@ -167,12 +167,13 @@ pub fn note_channel_status(cfg: &OpenAcosmiConfig) -> Vec<String> {
 ///
 /// Source: `src/commands/onboard-channels.ts` - `noteChannelPrimer`
 pub fn build_channel_primer_text() -> String {
+    let approve_cmd = format_cli_command("crabclaw pairing approve <channel> <code>");
     [
         "DM security: default is pairing; unknown DMs get a pairing code.",
-        "Approve with: openacosmi pairing approve <channel> <code>",
+        &format!("Approve with: {approve_cmd}"),
         "Public DMs require dmPolicy=\"open\" + allowFrom=[\"*\"].",
         "Multi-user DMs: set session.dmScope=\"per-channel-peer\" (or \"per-account-channel-peer\" for multi-account channels) to isolate sessions.",
-        "Docs: https://github.com/Acosmi/Claw-Acosmi/tree/main/docs/skills/general/pairing",
+        "Docs: https://github.com/Acosmi/CrabClaw/tree/main/docs/channels/pairing.md",
     ]
     .join("\n")
 }
@@ -189,9 +190,7 @@ pub async fn setup_channels(
 ) -> Result<OpenAcosmiConfig> {
     let status_lines = note_channel_status(&cfg);
 
-    let skip_note = options
-        .and_then(|o| o.skip_status_note)
-        .unwrap_or(false);
+    let skip_note = options.and_then(|o| o.skip_status_note).unwrap_or(false);
 
     if !skip_note && !status_lines.is_empty() {
         for line in &status_lines {
@@ -200,9 +199,7 @@ pub async fn setup_channels(
     }
 
     // In non-interactive mode or when skipConfirm is set, just return config as-is
-    let skip_confirm = options
-        .and_then(|o| o.skip_confirm)
-        .unwrap_or(false);
+    let skip_confirm = options.and_then(|o| o.skip_confirm).unwrap_or(false);
 
     if !skip_confirm {
         info!("Channel configuration available via interactive mode.");

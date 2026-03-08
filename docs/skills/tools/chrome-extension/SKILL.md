@@ -1,112 +1,63 @@
 ---
 name: chrome-extension
-description: "Chrome MV3 扩展：让 Claw Acosmi 通过 chrome.debugger API 驱动您现有的 Chrome 标签页"
+description: "Chrome extension: let Crab Claw（蟹爪） drive your existing Chrome tab"
 ---
 
-# Chrome 扩展（浏览器中继）
+# Chrome extension (browser relay)
 
-Claw Acosmi Chrome 扩展可以让 Agent 控制您**现有的 Chrome 标签页**（您日常使用的 Chrome 窗口），而无需启动单独的 openacosmi 托管 Chrome 配置文件。
+The Crab Claw（蟹爪） Chrome extension lets the agent control your **existing Chrome tabs** (your normal Chrome window) instead of launching a separate openacosmi-managed Chrome profile.
 
-通过 **Chrome 工具栏按钮**进行附加/分离。
+Attach/detach happens via a **single Chrome toolbar button**.
 
-## 架构
+## What it is (concept)
 
-```
-┌────────────────────┐   WebSocket    ┌──────────────────┐
-│  Chrome Extension  │ ◄────────────▶ │  ExtensionRelay   │
-│  (browser-         │               │  (Go backend)     │
-│   extension/)      │               │  端口: gateway    │
-│                    │               │    port + 3       │
-│  background.js     │               └────────┬──────────┘
-│  (Service Worker)  │                        │
-│  ├─ chrome.debugger│                        │
-│  ├─ tab 管理       │                        ▼
-│  └─ relay 重连     │             ┌──────────────────┐
-│                    │             │ BrowserController │
-│  popup.html/js     │             │ (Agent 工具层)    │
-│  (工具栏 UI)       │             └──────────────────┘
-└────────────────────┘
-```
+There are three parts:
 
-## 组件说明
+- **Browser control service** (Gateway or node): the API the agent/tool calls (via the Gateway)
+- **Local relay server** (loopback CDP): bridges between the control server and the extension (`http://127.0.0.1:18792` by default)
+- **Chrome MV3 extension**: attaches to the active tab using `chrome.debugger` and pipes CDP messages to the relay
 
-| 组件 | 说明 |
-|------|------|
-| **Chrome MV3 扩展** | 使用 `chrome.debugger` API 附加到标签页，将 CDP 命令转发到 Relay 服务器 |
-| **ExtensionRelay** | Go 后端 WebSocket 服务器，桥接扩展和 Agent 工具层。自动生成认证 token |
-| **BrowserController** | Agent 工具统一接口，通过 `SendCDPToExtension()` 向扩展发送 CDP 命令 |
+Crab Claw（蟹爪） then controls the attached tab through the normal `browser` tool surface (selecting the right profile).
 
-## 安装
+## Install / load (unpacked)
 
-详细安装步骤参见 `docs/使用帮助/浏览器自动化扩展安装使用说明.md`。
+1. 安装扩展到本地稳定路径（Rust CLI）: 参见 `docs/cli/browser.md`
+2. Chrome → `chrome://extensions` → Enable "Developer mode" → "Load unpacked" → 选择安装目录
+3. Pin the extension.
 
-快速步骤：
-1. Chrome → `chrome://extensions` → 启用"开发者模式"
-2. "加载已解压的扩展" → 选择仓库根目录下 `browser-extension/` 目录
-3. 固定扩展到工具栏
+升级 Crab Claw（蟹爪） 后在 `chrome://extensions` 中 Reload 扩展即可。
 
-## 端口
+## Use it
 
-Relay 服务器端口通过 Gateway 端口自动推导：
-
-```
-relay_port = gateway_port + 3
-```
-
-| 环境 | Gateway 端口 | Relay 端口 | 扩展默认连接 |
-|------|-------------|-----------|-------------|
-| 开发 | 19001 | 19004 | `ws://127.0.0.1:19004/ws` |
-| 生产 | 18789 | 18792 | `ws://127.0.0.1:18792/ws` |
-
-扩展弹窗中可手动修改 Relay URL。Token 支持自动发现（通过 `/json/version` 端点）。
-
-## 使用
-
-系统内置 `chrome` profile 指向扩展中继端口。Agent 工具中使用 `browser` 工具 + `profile="chrome"` 参数。
+系统内置 `chrome` profile 指向扩展中继的默认端口。Agent 工具中使用 `browser` 工具 + `profile="chrome"` 参数。
 
 自定义 profile 配置参见 `docs/cli/browser.md`。
 
-## 附加/分离
+## Attach / detach (toolbar button)
 
-- 打开您想让 Agent 控制的标签页。
-- 点击扩展图标 → 在 tab 列表中点击 **Attach** 按钮。
-- 附加后工具栏图标显示绿色 `ON` 标记。
-- 再次点击 **Detach** 按钮或使用底部 **Detach All** 断开所有标签页。
-- 也可使用 **Attach Current Tab** 快速附加当前活跃标签页。
+- Open the tab you want Crab Claw（蟹爪） to control.
+- Click the extension icon. Badge shows `ON` when attached.
+- Click again to detach.
 
-## 控制范围
+## Which tab does it control?
 
-- **不会**自动控制"您正在查看的标签页"。
-- 仅控制**您通过点击扩展 UI 显式附加的标签页**。
-- 附加后，Agent 通过 `chrome.debugger` API 获得该标签页的完整 CDP 控制权。
-- 自动启用的 CDP domains: `Page`, `Runtime`, `DOM`, `Accessibility`。
+- It does **not** automatically control "whatever tab you're looking at".
+- It controls **only the tab(s) you explicitly attached** by clicking the toolbar button.
+- To switch: open the other tab and click the extension icon there.
 
-## 状态标记
+## Badge + common errors
 
-| 标记 | 含义 |
-|------|------|
-| `ON` (绿色) | 已连接 Relay 且有标签页已附加，Agent 可驱动 |
-| `...` (橙色) | 正在连接 Relay 服务器 |
-| `!` (红色) | Relay 不可达（常见：Gateway 未运行或端口不对） |
-| 无标记 | 已连接 Relay 但无标签页附加 |
+| Badge | 含义 |
+|-------|------|
+| `ON` | 已附加，agent 可驱动 |
+| `…` | 正在连接本地 relay |
+| `!` | relay 不可达（常见: relay 服务未运行） |
 
-## 自动重连
+If you see `!`: Make sure the Gateway is running locally, or run a node host on this machine if the Gateway runs elsewhere.
 
-扩展内置自动重连机制：
-- 最多 10 次尝试
-- 延迟递增（3s × min(attempt, 5)）
-- Relay 恢复后自动重连并发送 tab 列表
+## Sandboxing (tool containers)
 
-## 认证
-
-- Relay 启动时生成 256-bit 随机 token
-- 扩展通过 `/json/version` 端点自动发现 token（loopback only）
-- 也可在弹窗 UI 中手动输入 token
-- 所有 WebSocket 连接需携带 `?token=xxx`
-
-## 沙箱
-
-如果 Agent session 是沙箱模式，browser 工具默认目标为沙箱。允许 host 控制：
+如果 agent session 是沙箱模式，browser 工具默认目标为沙箱。允许 host 控制:
 
 ```json5
 {
@@ -122,21 +73,21 @@ relay_port = gateway_port + 3
 }
 ```
 
-## 安全影响
+## Security implications (read this)
 
-将此功能视为给 Agent "在您浏览器上操作的双手"。
+This is powerful and risky. Treat it like giving the model "hands on your browser".
 
-- 扩展使用 Chrome 的 `chrome.debugger` API。附加后，Agent 可以：
-  - 在该标签页中点击/输入/导航
-  - 读取页面内容
-  - 访问该标签页已登录会话能访问的任何内容
-- **这不像**专用的 openacosmi 托管配置文件那样隔离。
+- The extension uses Chrome's debugger API (`chrome.debugger`). When attached, the model can:
+  - click/type/navigate in that tab
+  - read page content
+  - access whatever the tab's logged-in session can access
+- **This is not isolated** like the dedicated openacosmi-managed profile.
 
-建议：
-- 推荐为扩展中继使用专用的 Chrome 配置文件。
-- 保持 Gateway 和所有 node host 仅在 tailnet 中。
-- 避免在局域网或公共互联网上暴露 Relay 端口。
-- Relay 仅监听 `127.0.0.1`，不接受外部连接。
+Recommendations:
+
+- Prefer a dedicated Chrome profile for extension relay usage.
+- Keep the Gateway and any node hosts tailnet-only.
+- Avoid exposing relay ports over LAN or public Internet.
 
 ## CLI 参考
 

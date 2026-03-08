@@ -1,17 +1,19 @@
 ---
 name: llm-task
-description: "面向工作流的 JSON-only LLM 任务（可选插件工具）"
+description: "JSON-only LLM tasks for workflows (optional plugin tool)"
 ---
 
 # LLM Task
 
-`llm-task` 是一个**可选的插件工具**，运行 JSON-only LLM 任务并返回结构化输出（可选使用 JSON Schema 验证）。
+`llm-task` is an **optional plugin tool** that runs a JSON-only LLM task and
+returns structured output (optionally validated against JSON Schema).
 
-适用于 Lobster 等工作流引擎：您可以添加单个 LLM 步骤，无需为每个工作流编写自定义 Claw Acosmi 代码。
+This is ideal for workflow engines like Lobster: you can add a single LLM step
+without writing custom Crab Claw（蟹爪） code for each workflow.
 
-## 启用插件
+## Enable the plugin
 
-1. 启用插件：
+1. Enable the plugin:
 
 ```json
 {
@@ -23,7 +25,7 @@ description: "面向工作流的 JSON-only LLM 任务（可选插件工具）"
 }
 ```
 
-1. 将工具加入白名单（注册时带 `optional: true`）：
+2. Allowlist the tool (it is registered with `optional: true`):
 
 ```json
 {
@@ -38,7 +40,7 @@ description: "面向工作流的 JSON-only LLM 任务（可选插件工具）"
 }
 ```
 
-## 配置（可选）
+## Config (optional)
 
 ```json
 {
@@ -60,25 +62,27 @@ description: "面向工作流的 JSON-only LLM 任务（可选插件工具）"
 }
 ```
 
-`allowedModels` 是 `provider/model` 字符串的白名单。如果设置了，白名单之外的请求将被拒绝。
+`allowedModels` is an allowlist of `provider/model` strings. If set, any request
+outside the list is rejected.
 
-## 工具参数
+## Tool parameters
 
-- `prompt`（string，必填）
-- `input`（any，可选）
-- `schema`（object，可选 JSON Schema）
-- `provider`（string，可选）
-- `model`（string，可选）
-- `authProfileId`（string，可选）
-- `temperature`（number，可选）
-- `maxTokens`（number，可选）
-- `timeoutMs`（number，可选）
+- `prompt` (string, required)
+- `input` (any, optional)
+- `schema` (object, optional JSON Schema)
+- `provider` (string, optional)
+- `model` (string, optional)
+- `authProfileId` (string, optional)
+- `temperature` (number, optional)
+- `maxTokens` (number, optional)
+- `timeoutMs` (number, optional)
 
-## 输出
+## Output
 
-返回 `details.json`，包含解析后的 JSON（提供了 `schema` 时会进行验证）。
+Returns `details.json` containing the parsed JSON (and validates against
+`schema` when provided).
 
-## 示例：Lobster 工作流步骤
+## Example: Lobster workflow step
 
 ```lobster
 openacosmi.invoke --tool llm-task --action json --args-json '{
@@ -99,9 +103,10 @@ openacosmi.invoke --tool llm-task --action json --args-json '{
 }'
 ```
 
-## 安全说明
+## Safety notes
 
-- 该工具为 **JSON-only**，指示模型仅输出 JSON（无代码围栏、无注释）。
-- 此运行不向模型暴露任何工具。
-- 除非使用 `schema` 验证，否则将输出视为不可信。
-- 在任何有副作用的步骤（发送、发布、执行）之前添加审批。
+- The tool is **JSON-only** and instructs the model to output only JSON (no
+  code fences, no commentary).
+- No tools are exposed to the model for this run.
+- Treat output as untrusted unless you validate with `schema`.
+- Put approvals before any side-effecting step (send, post, exec).

@@ -1,4 +1,4 @@
-// Package types 定义 Open Acosmi 后端的共享类型。
+// Package types 定义 Crab Claw（蟹爪）后端的共享类型。
 //
 // 对应原版 src/config/types.*.ts 中的核心类型定义。
 // 此文件定义基础类型，各子域类型将在后续 Phase 中逐步添加。

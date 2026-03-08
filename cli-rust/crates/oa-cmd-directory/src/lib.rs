@@ -1,4 +1,4 @@
-/// Directory lookup commands for Claw Acosmi CLI.
+/// Directory lookup commands for Crab Claw CLI.
 ///
 /// Provides subcommands: self, peers list, groups list/members.
 ///

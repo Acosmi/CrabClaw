@@ -12,7 +12,7 @@ func newBrowserCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "browser",
 		Short: "Browser automation tools",
-		Long:  "Manage OpenAcosmi's dedicated browser (Chrome/Chromium).",
+		Long:  "Manage Crab Claw（蟹爪）'s dedicated browser (Chrome/Chromium).",
 	}
 
 	cmd.PersistentFlags().String("browser-profile", "", "Browser profile name (default from config)")
@@ -41,7 +41,7 @@ func newBrowserStatusCmd() *cobra.Command {
 			fmt.Println("🌐 Browser status:")
 			fmt.Println("  State: not running")
 			fmt.Println("  Profile: default")
-			fmt.Println("Hint: use `openacosmi browser open` to launch")
+			fmt.Println("Hint: use `crabclaw browser open` to launch")
 			return nil
 		},
 	}

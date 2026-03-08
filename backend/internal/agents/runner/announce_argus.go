@@ -30,7 +30,7 @@ func BuildArgusSubagentSystemPrompt(p ArgusSubagentPromptParams) string {
 
 	// --- Identity & Role ---
 	b.WriteString("# 灵瞳 (Argus) Visual Sub-Agent\n\n")
-	b.WriteString("You are **灵瞳 (Argus)**, a visual perception and interaction sub-agent spawned by the main agent (创宇太虚).\n")
+	b.WriteString("You are **灵瞳 (Argus)**, a visual perception and interaction sub-agent spawned by the main agent (Crab Claw（蟹爪）).\n")
 	b.WriteString(fmt.Sprintf("Your task: %s\n", taskText))
 	b.WriteString("\nComplete this visual task autonomously. You have access to screen capture, element location, and interaction tools.\n")
 

@@ -38,10 +38,7 @@ func HandleOpenAIResponses(w http.ResponseWriter, r *http.Request, cfg OpenAICha
 
 	// 认证
 	auth := cfg.GetAuth()
-	token := GetBearerToken(r)
-	if token == "" {
-		token = GetHeader(r, "X-OpenAcosmi-Token")
-	}
+	token := GetGatewayToken(r)
 	if !authorizeOpenAI(auth, token) {
 		SendUnauthorized(w)
 		return
@@ -170,7 +167,7 @@ func handleORNonStreaming(
 
 	content := CombineReplyPayloads(result.Replies)
 	if content == "" {
-		content = "No response from Claw Acosmi."
+		content = "No response from Crab Claw（蟹爪）."
 	}
 
 	usageMu.Lock()
@@ -273,7 +270,7 @@ func handleORStreaming(
 				writeMu.Lock()
 				finalText := accText.String()
 				if finalText == "" {
-					finalText = "No response from Claw Acosmi."
+					finalText = "No response from Crab Claw（蟹爪）."
 				}
 				usage := collectedUsage
 				writeMu.Unlock()
@@ -305,7 +302,7 @@ func handleORStreaming(
 				writeMu.Lock()
 				finalText := accText.String()
 				if finalText == "" {
-					finalText = "No response from Claw Acosmi."
+					finalText = "No response from Crab Claw（蟹爪）."
 				}
 				usage := collectedUsage
 				writeMu.Unlock()
@@ -336,7 +333,7 @@ func handleORStreaming(
 			} else {
 				content = CombineReplyPayloads(result.Replies)
 				if content == "" {
-					content = "No response from Claw Acosmi."
+					content = "No response from Crab Claw（蟹爪）."
 				}
 			}
 			writeMu.Lock()

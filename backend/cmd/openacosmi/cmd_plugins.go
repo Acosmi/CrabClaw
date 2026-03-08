@@ -8,7 +8,7 @@ func newPluginsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "plugins",
 		Short: "Plugin management",
-		Long:  "Install, update, remove, and list OpenAcosmi plugins.",
+		Long:  "Install, update, remove, and list Crab Claw（蟹爪） plugins.",
 	}
 
 	cmd.AddCommand(

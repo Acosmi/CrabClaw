@@ -25,6 +25,7 @@ const (
 	ChannelFeishu     ChannelID = "feishu"
 	ChannelDingTalk   ChannelID = "dingtalk"
 	ChannelWeCom      ChannelID = "wecom"
+	ChannelEmail      ChannelID = "email"
 )
 
 const DefaultAccountID = "default"

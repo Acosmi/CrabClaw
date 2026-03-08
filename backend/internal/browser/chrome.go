@@ -362,7 +362,7 @@ func LaunchOpenAcosmiChrome(ctx context.Context, cfg ChromeStartConfig) (*Chrome
 		if cfg.Profile != nil && cfg.Profile.Color != "" {
 			color = cfg.Profile.Color
 		}
-		if err := DecorateOpenAcosmiProfile(dataDir, "OpenAcosmi", color); err != nil {
+		if err := DecorateOpenAcosmiProfile(dataDir, "Crab Claw", color); err != nil {
 			cfg.Logger.Warn("profile decoration failed", "err", err)
 		} else {
 			cfg.Logger.Info("profile decorated", "color", color)

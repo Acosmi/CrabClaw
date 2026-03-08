@@ -28,6 +28,24 @@ func IsTruthyEnv(key string) bool {
 	return false
 }
 
+func envValueCompat(keys ...string) string {
+	for _, key := range keys {
+		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func IsTruthyAnyEnv(keys ...string) bool {
+	val := strings.TrimSpace(strings.ToLower(envValueCompat(keys...)))
+	switch val {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
+}
+
 // profileNameRe 合法的 profile 名称：仅字母、数字、下划线、连字符，长度 1-64。
 var profileNameRe = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
@@ -59,7 +77,7 @@ func ResolveProfile(args []string) (string, error) {
 
 // ResolveStateDir 根据 profile 解析 state 目录。
 func ResolveStateDir(profile string) string {
-	if envDir := os.Getenv("OPENACOSMI_STATE_DIR"); envDir != "" {
+	if envDir := envValueCompat("CRABCLAW_STATE_DIR", "OPENACOSMI_STATE_DIR"); envDir != "" {
 		return envDir
 	}
 	home, err := os.UserHomeDir()
@@ -87,13 +105,13 @@ var coreChannelOrder = []string{
 var ChannelOptions = coreChannelOrder
 
 // ResolveCliChannelOptions 解析 CLI 可用频道列表。
-// 当 OPENACOSMI_EAGER_CHANNEL_OPTIONS=1 时，加载插件注册表并合并插件频道。
+// 当 CRABCLAW_EAGER_CHANNEL_OPTIONS=1 或 OPENACOSMI_EAGER_CHANNEL_OPTIONS=1 时，加载插件注册表并合并插件频道。
 // 对应 TS channel-options.ts resolveCliChannelOptions()。
 func ResolveCliChannelOptions() []string {
 	base := make([]string, len(coreChannelOrder))
 	copy(base, coreChannelOrder)
 
-	if !IsTruthyEnv("OPENACOSMI_EAGER_CHANNEL_OPTIONS") {
+	if !IsTruthyAnyEnv("CRABCLAW_EAGER_CHANNEL_OPTIONS", "OPENACOSMI_EAGER_CHANNEL_OPTIONS") {
 		return base
 	}
 

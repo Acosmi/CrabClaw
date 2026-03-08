@@ -329,7 +329,7 @@ func handleWhatsAppPairing(
 // TS 对照: pairing/pairing-messages.ts buildPairingReply()
 func BuildWhatsAppPairingReply(senderID, code string) string {
 	var lines []string
-	lines = append(lines, "👋 Hi! This WhatsApp account is paired with Open Acosmi.")
+	lines = append(lines, "👋 Hi! This WhatsApp account is paired with Crab Claw（蟹爪）.")
 	lines = append(lines, "")
 	if senderID != "" {
 		lines = append(lines, fmt.Sprintf("Your WhatsApp sender id: %s", senderID))

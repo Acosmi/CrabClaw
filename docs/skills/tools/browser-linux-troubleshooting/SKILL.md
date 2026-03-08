@@ -1,27 +1,27 @@
 ---
 name: browser-linux-troubleshooting
-description: "修复 Claw Acosmi 在 Linux 上控制浏览器时的 Chrome/Brave/Edge/Chromium CDP 启动问题"
+description: "Fix Chrome/Brave/Edge/Chromium CDP startup issues for Crab Claw（蟹爪） browser control on Linux"
 ---
 
-# 浏览器故障排除（Linux）
+# Browser Troubleshooting (Linux)
 
-## 问题："Failed to start Chrome CDP on port 18800"
+## Problem: "Failed to start Chrome CDP on port 18800"
 
-Claw Acosmi 的浏览器控制服务无法启动 Chrome/Brave/Edge/Chromium，报错：
+Crab Claw（蟹爪）'s browser control server fails to launch Chrome/Brave/Edge/Chromium with the error:
 
 ```
 {"error":"Error: Failed to start Chrome CDP on port 18800 for profile \"openacosmi\"."}
 ```
 
-### 根本原因
+### Root Cause
 
-在 Ubuntu（及许多 Linux 发行版）上，默认的 Chromium 安装是一个 **snap 包**。snap 的 AppArmor 沙箱限制干扰了 Claw Acosmi 生成和监控浏览器进程的方式。
+On Ubuntu (and many Linux distros), the default Chromium installation is a **snap package**. Snap's AppArmor confinement interferes with how Crab Claw（蟹爪） spawns and monitors the browser process.
 
-`apt install chromium` 安装的是一个重定向到 snap 的桩包 — 并非真正的浏览器。
+`apt install chromium` installs a stub package that redirects to snap — NOT a real browser.
 
-### 方案 1：安装 Google Chrome（推荐）
+### Solution 1: Install Google Chrome (Recommended)
 
-安装官方 Google Chrome `.deb` 包：
+Install the official Google Chrome `.deb` package:
 
 ```bash
 wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
@@ -29,7 +29,7 @@ sudo dpkg -i google-chrome-stable_current_amd64.deb
 sudo apt --fix-broken install -y
 ```
 
-然后更新配置（`~/.openacosmi/openacosmi.json`）：
+Then update config (`~/.openacosmi/openacosmi.json`):
 
 ```json
 {
@@ -42,9 +42,9 @@ sudo apt --fix-broken install -y
 }
 ```
 
-### 方案 2：snap Chromium + Attach-Only 模式
+### Solution 2: Snap Chromium + Attach-Only Mode
 
-如果必须使用 snap Chromium，配置 attach-only 模式：
+If you must use snap Chromium, configure attach-only mode:
 
 ```json
 {
@@ -57,7 +57,7 @@ sudo apt --fix-broken install -y
 }
 ```
 
-手动启动 Chromium：
+Start Chromium manually:
 
 ```bash
 chromium-browser --headless --no-sandbox --disable-gpu \
@@ -66,9 +66,9 @@ chromium-browser --headless --no-sandbox --disable-gpu \
   about:blank &
 ```
 
-可选：创建 systemd 用户服务以自动启动（`~/.config/systemd/user/openacosmi-browser.service`）。
+Optional: create systemd user service for auto-start (`~/.config/systemd/user/openacosmi-browser.service`).
 
-### 验证
+### Verifying
 
 ```bash
 curl -s http://127.0.0.1:18791/ | jq '{running, pid, chosenBrowser}'
@@ -76,19 +76,19 @@ curl -s -X POST http://127.0.0.1:18791/start
 curl -s http://127.0.0.1:18791/tabs
 ```
 
-### 配置参考
+### Config Reference
 
-| 选项 | 描述 | 默认值 |
-|------|------|--------|
-| `browser.enabled` | 启用浏览器控制 | `true` |
-| `browser.executablePath` | Chromium 系浏览器二进制路径 | 自动检测 |
-| `browser.headless` | 无 GUI 运行 | `false` |
-| `browser.noSandbox` | 添加 `--no-sandbox` 标志 | `false` |
-| `browser.attachOnly` | 不启动浏览器，仅附加 | `false` |
-| `browser.cdpPort` | Chrome DevTools Protocol 端口 | `18800` |
+| Option | Description | Default |
+|--------|-------------|---------|
+| `browser.enabled` | Enable browser control | `true` |
+| `browser.executablePath` | Chromium-based browser binary path | auto-detected |
+| `browser.headless` | Run without GUI | `false` |
+| `browser.noSandbox` | Add `--no-sandbox` flag | `false` |
+| `browser.attachOnly` | Don't launch browser, only attach | `false` |
+| `browser.cdpPort` | Chrome DevTools Protocol port | `18800` |
 
-### 问题："Chrome extension relay is running, but no tab is connected"
+### Problem: "Chrome extension relay is running, but no tab is connected"
 
-使用 `chrome` 配置文件（扩展中继）但没有标签页附加。
+Using the `chrome` profile (extension relay) but no tab is attached.
 
-修复：设置 `browser.defaultProfile: "openacosmi"` 使用托管浏览器，或安装扩展并点击图标附加标签页。
+Fix: set `browser.defaultProfile: "openacosmi"` to use managed browser, or install the extension and click the icon to attach a tab.

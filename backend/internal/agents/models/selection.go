@@ -472,3 +472,37 @@ func ResolveHooksGmailModel(cfg *types.OpenAcosmiConfig, defaultProvider string)
 	aliasIndex := BuildModelAliasIndex(cfg, defaultProvider)
 	return ResolveModelRefFromString(hooksModel, defaultProvider, &aliasIndex)
 }
+
+// ---------- Managed Model 双轨优先判断 (Phase 4) ----------
+
+// ManagedModelProvider 托管模型提供者接口。
+type ManagedModelProvider interface {
+	List() ([]types.ManagedModelEntry, error)
+	DefaultModel() *types.ManagedModelEntry
+}
+
+// ResolveManagedModelRef 解析托管模型为 ModelRef。
+// 优先规则（前置判断，不修改现有 custom 逻辑）:
+//  1. 用户显式指定了 custom model.primary → 返回 nil（尊重用户选择）
+//  2. ManagedModels.Enabled && managed 有可用模型 → 返回 managed 默认模型
+//  3. 否则 → 返回 nil（调用方走现有 custom 逻辑）
+func ResolveManagedModelRef(cfg *types.OpenAcosmiConfig, managed ManagedModelProvider) *ModelRef {
+	if cfg != nil && cfg.Agents != nil && cfg.Agents.Defaults != nil &&
+		cfg.Agents.Defaults.Model != nil && cfg.Agents.Defaults.Model.Primary != "" {
+		return nil
+	}
+	if cfg == nil || cfg.Models == nil || cfg.Models.ManagedModels == nil || !cfg.Models.ManagedModels.Enabled {
+		return nil
+	}
+	if managed == nil {
+		return nil
+	}
+	entry := managed.DefaultModel()
+	if entry == nil {
+		return nil
+	}
+	return &ModelRef{
+		Provider: entry.Provider,
+		Model:    entry.ModelID,
+	}
+}

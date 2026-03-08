@@ -25,7 +25,7 @@ import (
 // Aligns with TS chrome.profile-decoration.ts decorateOpenAcosmiProfile().
 func DecorateOpenAcosmiProfile(userDataDir, desiredName, desiredColor string) error {
 	if desiredName == "" {
-		desiredName = "OpenAcosmi"
+		desiredName = "Crab Claw"
 	}
 	desiredColor = NormalizeHexColor(desiredColor)
 	colorInt := parseHexRgbToSignedArgbInt(desiredColor)

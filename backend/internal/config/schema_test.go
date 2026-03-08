@@ -104,8 +104,8 @@ func TestGenerateConfigSchema(t *testing.T) {
 	if schema == nil {
 		t.Fatal("expected non-nil schema")
 	}
-	if schema["title"] != "OpenAcosmiConfig" {
-		t.Errorf("expected title 'OpenAcosmiConfig', got %v", schema["title"])
+	if schema["title"] != "Crab Claw Config" {
+		t.Errorf("expected title 'Crab Claw Config', got %v", schema["title"])
 	}
 	if schema["$schema"] != "http://json-schema.org/draft-07/schema#" {
 		t.Errorf("expected $schema draft-07, got %v", schema["$schema"])

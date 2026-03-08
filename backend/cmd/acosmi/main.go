@@ -1,4 +1,4 @@
-// Package main 是 Open Acosmi Gateway 服务的入口程序。
+// Package main 是 Crab Claw（蟹爪）Gateway 服务的入口程序。
 // 负责初始化配置、启动 WebSocket RPC 网关服务器。
 //
 // 这是 Go 端的主要二进制。CLI 命令由 Rust 版 openacosmi 承担，

@@ -122,9 +122,9 @@ func SetupInternalHooks(
 		fmt.Sprintf("Enabled %d hook%s: %s", len(toEnable), suffix, strings.Join(toEnable, ", ")),
 		"",
 		"You can manage hooks later with:",
-		"  openacosmi hooks list",
-		"  openacosmi hooks enable <name>",
-		"  openacosmi hooks disable <name>",
+		"  crabclaw hooks list",
+		"  crabclaw hooks enable <name>",
+		"  crabclaw hooks disable <name>",
 	}, "\n"), i18n.Tp("onboard.hook.summary"))
 
 	return next, nil

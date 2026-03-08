@@ -174,6 +174,8 @@ type EmbeddedAttemptRunner struct {
 	MediaSender interface {
 		SendMedia(ctx context.Context, channelID, to string, data []byte, fileName, mimeType, message string) error
 	}
+	// EmailSender 邮件发送器（可选，nil = send_email 工具不可用）
+	EmailSender EmailSender
 	// MediaSubsystem 媒体子系统（可选，nil = spawn_media_agent 工具不注册）。
 	// 提供 trending_topics / content_compose / media_publish / social_interact 工具。
 	MediaSubsystem MediaSubsystemForAgent
@@ -1298,6 +1300,11 @@ Also supports: navigate, screenshot, evaluate JS, wait_for, go_back/forward, get
 		})
 	}
 
+	// Phase 7: send_email 工具
+	if r.EmailSender != nil {
+		tools = append(tools, SendEmailToolDef())
+	}
+
 	// 追加 Argus 视觉工具（前缀 argus_ 以区分）
 	if r.ArgusBridge != nil {
 		for _, t := range r.ArgusBridge.AgentTools() {
@@ -1412,6 +1419,7 @@ func (r *EmbeddedAttemptRunner) buildToolExecParams(params AttemptParams, secLvl
 		BrowserController:      r.BrowserController,
 		ContractStore:          r.ContractStore,
 		MediaSender:            r.MediaSender,
+		EmailSender:            r.EmailSender,
 		QualityReviewFn:        r.QualityReviewFn,
 		ResultApprovalMgr:      r.ResultApprovalMgr,
 		OnProgress:             params.OnProgress,
@@ -1462,6 +1470,8 @@ func isToolSoftError(toolName, output string) bool {
 		return false
 	case "send_media":
 		return strings.HasPrefix(output, "[send_media]")
+	case "send_email":
+		return strings.HasPrefix(output, "[send_email]")
 	case "browser":
 		return strings.HasPrefix(output, "[Browser ") || strings.HasPrefix(output, "[Unknown browser action")
 	default:
@@ -1498,13 +1508,22 @@ func toolFailureGuidance(toolName string, failCount int) string {
 			"4. If sending a screenshot: run '%s' via bash, then call send_media with file_path='/tmp/screenshot.png'.\n"+
 			"5. If the file does not exist at the path, check the actual path with 'ls' first.\n"+
 			"If you cannot send the media after these steps, respond with text instead of retrying.", failCount, screenshotCmd)
+	case "send_email":
+		return fmt.Sprintf("⚠️ TOOL FAILURE LOOP DETECTED (%d failures). STOP retrying send_email.\n"+
+			"REMEDIATION:\n"+
+			"1. Verify the recipient email address is valid.\n"+
+			"2. Check that the email account is configured and running.\n"+
+			"3. If the error is about authentication, the user needs to check their email credentials.\n"+
+			"If you cannot send the email, respond with text to inform the user of the issue.", failCount)
 	case "browser":
+		guideURL := "http://127.0.0.1:26222/browser-extension/"
 		return fmt.Sprintf("⚠️ TOOL FAILURE LOOP DETECTED (%d failures). STOP retrying browser with the same approach.\n"+
 			"REMEDIATION:\n"+
-			"1. Use 'observe' first to refresh ARIA refs before click_ref/fill_ref.\n"+
-			"2. If refs are stale, re-observe. If the page has changed, re-navigate.\n"+
-			"3. For complex multi-step goals, use 'ai_browse' instead of manual step-by-step.\n"+
-			"If the page is unresponsive, respond with text to describe the issue.", failCount)
+			"1. If the error says 'not available': the browser extension is not installed. Guide the user to: %s\n"+
+			"2. Use 'observe' first to refresh ARIA refs before click_ref/fill_ref.\n"+
+			"3. If refs are stale, re-observe. If the page has changed, re-navigate.\n"+
+			"4. For complex multi-step goals, use 'ai_browse' instead of manual step-by-step.\n"+
+			"If the page is unresponsive, respond with text to describe the issue.", failCount, guideURL)
 	default:
 		return fmt.Sprintf("⚠️ Tool %s has failed %d times. Consider trying a different approach or respond with text to the user.", toolName, failCount)
 	}

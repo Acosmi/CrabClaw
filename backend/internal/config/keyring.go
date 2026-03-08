@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/Acosmi/ClawAcosmi/pkg/log"
 	"github.com/Acosmi/ClawAcosmi/pkg/types"
@@ -12,10 +13,54 @@ import (
 // KeyringSentinel 脱敏并存入 Keyring 后的占位符
 const KeyringSentinel = "__OPENACOSMI_KEYRING_REF__"
 
-// KeyringServiceName 系统钥匙串中存储的服务名称
-const KeyringServiceName = "OpenAcosmi"
+// KeyringServiceName 系统钥匙串中用于新品牌的服务名称。
+const KeyringServiceName = "Crab Claw"
+
+// LegacyKeyringServiceName 兼容旧版本遗留的 Keyring 服务名称。
+const LegacyKeyringServiceName = "OpenAcosmi"
 
 var keyringLogger = log.New("keyring")
+
+func keyringServiceNames() []string {
+	return []string{KeyringServiceName, LegacyKeyringServiceName}
+}
+
+// storeSecretInKeyring 双写新旧 service name，保证新品牌和旧版本都能读取同一份凭据。
+func storeSecretInKeyring(path, secret string) error {
+	var failures []string
+	successCount := 0
+	for _, serviceName := range keyringServiceNames() {
+		if err := keyring.Set(serviceName, path, secret); err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", serviceName, err))
+			continue
+		}
+		successCount++
+	}
+	if successCount == 0 {
+		return fmt.Errorf("keyring set failed for all services: %s", strings.Join(failures, "; "))
+	}
+	if len(failures) > 0 {
+		keyringLogger.Warn("Keyring mirror write partial failure for '%s': %s", path, strings.Join(failures, "; "))
+	}
+	return nil
+}
+
+// restoreSecretFromKeyring 优先读取新 service name，读取不到时回退旧 service name。
+func restoreSecretFromKeyring(path string) (string, error) {
+	var failures []string
+	for _, serviceName := range keyringServiceNames() {
+		secret, err := keyring.Get(serviceName, path)
+		if err == nil && secret != "" {
+			return secret, nil
+		}
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", serviceName, err))
+			continue
+		}
+		failures = append(failures, fmt.Sprintf("%s: empty secret", serviceName))
+	}
+	return "", fmt.Errorf("keyring get failed for all services: %s", strings.Join(failures, "; "))
+}
 
 // StoreSensitiveToKeyring 递归遍历配置对象，将敏感字段保存到 OS Keyring，并在原位留存 KeyringSentinel 占位符。
 func StoreSensitiveToKeyring(obj interface{}) (interface{}, error) {
@@ -38,7 +83,7 @@ func storeToKeyringRecursively(obj interface{}, pathPrefix string) (interface{},
 
 			if IsSensitiveKey(key) {
 				if strVal, ok := value.(string); ok && strVal != "" && strVal != KeyringSentinel && strVal != RedactedSentinel {
-					err := keyring.Set(KeyringServiceName, currentPath, strVal)
+					err := storeSecretInKeyring(currentPath, strVal)
 					if err != nil {
 						keyringLogger.Warn("Keyring set failed for '%s': %v. Storing as plain text.", currentPath, err)
 						result[key] = value // Fallback to plain text store
@@ -105,7 +150,7 @@ func restoreFromKeyringRecursively(obj interface{}, pathPrefix string) (interfac
 
 			if IsSensitiveKey(key) {
 				if strVal, ok := value.(string); ok && strVal == KeyringSentinel {
-					secret, err := keyring.Get(KeyringServiceName, currentPath)
+					secret, err := restoreSecretFromKeyring(currentPath)
 					if err == nil && secret != "" {
 						v[key] = secret
 					} else {

@@ -1,4 +1,4 @@
-/// Supporting commands for Claw Acosmi CLI.
+/// Supporting commands for Crab Claw CLI.
 ///
 /// This crate implements ancillary commands that are not part of the core
 /// agent/model/channel pipelines: dashboard, docs search, reset, setup,

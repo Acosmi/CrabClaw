@@ -237,7 +237,7 @@ func normalizeInstallOptions(entry *HookEntry) []HookInstallOption {
 		if label == "" {
 			switch spec.Kind {
 			case HookInstallBundled:
-				label = "Bundled with OpenAcosmi"
+				label = "Bundled with Crab Claw（蟹爪）"
 			case HookInstallNPM:
 				if spec.Package != "" {
 					label = fmt.Sprintf("Install %s (npm)", spec.Package)

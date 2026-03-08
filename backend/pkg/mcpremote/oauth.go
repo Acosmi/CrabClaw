@@ -132,6 +132,11 @@ func NewOAuthTokenManager(cfg OAuthConfig, store TokenStore) *OAuthTokenManager 
 	}
 }
 
+// Store 返回底层 token store（用于外部 Clear 等操作）。
+func (m *OAuthTokenManager) Store() TokenStore {
+	return m.store
+}
+
 // GetAccessToken 获取有效的 access token。
 // P1 模式: 直接返回静态 JWT token。
 // OAuth 模式: RWMutex double-checked locking，HTTP 刷新在锁外执行，
@@ -357,6 +362,11 @@ func DiscoverAuthServer(client *http.Client, issuerURL string) (*AuthServerMetad
 
 	if meta.TokenEndpoint == "" {
 		return nil, fmt.Errorf("oauth discovery: missing token_endpoint")
+	}
+
+	// [FIX-01: RFC 8414 §3.3 issuer 验证 — 返回值必须与请求的 issuerURL 一致]
+	if meta.Issuer != "" && meta.Issuer != issuerURL {
+		return nil, fmt.Errorf("oauth discovery: issuer mismatch: expected %q, got %q (RFC 8414 §3.3)", issuerURL, meta.Issuer)
 	}
 
 	return &meta, nil

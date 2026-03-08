@@ -1,30 +1,30 @@
 ---
 name: date-time
-description: "日期和时间处理：信封、提示词、工具和连接器"
+description: "Date and time handling across envelopes, prompts, tools, and connectors"
 ---
 
-# 日期与时间
+# Date & Time
 
-创宇太虚默认将**主机本地时间用于传输时间戳**，**用户时区仅在 system prompt 中使用**。
-供应商时间戳会被保留，因此工具保持其原生语义（当前时间可通过 `session_status` 获取）。
+Crab Claw（蟹爪） defaults to **host-local time for transport timestamps** and **user timezone only in the system prompt**.
+Provider timestamps are preserved so tools keep their native semantics (current time is available via `session_status`).
 
-## 消息信封（默认本地时间）
+## Message envelopes (local by default)
 
-入站消息会被包装一个时间戳（分钟精度）：
+Inbound messages are wrapped with a timestamp (minute precision):
 
 ```
-[Provider ... 2026-01-05 16:26 PST] 消息文本
+[Provider ... 2026-01-05 16:26 PST] message text
 ```
 
-此信封时间戳**默认使用主机本地时间**，与供应商时区无关。
+This envelope timestamp is **host-local by default**, regardless of the provider timezone.
 
-可通过配置覆盖此行为：
+You can override this behavior:
 
 ```json5
 {
   agents: {
     defaults: {
-      envelopeTimezone: "local", // "utc" | "local" | "user" | IANA 时区
+      envelopeTimezone: "local", // "utc" | "local" | "user" | IANA timezone
       envelopeTimestamp: "on", // "on" | "off"
       envelopeElapsed: "on", // "on" | "off"
     },
@@ -32,52 +32,56 @@ description: "日期和时间处理：信封、提示词、工具和连接器"
 }
 ```
 
-- `envelopeTimezone: "utc"` 使用 UTC。
-- `envelopeTimezone: "local"` 使用主机时区。
-- `envelopeTimezone: "user"` 使用 `agents.defaults.userTimezone`（回退到主机时区）。
-- 使用显式 IANA 时区（如 `"America/Chicago"`）指定固定时区。
-- `envelopeTimestamp: "off"` 移除信封头中的绝对时间戳。
-- `envelopeElapsed: "off"` 移除已用时间后缀（`+2m` 样式）。
+- `envelopeTimezone: "utc"` uses UTC.
+- `envelopeTimezone: "local"` uses the host timezone.
+- `envelopeTimezone: "user"` uses `agents.defaults.userTimezone` (falls back to host timezone).
+- Use an explicit IANA timezone (e.g., `"America/Chicago"`) for a fixed zone.
+- `envelopeTimestamp: "off"` removes absolute timestamps from envelope headers.
+- `envelopeElapsed: "off"` removes elapsed time suffixes (the `+2m` style).
 
-### 示例
+### Examples
 
-**本地（默认）：**
+**Local (default):**
 
 ```
 [WhatsApp +1555 2026-01-18 00:19 PST] hello
 ```
 
-**用户时区：**
+**User timezone:**
 
 ```
 [WhatsApp +1555 2026-01-18 00:19 CST] hello
 ```
 
-**启用已用时间：**
+**Elapsed time enabled:**
 
 ```
-[WhatsApp +1555 +30s 2026-01-18T05:19Z] 后续消息
+[WhatsApp +1555 +30s 2026-01-18T05:19Z] follow-up
 ```
 
-## System Prompt：当前日期与时间
+## System prompt: Current Date & Time
 
-若已知用户时区，system prompt 会包含一个专门的**当前日期与时间**段，仅含**时区**（无时钟/时间格式），以保持 prompt 缓存稳定：
+If the user timezone is known, the system prompt includes a dedicated
+**Current Date & Time** section with the **time zone only** (no clock/time format)
+to keep prompt caching stable:
 
 ```
 Time zone: America/Chicago
 ```
 
-当智能体需要获取当前时间时，使用 `session_status` 工具；状态卡包含时间戳行。
+When the agent needs the current time, use the `session_status` tool; the status
+card includes a timestamp line.
 
-## 系统事件行（默认本地时间）
+## System event lines (local by default)
 
-插入到智能体上下文中的排队系统事件会加上时间戳前缀，使用与消息信封相同的时区选择（默认：主机本地）。
+Queued system events inserted into agent context are prefixed with a timestamp using the
+same timezone selection as message envelopes (default: host-local).
 
 ```
-System: [2026-01-12 12:19:17 PST] 模型已切换。
+System: [2026-01-12 12:19:17 PST] Model switched.
 ```
 
-### 配置用户时区 + 格式
+### Configure user timezone + format
 
 ```json5
 {
@@ -90,30 +94,32 @@ System: [2026-01-12 12:19:17 PST] 模型已切换。
 }
 ```
 
-- `userTimezone` 设置用于 prompt 上下文的**用户本地时区**。
-- `timeFormat` 控制 prompt 中的 **12 小时/24 小时显示**。`auto` 跟随系统偏好。
+- `userTimezone` sets the **user-local timezone** for prompt context.
+- `timeFormat` controls **12h/24h display** in the prompt. `auto` follows OS prefs.
 
-## 时间格式检测（auto）
+## Time format detection (auto)
 
-当 `timeFormat: "auto"` 时，创宇太虚会检查操作系统偏好（macOS/Windows）并回退到 locale 格式化。检测值在**每个进程中缓存**，避免重复系统调用。
+When `timeFormat: "auto"`, Crab Claw（蟹爪） inspects the OS preference (macOS/Windows)
+and falls back to locale formatting. The detected value is **cached per process**
+to avoid repeated system calls.
 
-## 工具载荷 + 连接器（原始供应商时间 + 标准化字段）
+## Tool payloads + connectors (raw provider time + normalized fields)
 
-频道工具返回**供应商原生时间戳**，并添加标准化字段以保持一致性：
+Channel tools return **provider-native timestamps** and add normalized fields for consistency:
 
-- `timestampMs`：纪元毫秒（UTC）
-- `timestampUtc`：ISO 8601 UTC 字符串
+- `timestampMs`: epoch milliseconds (UTC)
+- `timestampUtc`: ISO 8601 UTC string
 
-原始供应商字段会被保留，不会丢失。
+Raw provider fields are preserved so nothing is lost.
 
-- Slack：API 返回的纪元样式字符串
-- Discord：UTC ISO 时间戳
-- Telegram/WhatsApp：供应商特定的数字/ISO 时间戳
+- Slack: epoch-like strings from the API
+- Discord: UTC ISO timestamps
+- Telegram/WhatsApp: provider-specific numeric/ISO timestamps
 
-若需要本地时间，使用已知时区在下游进行转换。
+If you need local time, convert it downstream using the known timezone.
 
-## 相关文档
+## Related docs
 
-- [系统提示词](/concepts/system-prompt)
-- [时区](/concepts/timezone)
-- [消息](/concepts/messages)
+- [System Prompt](/concepts/system-prompt)
+- [Timezones](/concepts/timezone)
+- [Messages](/concepts/messages)

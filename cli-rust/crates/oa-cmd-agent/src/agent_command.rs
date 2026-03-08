@@ -2,10 +2,9 @@
 ///
 /// Validates command options, resolves sessions, configures model and
 /// thinking parameters, and orchestrates the agent run pipeline.
-/// This is the entry point for `openacosmi agent --message "..."`.
+/// This is the entry point for `crabclaw agent --message "..."`.
 ///
 /// Source: `src/commands/agent.ts` - `agentCommand`
-
 use anyhow::{Result, bail};
 use tracing::info;
 
@@ -76,7 +75,7 @@ pub fn validate_agent_id(agent_id_raw: Option<&str>) -> Result<Option<String>> {
     if !known_agents.contains(&normalized) {
         bail!(
             "Unknown agent id \"{raw}\". Use \"{}\" to see configured agents.",
-            format_cli_command("openacosmi agents list")
+            format_cli_command("crabclaw agents list")
         );
     }
 
@@ -89,12 +88,16 @@ pub fn validate_agent_id(agent_id_raw: Option<&str>) -> Result<Option<String>> {
 /// the default of 600 seconds.
 ///
 /// Source: `src/commands/agent.ts` - timeout parsing
-pub fn parse_timeout_seconds(timeout_raw: Option<&str>, config_timeout: Option<u64>) -> Result<u64> {
+pub fn parse_timeout_seconds(
+    timeout_raw: Option<&str>,
+    config_timeout: Option<u64>,
+) -> Result<u64> {
     match timeout_raw {
         Some(raw) => {
-            let parsed: i64 = raw.trim().parse().map_err(|_| {
-                anyhow::anyhow!("--timeout must be a positive integer (seconds)")
-            })?;
+            let parsed: i64 = raw
+                .trim()
+                .parse()
+                .map_err(|_| anyhow::anyhow!("--timeout must be a positive integer (seconds)"))?;
             if parsed <= 0 {
                 bail!("--timeout must be a positive integer (seconds)");
             }
@@ -142,10 +145,7 @@ pub async fn agent_command(opts: &AgentCommandOpts) -> Result<serde_json::Value>
         .as_ref()
         .and_then(|a| a.defaults.as_ref())
         .and_then(|d| d.timeout_seconds);
-    let _timeout_seconds = parse_timeout_seconds(
-        opts.timeout.as_deref(),
-        config_timeout,
-    )?;
+    let _timeout_seconds = parse_timeout_seconds(opts.timeout.as_deref(), config_timeout)?;
 
     // Resolve session.
     let session_resolution = resolve_session(
@@ -168,8 +168,7 @@ pub async fn agent_command(opts: &AgentCommandOpts) -> Result<serde_json::Value>
         .or(think_override)
         .or(session_resolution.persisted_thinking);
 
-    let _resolved_verbose_level = verbose_override
-        .or(session_resolution.persisted_verbose);
+    let _resolved_verbose_level = verbose_override.or(session_resolution.persisted_verbose);
 
     // TODO: Full agent execution pipeline.
     // The complete pipeline includes:
@@ -292,9 +291,6 @@ mod tests {
 
     #[test]
     fn parse_timeout_from_config() {
-        assert_eq!(
-            parse_timeout_seconds(None, Some(120)).unwrap_or(0),
-            120
-        );
+        assert_eq!(parse_timeout_seconds(None, Some(120)).unwrap_or(0), 120);
     }
 }

@@ -1,7 +1,7 @@
 /// Setup command implementation.
 ///
 /// Initializes or updates the workspace, configuration file, and session
-/// directories for the Claw Acosmi CLI.
+/// directories for the Crab Claw CLI.
 ///
 /// Source: `src/commands/setup.ts`
 use std::path::PathBuf;

@@ -1,10 +1,9 @@
 /// Config unset command.
 ///
-/// Removes a key from the Claw Acosmi configuration at a dot-separated
+/// Removes a key from the Crab Claw configuration at a dot-separated
 /// path and writes the updated config to disk.
 ///
 /// Source: `src/commands/config-unset.ts`
-
 use anyhow::{Context, Result};
 
 use oa_config::io::{load_config, write_config_file};

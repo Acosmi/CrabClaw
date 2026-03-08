@@ -4,7 +4,6 @@
 /// strips unknown keys, and optionally applies all changes.
 ///
 /// Source: `src/commands/doctor-config-flow.ts`
-
 use oa_cli_shared::command_format::format_cli_command;
 use oa_config::io::read_config_file_snapshot;
 use oa_config::paths::resolve_config_path;
@@ -163,7 +162,7 @@ pub async fn load_and_maybe_migrate_doctor_config(
         } else {
             fix_hints.push(format!(
                 "Run \"{}\" to apply legacy migrations.",
-                format_cli_command("openacosmi doctor --fix")
+                format_cli_command("crabclaw doctor --fix")
             ));
         }
     }
@@ -171,10 +170,7 @@ pub async fn load_and_maybe_migrate_doctor_config(
     // ── Normalize legacy config values ──
     let normalized = normalize_legacy_config_values(&candidate);
     if !normalized.changes.is_empty() {
-        note(
-            &normalized.changes.join("\n"),
-            Some("Doctor changes"),
-        );
+        note(&normalized.changes.join("\n"), Some("Doctor changes"));
         candidate = normalized.config;
         pending_changes = true;
         if should_repair {
@@ -182,7 +178,7 @@ pub async fn load_and_maybe_migrate_doctor_config(
         } else {
             fix_hints.push(format!(
                 "Run \"{}\" to apply these changes.",
-                format_cli_command("openacosmi doctor --fix")
+                format_cli_command("crabclaw doctor --fix")
             ));
         }
     }

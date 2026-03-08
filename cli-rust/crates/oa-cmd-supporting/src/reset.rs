@@ -142,7 +142,7 @@ pub async fn reset_command(opts: &ResetOptions) -> Result<()> {
                 remove_path(&dir_str, dry_run, Some(&dir_str)).await;
             }
 
-            let next_cmd = format_cli_command("openacosmi onboard --install-daemon");
+            let next_cmd = format_cli_command("crabclaw onboard --install-daemon");
             info!("Next: {next_cmd}");
         }
         ResetScope::Full => {
@@ -163,7 +163,7 @@ pub async fn reset_command(opts: &ResetOptions) -> Result<()> {
                 remove_path(&ws_str, dry_run, Some(&ws_str)).await;
             }
 
-            let next_cmd = format_cli_command("openacosmi onboard --install-daemon");
+            let next_cmd = format_cli_command("crabclaw onboard --install-daemon");
             info!("Next: {next_cmd}");
         }
     }

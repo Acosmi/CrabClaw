@@ -1,9 +1,8 @@
 /// Config get command.
 ///
-/// Reads a value from the Claw Acosmi configuration by dot-separated path.
+/// Reads a value from the Crab Claw configuration by dot-separated path.
 ///
 /// Source: `src/commands/config-get.ts`
-
 use anyhow::{Context, Result};
 
 use oa_config::io::load_config;

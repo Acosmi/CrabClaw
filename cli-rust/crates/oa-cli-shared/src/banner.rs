@@ -1,15 +1,14 @@
 /// CLI banner display.
 ///
-/// Renders the Claw Acosmi ASCII art banner and single-line version info
+/// Renders the Crab Claw ASCII art banner and single-line version info
 /// to the terminal. Tracks whether the banner has already been emitted
 /// to avoid duplicate output.
 ///
 /// Source: `src/cli/banner.ts`
-
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use oa_terminal::ansi::visible_width;
-use oa_terminal::theme::{is_rich, Theme};
+use oa_terminal::theme::{Theme, is_rich};
 
 /// Tracks whether the banner has already been emitted this process.
 ///
@@ -25,7 +24,7 @@ const LOBSTER_ASCII: &[&str] = &[
     "\u{2588}\u{2588}\u{2591}\u{2588}\u{2588}\u{2588}\u{2591}\u{2588}\u{2588}\u{2591}\u{2580}\u{2580}\u{2591}\u{2588}\u{2588}\u{2591}\u{2584}\u{2584}\u{2584}\u{2588}\u{2588}\u{2591}\u{2588}\u{2591}\u{2588}\u{2591}\u{2588}\u{2588}\u{2591}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2591}\u{2588}\u{2588}\u{2588}\u{2588}\u{2591}\u{2580}\u{2580}\u{2591}\u{2588}\u{2588}\u{2591}\u{2588}\u{2591}\u{2588}\u{2591}\u{2588}\u{2588}",
     "\u{2588}\u{2588}\u{2591}\u{2580}\u{2580}\u{2580}\u{2591}\u{2588}\u{2588}\u{2591}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2591}\u{2580}\u{2580}\u{2580}\u{2588}\u{2588}\u{2591}\u{2588}\u{2588}\u{2584}\u{2591}\u{2588}\u{2588}\u{2591}\u{2580}\u{2580}\u{2584}\u{2588}\u{2588}\u{2591}\u{2580}\u{2580}\u{2591}\u{2588}\u{2591}\u{2588}\u{2588}\u{2591}\u{2588}\u{2588}\u{2584}\u{2580}\u{2584}\u{2580}\u{2584}\u{2588}\u{2588}",
     "\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}\u{2580}",
-    "                  \u{1F99C} OPENACOSMI \u{1F99C}                    ",
+    "                  \u{1F99C} CRAB CLAW \u{1F99C}                    ",
     " ",
 ];
 
@@ -54,7 +53,7 @@ fn has_version_flag(argv: &[String]) -> bool {
 /// Source: `src/cli/banner.ts` – `formatCliBannerLine`
 pub fn format_cli_banner_line(version: &str) -> String {
     let rich = is_rich();
-    let title = "\u{1F99C} OpenAcosmi";
+    let title = "\u{1F99C} Crab Claw（蟹爪）";
     let prefix_width = 3; // emoji + space visual width
     let columns = terminal_columns();
 
@@ -63,11 +62,7 @@ pub fn format_cli_banner_line(version: &str) -> String {
 
     if rich {
         if fits {
-            return format!(
-                "{} {}",
-                Theme::heading(title),
-                Theme::info(version),
-            );
+            return format!("{} {}", Theme::heading(title), Theme::info(version),);
         }
         let line1 = format!("{} {}", Theme::heading(title), Theme::info(version));
         let line2 = format!("{}{}", " ".repeat(prefix_width), Theme::muted(""));
@@ -94,12 +89,12 @@ pub fn format_cli_banner_art() -> String {
     let colored: Vec<String> = LOBSTER_ASCII
         .iter()
         .map(|line| {
-            if line.contains("OPENACOSMI") {
+            if line.contains("CRAB CLAW") {
                 return format!(
                     "{}{}{}{}",
                     Theme::muted("              "),
                     Theme::accent("\u{1F99C}"),
-                    Theme::info(" OPENACOSMI "),
+                    Theme::info(" CRAB CLAW "),
                     Theme::accent("\u{1F99C}"),
                 );
             }
@@ -203,9 +198,9 @@ mod tests {
     }
 
     #[test]
-    fn banner_line_contains_openacosmi() {
+    fn banner_line_contains_crab_claw() {
         let line = format_cli_banner_line("0.0.1");
-        assert!(line.contains("OpenAcosmi") || line.contains("OPENACOSMI"));
+        assert!(line.contains("Crab Claw"));
     }
 
     #[test]
@@ -250,6 +245,6 @@ mod tests {
     fn banner_art_produces_output() {
         let art = format_cli_banner_art();
         assert!(!art.is_empty());
-        assert!(art.contains("OPENACOSMI"));
+        assert!(art.contains("CRAB CLAW"));
     }
 }

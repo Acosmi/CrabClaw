@@ -152,7 +152,7 @@ var (
 	readMethods = newStringSet(
 		"health", "logs.tail", "channels.status", "status",
 		"usage.status", "usage.cost", "tts.status", "tts.providers",
-		"models.list", "agents.list", "agent.identity.get",
+		"models.list", "models.default.get", "agents.list", "agent.identity.get",
 		"skills.status", "skills.store.browse", "skills.store.refresh", "skills.store.link",
 		"voicewake.get",
 		"sessions.list", "sessions.preview",
@@ -176,6 +176,11 @@ var (
 		"wizard.v2.providers.list", // Wizard V2 provider 目录 (只读)
 		"subagent.list",            // 子智能体状态查询
 		"argus.permission.check",   // Argus TCC 权限检查
+		"auth.state",               // P2: OAuth 认证状态查询
+		"models.managed.list",      // P4: 托管模型列表
+		"packages.catalog.browse",  // P3: 统一应用中心 浏览
+		"packages.catalog.detail",  // P3: 统一应用中心 详情
+		"packages.installed",       // P3: 统一应用中心 已安装列表
 	)
 
 	writeMethods = newStringSet(
@@ -191,6 +196,12 @@ var (
 		"memory.delete", "memory.compress", "memory.commit", "memory.decay.run", "memory.import.skills", // memory.* 直接操作 (写)
 		"media.drafts.delete", // Phase 5: 媒体草稿 (写)
 		"subagent.ctl",        // 子智能体控制
+		"auth.login.start",    // P2: OAuth 登录启动
+		"auth.login.exchange", // P2: OAuth 手动 code 交换
+		"auth.logout",         // P2: OAuth 登出
+		"packages.install",    // P3: 统一应用中心 安装
+		"packages.update",     // P3: 统一应用中心 更新
+		"packages.remove",     // P3: 统一应用中心 移除
 	)
 
 	approvalMethods = newStringSet(
@@ -222,7 +233,11 @@ var (
 		"security.remoteApproval.config.set", "security.remoteApproval.test", // P4: 远程审批管理
 		"security.remoteApproval.callback",                                                       // P4: 远程审批回调
 		"security.taskPresets.add", "security.taskPresets.update", "security.taskPresets.remove", // P5: 任务预设管理
-		"mcp.remote.connect", // P2: MCP 远程工具连接/重连
+		"mcp.remote.connect",     // P2: MCP 远程工具连接/重连
+		"models.default.set",     // P4: 设置默认模型
+		"models.managed.refresh", // P4: 托管模型缓存刷新
+		"models.source.set",      // P4: 设置模型来源偏好
+		"email.test",             // P10: 邮箱连接验证
 	)
 )
 

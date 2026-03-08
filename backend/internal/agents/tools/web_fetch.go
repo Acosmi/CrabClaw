@@ -177,7 +177,7 @@ func DefaultWebFetchOptions() WebFetchOptions {
 	return WebFetchOptions{
 		MaxResponseBytes: 5 * 1024 * 1024, // 5MB
 		Timeout:          30 * time.Second,
-		UserAgent:        "OpenAcosmi/1.0 (Web Fetch Tool)",
+		UserAgent:        "CrabClaw/1.0 (Web Fetch Tool)",
 		CacheTTL:         15 * time.Minute,
 	}
 }

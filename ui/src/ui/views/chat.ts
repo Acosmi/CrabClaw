@@ -5,12 +5,15 @@ import { repeat } from "lit/directives/repeat.js";
 import type { SessionsListResult } from "../types.ts";
 import type { ChatItem, MessageGroup } from "../types/chat-types.ts";
 import type { AttachmentCategory, ChatAttachment, ChatQueueItem } from "../ui-types.ts";
+import type { ChatReadonlyRunState, ChatUxMode } from "../chat/readonly-run-state.ts";
 import {
   renderMessageGroup,
   renderReadingIndicatorGroup,
   renderStreamingGroup,
   renderProcessingCard,
 } from "../chat/grouped-render.ts";
+import { renderCodexReadonlySurface } from "../chat/codex-readonly-surface.ts";
+import { isReadonlyRunVisible } from "../chat/readonly-run-state.ts";
 import { normalizeMessage, normalizeRoleForGrouping } from "../chat/message-normalizer.ts";
 import { initCodeBlockCopyListeners } from "../chat/code-block-actions.ts";
 import { icons } from "../icons.ts";
@@ -35,6 +38,8 @@ export type ChatProps = {
   compactionStatus?: CompactionIndicatorStatus | null;
   messages: unknown[];
   toolMessages: unknown[];
+  uxMode?: ChatUxMode;
+  readonlyRun?: ChatReadonlyRunState | null;
   stream: string | null;
   streamStartedAt: number | null;
   assistantAvatarUrl?: string | null;
@@ -83,10 +88,36 @@ export type ChatProps = {
   permissionPopupCallbacks?: PermissionPopupCallbacks;
   requestUpdate?: () => void;
   onDismissError?: () => void;
+  // Browser extension banner
+  browserExtBannerDismissed?: boolean;
+  onDismissBrowserExtBanner?: () => void;
+  // Model selector in composer
+  models?: Array<{ id: string; name: string; provider: string; source: string }>;
+  currentModel?: string | null;
+  onModelChange?: (model: string) => void;
 };
 
 const _codeBlockInitialized = new WeakSet<HTMLElement>();
 const COMPACTION_TOAST_DURATION_MS = 5000;
+
+// Browser extension error detection pattern (matches P1-T1 improved error message)
+const _BROWSER_EXT_ERROR_RE = /Browser tool is not (available|configured)/i;
+
+/** Scan chat messages for browser tool "not available" errors. */
+function hasBrowserExtError(messages: unknown[]): boolean {
+  for (const msg of messages) {
+    const m = msg as Record<string, unknown>;
+    const content = m?.content;
+    if (!Array.isArray(content)) continue;
+    for (const block of content) {
+      const b = block as Record<string, unknown>;
+      if (typeof b?.text === "string" && _BROWSER_EXT_ERROR_RE.test(b.text)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 // Close "+" menu on click outside
 let _menuCloseInstalled = false;
@@ -405,12 +436,33 @@ export function renderChat(props: ChatProps) {
         return nothing;
       },
     )}
+      ${shouldRenderReadonlyRunSurface(props)
+      ? renderCodexReadonlySurface(props.readonlyRun!)
+      : nothing}
     </div>
   `;
 
   return html`
     <section class="card chat">
       ${props.disabledReason ? html`<div class="callout">${props.disabledReason}</div>` : nothing}
+
+      ${!props.browserExtBannerDismissed && hasBrowserExtError(props.messages)
+      ? html`
+            <div class="browser-ext-banner">
+              <span>
+                ${t("chat.browserExtBanner")}
+                <a href="http://127.0.0.1:26222/browser-extension/" target="_blank">${t("chat.browserExtGuideLink")}</a>
+              </span>
+              <button
+                class="browser-ext-banner__close"
+                type="button"
+                @click=${() => props.onDismissBrowserExtBanner?.()}
+                aria-label="Dismiss"
+              >&times;</button>
+            </div>
+          `
+      : nothing
+    }
 
       ${props.focusMode
       ? html`
@@ -585,6 +637,26 @@ export function renderChat(props: ChatProps) {
               >
                 ${icons.image}
               </button>
+              ${(props.models?.length ?? 0) > 0
+      ? html`<select
+                    class="chat-compose__model-select"
+                    title="${t("chat.selectModel")}"
+                    aria-label="${t("chat.selectModel")}"
+                    ?disabled=${!props.connected}
+                    @change=${(e: Event) => {
+        const val = (e.target as HTMLSelectElement).value;
+        if (val && props.onModelChange) props.onModelChange(val);
+      }}
+                  >
+                    ${props.models!.map((m) => {
+        const value = m.provider ? `${m.provider}/${m.id}` : m.id;
+        const selected = props.currentModel === value || props.currentModel === m.id;
+        const label = m.name || m.id;
+        const badge = m.source === "managed" ? " ★" : "";
+        return html`<option value=${value} ?selected=${selected}>${label}${badge}</option>`;
+      })}
+                  </select>`
+      : nothing}
             </div>
 
             <div class="chat-compose__right">
@@ -727,7 +799,16 @@ function groupMessages(items: ChatItem[]): Array<ChatItem | MessageGroup> {
   return result;
 }
 
-function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
+export function shouldRenderReadonlyRunSurface(
+  props: Pick<ChatProps, "uxMode" | "readonlyRun" | "sessionKey">,
+): boolean {
+  return (
+    (props.uxMode ?? "classic") === "codex-readonly" &&
+    isReadonlyRunVisible(props.readonlyRun ?? null, props.sessionKey)
+  );
+}
+
+export function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
   const items: ChatItem[] = [];
   const history = Array.isArray(props.messages) ? props.messages : [];
   const tools = Array.isArray(props.toolMessages) ? props.toolMessages : [];
@@ -771,7 +852,7 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
       message: msg,
     });
   }
-  if (props.showThinking) {
+  if (props.showThinking && (props.uxMode ?? "classic") !== "codex-readonly") {
     for (let i = 0; i < tools.length; i++) {
       items.push({
         kind: "message",
@@ -781,7 +862,7 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
     }
   }
 
-  if (props.stream !== null) {
+  if (props.stream !== null && (props.uxMode ?? "classic") !== "codex-readonly") {
     const key = `stream:${props.sessionKey}:${props.streamStartedAt ?? "live"}`;
     if (props.stream.trim().length > 0) {
       items.push({

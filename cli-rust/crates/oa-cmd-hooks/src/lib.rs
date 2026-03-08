@@ -1,8 +1,7 @@
-/// Hook management commands for Claw Acosmi CLI.
+/// Hook management commands for Crab Claw CLI.
 ///
 /// Provides `hooks` subcommands: list, info, check, enable, disable, install, update.
 /// Hooks are managed via config — no dedicated Gateway RPC.
-
 use anyhow::Result;
 use clap::Parser;
 
@@ -213,8 +212,7 @@ pub async fn hooks_enable_command(args: &HooksEnableArgs) -> Result<()> {
         ..Default::default()
     };
 
-    let _: serde_json::Value =
-        with_progress("Enabling hook\u{2026}", call_gateway(opts)).await?;
+    let _: serde_json::Value = with_progress("Enabling hook\u{2026}", call_gateway(opts)).await?;
 
     println!("Hook '{}' enabled.", args.name);
     Ok(())
@@ -232,8 +230,7 @@ pub async fn hooks_disable_command(args: &HooksDisableArgs) -> Result<()> {
         ..Default::default()
     };
 
-    let _: serde_json::Value =
-        with_progress("Disabling hook\u{2026}", call_gateway(opts)).await?;
+    let _: serde_json::Value = with_progress("Disabling hook\u{2026}", call_gateway(opts)).await?;
 
     println!("Hook '{}' disabled.", args.name);
     Ok(())

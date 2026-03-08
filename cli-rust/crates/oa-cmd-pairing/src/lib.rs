@@ -1,4 +1,4 @@
-/// DM pairing approval commands for Claw Acosmi CLI.
+/// DM pairing approval commands for Crab Claw CLI.
 ///
 /// Provides subcommands: list, approve.
 ///

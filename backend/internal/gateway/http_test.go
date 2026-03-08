@@ -3,6 +3,7 @@ package gateway
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -48,6 +49,12 @@ func TestCORSMiddleware(t *testing.T) {
 	if w.Header().Get("Access-Control-Allow-Origin") != "*" {
 		t.Error("missing CORS header")
 	}
+	allowHeaders := w.Header().Get("Access-Control-Allow-Headers")
+	for _, header := range []string{HeaderToken, HeaderLegacyToken, HeaderAgentID, HeaderLegacyAgentID, HeaderAgent, HeaderLegacyAgent} {
+		if !strings.Contains(allowHeaders, header) {
+			t.Fatalf("CORS allow headers missing %q in %q", header, allowHeaders)
+		}
+	}
 
 	// 正常请求
 	w = httptest.NewRecorder()
@@ -84,10 +91,19 @@ func TestAuthMiddleware(t *testing.T) {
 	// X-OpenAcosmi-Token
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest("GET", "/", nil)
-	req.Header.Set("X-OpenAcosmi-Token", "secret123")
+	req.Header.Set(HeaderLegacyToken, "secret123")
 	handler.ServeHTTP(w, req)
 	if w.Code != 200 {
 		t.Errorf("valid header token: got %d", w.Code)
+	}
+
+	// X-CrabClaw-Token
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest("GET", "/", nil)
+	req.Header.Set(HeaderToken, "secret123")
+	handler.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Errorf("valid new header token: got %d", w.Code)
 	}
 }
 

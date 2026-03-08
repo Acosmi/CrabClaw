@@ -93,6 +93,13 @@ import {
 } from "./app-tool-stream.ts";
 import { resolveInjectedAssistantIdentity } from "./assistant-identity.ts";
 import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./controllers/assistant-identity.ts";
+import {
+  createChatReadonlyRunState,
+  isReadonlyRunActive,
+  syncChatReadonlyRunSession,
+  type ChatReadonlyRunState,
+  type ChatUxMode,
+} from "./chat/readonly-run-state.ts";
 import { loadSettings, type UiSettings } from "./storage.ts";
 import { initLocale, onLocaleChange } from "./i18n.ts";
 import { type ChatAttachment, type ChatQueueItem, type CronFormState } from "./ui-types.ts";
@@ -150,6 +157,8 @@ export class OpenAcosmiApp extends LitElement {
   @state() chatMessage = "";
   @state() chatMessages: unknown[] = [];
   @state() chatToolMessages: unknown[] = [];
+  @state() chatUxMode: ChatUxMode = this.settings.chatUxMode;
+  @state() chatReadonlyRun: ChatReadonlyRunState = createChatReadonlyRunState(this.settings.sessionKey);
   @state() chatStream: string | null = null;
   @state() chatStreamStartedAt: number | null = null;
   @state() chatRunId: string | null = null;
@@ -407,6 +416,10 @@ export class OpenAcosmiApp extends LitElement {
   @state() distributeLoading = false;
   @state() distributeResult: string | null = null;
 
+  // Chat model selector — loaded on connect for composer dropdown
+  @state() chatModels: Array<{ id: string; name: string; provider: string; source: string }> = [];
+  @state() chatCurrentModel: string | null = null;
+
   @state() debugLoading = false;
   @state() debugStatus: StatusSummary | null = null;
   @state() debugHealth: HealthSnapshot | null = null;
@@ -456,7 +469,7 @@ export class OpenAcosmiApp extends LitElement {
   @state() memorySearching = false;
 
   // Plugins & Tools
-  @state() pluginsPanel: "plugins" | "tools" | "skills" = "plugins";
+  @state() pluginsPanel: "plugins" | "tools" | "skills" | "packages" = "plugins";
   @state() pluginsLoading = false;
   @state() pluginsList: import("./types.js").PluginInfo[] = [];
   @state() pluginsError: string | null = null;
@@ -470,6 +483,15 @@ export class OpenAcosmiApp extends LitElement {
   @state() browserToolSaving = false;
   @state() browserToolError: string | null = null;
   @state() browserToolEdits: Record<string, string | boolean> = {};
+
+  // App Center (packages)
+  @state() packagesLoading = false;
+  @state() packagesItems: import("./types.js").PackageCatalogItem[] = [];
+  @state() packagesTotal = 0;
+  @state() packagesError: string | null = null;
+  @state() packagesKindFilter: import("./types.js").PackageKind | "all" = "all";
+  @state() packagesKeyword = "";
+  @state() packagesBusyId: string | null = null;
 
   // Media Dashboard
   @state() mediaTrendingTopics: import("./controllers/media-dashboard.js").TrendingTopic[] = [];
@@ -520,6 +542,7 @@ export class OpenAcosmiApp extends LitElement {
   private chatHasAutoScrolled = false;
   private chatUserNearBottom = true;
   @state() chatNewMessagesBelow = false;
+  @state() browserExtBannerDismissed = false;
   private nodesPollInterval: number | null = null;
   private logsPollInterval: number | null = null;
   private debugPollInterval: number | null = null;
@@ -535,7 +558,12 @@ export class OpenAcosmiApp extends LitElement {
   private topbarObserver: ResizeObserver | null = null;
 
   private isProcessingCardActive(): boolean {
-    return this.tab === "chat" && this.chatStream !== null && this.chatStreamStartedAt !== null;
+    const classicProcessingActive = this.chatStream !== null && this.chatStreamStartedAt !== null;
+    const readonlyProcessingActive =
+      this.chatUxMode === "codex-readonly" &&
+      isReadonlyRunActive(this.chatReadonlyRun) &&
+      this.chatReadonlyRun.startedAt !== null;
+    return this.tab === "chat" && (classicProcessingActive || readonlyProcessingActive);
   }
 
   private startProcessingCardTicker() {
@@ -604,6 +632,9 @@ export class OpenAcosmiApp extends LitElement {
 
   protected updated(changed: Map<PropertyKey, unknown>) {
     handleUpdated(this as unknown as Parameters<typeof handleUpdated>[0], changed);
+    if (changed.has("sessionKey")) {
+      syncChatReadonlyRunSession(this);
+    }
     if (changed.has("chatStreamStartedAt")) {
       this.stopProcessingCardTicker();
     }

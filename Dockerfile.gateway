@@ -1,8 +1,8 @@
 # Go Gateway (acosmi) — multi-stage build
 #
 # Usage:
-#   docker build -f Dockerfile.gateway -t openacosmi-gateway .
-#   docker run -p 19001:19001 openacosmi-gateway
+#   docker build -f Dockerfile.gateway -t crabclaw-gateway .
+#   docker run -p 19001:19001 crabclaw-gateway
 #
 # Architecture: This image contains ONLY the Go Gateway binary.
 # The CLI is distributed separately as a Rust binary.

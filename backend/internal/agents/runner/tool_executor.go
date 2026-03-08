@@ -127,6 +127,8 @@ type ToolExecParams struct {
 	MediaSender interface {
 		SendMedia(ctx context.Context, channelID, to string, data []byte, fileName, mimeType, message string) error
 	}
+	// EmailSender 邮件发送器（可选，nil = send_email 工具不可用）
+	EmailSender EmailSender
 	// QualityReviewFn 质量审核回调（可选，nil = 跳过 LLM 语义审核，只做规则预检）
 	// Phase 2: 三级指挥体系 — 子智能体结果质量审核
 	QualityReviewFn QualityReviewFunc
@@ -292,6 +294,8 @@ func ExecuteToolCall(ctx context.Context, name string, inputJSON json.RawMessage
 		return executeBrowserTool(ctx, inputJSON, params)
 	case "send_media":
 		return executeSendMedia(ctx, inputJSON, params)
+	case "send_email":
+		return executeSendEmail(ctx, inputJSON, params)
 	case "memory_search":
 		return executeMemorySearch(ctx, inputJSON, params)
 	case "memory_get":
@@ -1208,7 +1212,18 @@ func classifyBrowserError(err error) string {
 // 通过 CDP 直连浏览器，比 Argus 屏幕坐标操控更高效精准。
 func executeBrowserTool(ctx context.Context, inputJSON json.RawMessage, params ToolExecParams) (string, error) {
 	if params.BrowserController == nil {
-		return "[Browser tool is not configured. Enable browser in config and ensure CDP is running.]", nil
+		guideURL := "http://127.0.0.1:26222/browser-extension/"
+		return fmt.Sprintf(
+			"[Browser tool is not available — extension not installed or not connected.\n"+
+				"浏览器工具不可用 — 扩展未安装或未连接。\n\n"+
+				"Setup guide / 安装引导: %s\n\n"+
+				"Steps / 步骤:\n"+
+				"1. Download extension zip from the guide page / 从引导页下载扩展 zip\n"+
+				"2. Open chrome://extensions → Enable Developer Mode → Load Unpacked\n"+
+				"   打开 chrome://extensions → 启用开发者模式 → 加载已解压的扩展\n"+
+				"3. Extension auto-connects to Gateway / 扩展自动连接 Gateway]",
+			guideURL,
+		), nil
 	}
 
 	var input struct {

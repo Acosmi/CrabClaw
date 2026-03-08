@@ -69,10 +69,7 @@ func HandleOpenAIChatCompletions(w http.ResponseWriter, r *http.Request, cfg Ope
 
 	// 认证
 	auth := cfg.GetAuth()
-	token := GetBearerToken(r)
-	if token == "" {
-		token = GetHeader(r, "X-OpenAcosmi-Token")
-	}
+	token := GetGatewayToken(r)
 	if !authorizeOpenAI(auth, token) {
 		SendUnauthorized(w)
 		return
@@ -183,7 +180,7 @@ func handleNonStreaming(
 
 	content := CombineReplyPayloads(result.Replies)
 	if content == "" {
-		content = "No response from Claw Acosmi."
+		content = "No response from Crab Claw（蟹爪）."
 	}
 
 	SendJSON(w, http.StatusOK, map[string]interface{}{
@@ -338,7 +335,7 @@ func handleStreaming(
 			} else {
 				content = CombineReplyPayloads(result.Replies)
 				if content == "" {
-					content = "No response from Claw Acosmi."
+					content = "No response from Crab Claw（蟹爪）."
 				}
 			}
 			writeSSEChunk(w, runID, model, nil, content)

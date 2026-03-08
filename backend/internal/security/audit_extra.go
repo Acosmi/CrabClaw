@@ -695,7 +695,7 @@ func CollectPluginsCodeSafetyFindings(stateDir string) []SecurityAuditFinding {
 			Severity:    SeverityWarn,
 			Title:       "Plugin extensions directory scan failed",
 			Detail:      fmt.Sprintf("Static code scan could not list extensions directory: %s", err),
-			Remediation: "Check file permissions and plugin layout, then rerun `openacosmi security audit --deep`.",
+			Remediation: "Check file permissions and plugin layout, then rerun `crabclaw security audit --deep`.",
 		})
 		return findings
 	}
@@ -714,7 +714,7 @@ func CollectPluginsCodeSafetyFindings(stateDir string) []SecurityAuditFinding {
 				Severity:    SeverityWarn,
 				Title:       fmt.Sprintf("Plugin %q code scan failed", pluginName),
 				Detail:      fmt.Sprintf("Static code scan could not complete: %s", err),
-				Remediation: "Check file permissions and plugin layout, then rerun `openacosmi security audit --deep`.",
+				Remediation: "Check file permissions and plugin layout, then rerun `crabclaw security audit --deep`.",
 			})
 			continue
 		}
@@ -726,7 +726,7 @@ func CollectPluginsCodeSafetyFindings(stateDir string) []SecurityAuditFinding {
 				Severity:    SeverityCritical,
 				Title:       fmt.Sprintf("Plugin %q contains dangerous code patterns", pluginName),
 				Detail:      fmt.Sprintf("Found %d critical issue(s) in %d scanned file(s):\n%s", summary.Critical, summary.ScannedFiles, details),
-				Remediation: "Review the plugin source code carefully before use. If untrusted, remove the plugin from your OpenAcosmi extensions state directory.",
+				Remediation: "Review the plugin source code carefully before use. If untrusted, remove the plugin from your Crab Claw（蟹爪） extensions state directory.",
 			})
 		} else if summary.Warn > 0 {
 			details := formatCodeSafetyDetails(summary.Findings, pluginPath, "warn")
@@ -786,7 +786,7 @@ func CollectInstalledSkillsCodeSafetyFindings(skills []InstalledSkillEntry, stat
 				Severity:    SeverityWarn,
 				Title:       fmt.Sprintf("Skill %q code scan failed", skillName),
 				Detail:      fmt.Sprintf("Static code scan could not complete for %s: %s", skillDir, err),
-				Remediation: "Check file permissions and skill layout, then rerun `openacosmi security audit --deep`.",
+				Remediation: "Check file permissions and skill layout, then rerun `crabclaw security audit --deep`.",
 			})
 			continue
 		}

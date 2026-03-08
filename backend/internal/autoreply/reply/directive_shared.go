@@ -82,7 +82,7 @@ func FormatElevatedUnavailableText(runtimeSandboxed bool, failures []ElevatedGat
 		lines = append(lines, "Fix-it keys: tools.elevated.enabled, tools.elevated.allowFrom.<provider>, agents.list[].tools.elevated.*")
 	}
 	if sessionKey != "" {
-		lines = append(lines, fmt.Sprintf("See: `openacosmi sandbox explain --session %s`", sessionKey))
+		lines = append(lines, fmt.Sprintf("See: `crabclaw sandbox explain --session %s`", sessionKey))
 	}
 	return strings.Join(lines, "\n")
 }

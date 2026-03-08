@@ -197,7 +197,7 @@ func ConfigureIMessage(params ConfigureIMessageParams) (*ConfigureIMessageResult
 	// 展示 next steps
 	prompter.Note(strings.Join([]string{
 		"This is still a work in progress.",
-		"Ensure OpenAcosmi has Full Disk Access to Messages DB.",
+		"Ensure Crab Claw（蟹爪） has Full Disk Access to Messages DB.",
 		"Grant Automation permission for Messages when prompted.",
 		"List chats with: imsg chats --limit 20",
 		"Docs: https://docs.openacosmi.dev/imessage",

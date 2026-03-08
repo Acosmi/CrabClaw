@@ -5,9 +5,7 @@
 /// legacy environment variable prefixes (MOLTBOT_*, CLAWDBOT_*).
 ///
 /// Source: `src/commands/doctor-platform-notes.ts`
-
-use std::path::Path;
-
+use oa_config::paths::resolve_state_dir;
 use oa_terminal::note::note;
 use oa_types::config::OpenAcosmiConfig;
 
@@ -34,7 +32,8 @@ fn shorten_home_path(path: &str) -> String {
 
 /// Check for macOS LaunchAgent disable marker.
 ///
-/// If `~/.openacosmi/disable-launchagent` exists, the doctor notes that
+/// If the active compatibility state dir contains `disable-launchagent`, the doctor
+/// notes that LaunchAgent writes are disabled and how to re-enable them.
 /// LaunchAgent writes are disabled and how to re-enable them.
 ///
 /// Source: `src/commands/doctor-platform-notes.ts` — `noteMacLaunchAgentOverrides`
@@ -43,10 +42,7 @@ pub async fn note_mac_launch_agent_overrides() {
         return;
     }
 
-    let home = resolve_home_dir();
-    let marker_path = Path::new(&home)
-        .join(".openacosmi")
-        .join("disable-launchagent");
+    let marker_path = resolve_state_dir().join("disable-launchagent");
 
     if !marker_path.exists() {
         return;
@@ -123,7 +119,9 @@ pub async fn note_mac_launchctl_gateway_env_overrides(cfg: &OpenAcosmiConfig) {
 /// Report deprecated legacy environment variables (MOLTBOT_*, CLAWDBOT_*).
 ///
 /// Source: `src/commands/doctor-platform-notes.ts` — `noteDeprecatedLegacyEnvVars`
-pub fn note_deprecated_legacy_env_vars(env_override: Option<&std::collections::HashMap<String, String>>) {
+pub fn note_deprecated_legacy_env_vars(
+    env_override: Option<&std::collections::HashMap<String, String>>,
+) {
     let entries: Vec<String> = if let Some(env_map) = env_override {
         env_map
             .keys()
@@ -151,13 +149,11 @@ pub fn note_deprecated_legacy_env_vars(env_override: Option<&std::collections::H
 
     let mut lines = vec![
         "- Deprecated legacy environment variables detected (ignored).".to_string(),
-        "- Use OPENACOSMI_* equivalents instead:".to_string(),
+        "- Use CRABCLAW_* equivalents instead (OPENACOSMI_* remains supported during migration):"
+            .to_string(),
     ];
     for key in &entries {
-        let suffix = key
-            .find('_')
-            .map(|i| &key[i + 1..])
-            .unwrap_or(key);
+        let suffix = key.find('_').map(|i| &key[i + 1..]).unwrap_or(key);
         lines.push(format!("  {key} -> OPENACOSMI_{suffix}"));
     }
     note(&lines.join("\n"), Some("Environment"));
@@ -170,9 +166,9 @@ mod tests {
     #[test]
     fn shorten_home_path_replaces_prefix() {
         let home = resolve_home_dir();
-        let path = format!("{home}/.openacosmi/config.json");
+        let path = format!("{home}/.crabclaw/config.json");
         let shortened = shorten_home_path(&path);
-        assert!(shortened.starts_with("~/.openacosmi"));
+        assert!(shortened.starts_with("~/.crabclaw"));
     }
 
     #[test]

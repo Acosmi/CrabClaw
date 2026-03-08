@@ -4,7 +4,7 @@
  * 设计：
  * - 支持 'zh' | 'en' 两种语言
  * - 默认语言为中文 ('zh')
- * - 支持 {{var}} 插值
+ * - 支持 {{var}} / {var} 插值
  * - 语言选择持久化到 UiSettings (localStorage)
  * - 自动检测 navigator.language 初始化
  */
@@ -86,7 +86,7 @@ export function onLocaleChange(callback: (locale: Locale) => void): () => void {
  * 翻译函数
  *
  * @param key - 翻译键，如 'nav.tab.chat'
- * @param params - 可选插值参数，替换 {{key}} 占位符
+ * @param params - 可选插值参数，替换 {{key}} / {key} 占位符
  * @returns 翻译后的字符串，找不到时返回 key 本身
  */
 export function t(key: string, params?: Record<string, string | number>): string {
@@ -102,7 +102,9 @@ export function t(key: string, params?: Record<string, string | number>): string
   }
   if (params) {
     for (const [k, v] of Object.entries(params)) {
-      text = text.replaceAll(`{{${k}}}`, String(v));
+      const value = String(v);
+      text = text.replaceAll(`{{${k}}}`, value);
+      text = text.replaceAll(`{${k}}`, value);
     }
   }
   return text;

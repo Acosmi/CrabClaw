@@ -36,12 +36,16 @@ tmp/
 temp/
 
 # Sub-agent projects (仅排除非Go源码的外部项目)
-Acosmo-Code/
+coder/
 Swabble/
+
+# Apps: 桌面/移动端（源码 + 构建产物全部屏蔽）
+apps/
 
 # Argus: 排除编译产物，保留 Go 源码和脚本
 Argus/go-sensory/server
 Argus/build/
+Argus/rust-core/target/
 
 # Docs: 屏蔽 docs 目录，但开放 docs/skills
 docs/*

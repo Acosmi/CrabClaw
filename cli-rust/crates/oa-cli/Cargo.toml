@@ -1,6 +1,6 @@
 [package]
 name = "oa-cli"
-description = "OpenAcosmi CLI binary entry point"
+description = "Crab Claw CLI binary entry point"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,6 +9,10 @@ license.workspace = true
 [[bin]]
 name = "openacosmi"
 path = "src/main.rs"
+
+[[bin]]
+name = "crabclaw"
+path = "src/bin/crabclaw.rs"
 
 [dependencies]
 # All command crates
@@ -47,6 +51,7 @@ oa-cmd-update.workspace = true
 oa-cmd-voicecall.workspace = true
 oa-cmd-webhooks.workspace = true
 oa-cmd-skills.workspace = true
+oa-cmd-packages.workspace = true
 oa-cmd-plugins.workspace = true
 oa-cmd-security.workspace = true
 oa-cmd-hooks.workspace = true
@@ -54,6 +59,7 @@ oa-cmd-browser.workspace = true
 oa-cmd-mcp.workspace = true
 oa-mcp-install.workspace = true
 # Infrastructure
+oa-gateway-rpc.workspace = true
 oa-types.workspace = true
 oa-config.workspace = true
 oa-infra.workspace = true

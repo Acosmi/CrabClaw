@@ -1,4 +1,4 @@
-/// Voice call plugin commands for Claw Acosmi CLI.
+/// Voice call plugin commands for Crab Claw CLI.
 ///
 /// Provides subcommands: call, status, continue, end, expose, unexpose.
 ///

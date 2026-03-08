@@ -1,25 +1,25 @@
 ---
 name: vercel-ai-gateway
-description: "Vercel AI Gateway 设置（认证 + 模型选择）"
+description: "Vercel AI Gateway setup (auth + model selection)"
 ---
 
 # Vercel AI Gateway
 
-[Vercel AI Gateway](https://vercel.com/ai-gateway) 提供统一 API，通过单一端点访问数百种模型。
+The [Vercel AI Gateway](https://vercel.com/ai-gateway) provides a unified API to access hundreds of models through a single endpoint.
 
-- 供应商：`vercel-ai-gateway`
-- 认证：`AI_GATEWAY_API_KEY`
-- API：兼容 Anthropic Messages
+- Provider: `vercel-ai-gateway`
+- Auth: `AI_GATEWAY_API_KEY`
+- API: Anthropic Messages compatible
 
-## 快速开始
+## Quick start
 
-1. 设置 API 密钥（推荐：为网关存储）：
+1. Set the API key (recommended: store it for the Gateway):
 
 ```bash
-openacosmi onboard --auth-choice ai-gateway-api-key
+crabclaw onboard --auth-choice ai-gateway-api-key
 ```
 
-1. 设置默认模型：
+2. Set a default model:
 
 ```json5
 {
@@ -31,15 +31,17 @@ openacosmi onboard --auth-choice ai-gateway-api-key
 }
 ```
 
-## 非交互式示例
+## Non-interactive example
 
 ```bash
-openacosmi onboard --non-interactive \
+crabclaw onboard --non-interactive \
   --mode local \
   --auth-choice ai-gateway-api-key \
   --ai-gateway-api-key "$AI_GATEWAY_API_KEY"
 ```
 
-## 环境说明
+## Environment note
 
-若网关作为守护进程（launchd/systemd）运行，确保 `AI_GATEWAY_API_KEY` 对该进程可用（例如在 `~/.openacosmi/.env` 中或通过 `env.shellEnv`）。
+If the Gateway runs as a daemon (launchd/systemd), make sure `AI_GATEWAY_API_KEY`
+is available to that process (for example, in `~/.openacosmi/.env` or via
+`env.shellEnv`).

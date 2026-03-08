@@ -1,28 +1,28 @@
-/// Onboarding wizard commands for Claw Acosmi CLI.
+pub mod auth;
+pub mod channels;
+pub mod helpers;
+pub mod hooks;
+pub mod interactive;
+pub mod non_interactive;
+pub mod remote;
+pub mod skills;
+/// Onboarding wizard commands for Crab Claw CLI.
 ///
 /// Provides the `onboard` command with both interactive and non-interactive
 /// flows for initial setup of the gateway, auth providers, channels, skills,
 /// and workspace configuration.
 ///
 /// Source: `src/commands/onboard*.ts`
-
 pub mod types;
-pub mod helpers;
-pub mod auth;
-pub mod channels;
-pub mod hooks;
-pub mod interactive;
-pub mod non_interactive;
-pub mod remote;
-pub mod skills;
 
 use anyhow::Result;
 use tracing::warn;
 
+use oa_cli_shared::command_format::format_cli_command;
 use oa_config::io::read_config_file_snapshot;
 use oa_types::config::OpenAcosmiConfig;
 
-use crate::helpers::{handle_reset, resolve_user_path, DEFAULT_WORKSPACE};
+use crate::helpers::{DEFAULT_WORKSPACE, handle_reset, resolve_user_path};
 use crate::types::OnboardOptions;
 
 /// Execute the onboard command.
@@ -45,10 +45,11 @@ pub async fn execute(opts: OnboardOptions) -> Result<()> {
     if normalized_opts.non_interactive.unwrap_or(false)
         && !normalized_opts.accept_risk.unwrap_or(false)
     {
+        let rerun_cmd = format_cli_command("crabclaw onboard --non-interactive --accept-risk ...");
         anyhow::bail!(
             "Non-interactive onboarding requires explicit risk acknowledgement.\n\
-             Read: https://github.com/Acosmi/Claw-Acosmi/tree/main/docs/skills/general/security\n\
-             Re-run with: openacosmi onboard --non-interactive --accept-risk ..."
+             Read: https://github.com/Acosmi/CrabClaw/tree/main/docs/cli/security.md\n\
+             Re-run with: {rerun_cmd}"
         );
     }
 
@@ -79,10 +80,10 @@ pub async fn execute(opts: OnboardOptions) -> Result<()> {
     // Platform warning for Windows
     if cfg!(target_os = "windows") {
         warn!(
-            "Windows detected -- OpenAcosmi runs great on WSL2!\n\
+            "Windows detected -- Crab Claw（蟹爪） runs great on WSL2!\n\
              Native Windows might be trickier.\n\
              Quick setup: wsl --install (one command, one reboot)\n\
-             Guide: https://github.com/Acosmi/Claw-Acosmi/tree/main/docs/skills/platforms/windows"
+             Guide: https://github.com/Acosmi/CrabClaw/tree/main/docs/platforms/windows.md"
         );
     }
 

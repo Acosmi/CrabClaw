@@ -9,7 +9,7 @@ func init() {
 		"onboard.title":                    "Setup Wizard",
 		"onboard.daemon.title":             "Gateway Service",
 		"onboard.daemon.confirm":           "Install Gateway service (recommended)",
-		"onboard.daemon.quickstart":        "Gateway service: QuickStart skips daemon install.\nStart manually: openacosmi gateway serve",
+		"onboard.daemon.quickstart":        "Gateway service: QuickStart skips daemon install.\nStart manually: crabclaw gateway serve",
 		"onboard.daemon.systemd_unavail":   "Systemd user services are unavailable; skipping service install.\nUse your container supervisor or `docker compose up -d`.",
 		"onboard.daemon.already_installed": "Gateway service already installed",
 		"onboard.daemon.opt_restart":       "Restart",
@@ -18,12 +18,12 @@ func init() {
 		"onboard.daemon.restarted":         "Gateway service restarted.",
 		"onboard.daemon.installed":         "Gateway service installed.",
 		"onboard.daemon.install_failed":    "Gateway service install failed: %s",
-		"onboard.daemon.hint_unix":         "Tip: rerun `openacosmi gateway install` after fixing the error.",
+		"onboard.daemon.hint_unix":         "Tip: rerun `crabclaw gateway install` after fixing the error.",
 		"onboard.daemon.hint_windows":      "Tip: rerun from an elevated PowerShell or skip service install.",
 
 		"onboard.completion.title":  "Shell completion",
-		"onboard.completion.prompt": "Enable %s shell completion for openacosmi?",
-		"onboard.completion.hint":   "Shell completion: run `openacosmi completion %s >> %s`\nThen restart your shell or run: source %s",
+		"onboard.completion.prompt": "Enable %s shell completion for crabclaw? (`openacosmi` remains available as a compatibility alias)",
+		"onboard.completion.hint":   "Shell completion for crabclaw: run `crabclaw completion %s >> %s`\nThen restart your shell or run: source %s\nCompatibility alias `openacosmi` also works.",
 
 		"onboard.hatch.title":         "Launch",
 		"onboard.hatch.prompt":        "How do you want to hatch your bot?",
@@ -32,13 +32,13 @@ func init() {
 		"onboard.hatch.opt_later":     "Later (manual start)",
 		"onboard.hatch.web_opened":    "Web UI opened in browser.",
 		"onboard.hatch.web_failed":    "Failed to open browser: %s\nOpen manually: %s",
-		"onboard.hatch.later_hint":    "Start later: openacosmi",
+		"onboard.hatch.later_hint":    "Start later: crabclaw",
 		"onboard.controlui.title":     "Control UI",
-		"onboard.finalize.outro":      "Onboarding complete. Use the dashboard link above to control Claw Acosmi.",
+		"onboard.finalize.outro":      "Onboarding complete. Use the dashboard link above to control Crab Claw（蟹爪）.",
 		"onboard.finalize.probe_ok":   "Gateway reachable: %s",
-		"onboard.finalize.probe_fail": "Gateway not responding: %s\nStart manually: openacosmi gateway serve",
+		"onboard.finalize.probe_fail": "Gateway not responding: %s\nStart manually: crabclaw gateway serve",
 		"onboard.finalize.web_search": "Tip: enable web search to enhance AI answer quality.\nConfigure: config.json → agents.defaults.webSearch",
-		"onboard.finalize.run_manual": "Run: openacosmi",
+		"onboard.finalize.run_manual": "Run: crabclaw",
 
 		// ── gateway/wizard_gateway_config.go ──
 		"onboard.gw.bind_title":          "Gateway bind",
@@ -51,7 +51,7 @@ func init() {
 		"onboard.gw.ts_funnel_auth_note": "Tailscale funnel requires password auth.",
 
 		// ── gateway/wizard_onboarding.go ──
-		"onboard.welcome":               "Welcome to the Claw Acosmi Setup Wizard 🚀",
+		"onboard.welcome":               "Welcome to the Crab Claw（蟹爪） Setup Wizard 🚀",
 		"onboard.provider.title":        "Model Provider",
 		"onboard.provider.select":       "Choose your AI model provider",
 		"onboard.provider.env_detected": "Environment variable %s detected. Use existing credentials?",
@@ -73,7 +73,7 @@ func init() {
 
 		// ── cmd/setup_skills.go ──
 		"onboard.skill.title":         "Skills",
-		"onboard.skill.intro":         "Skills add extended capabilities to your bot.\nClaw Acosmi ships with several built-in skills, and you can install community skills.",
+		"onboard.skill.intro":         "Skills add extended capabilities to your bot.\nCrab Claw（蟹爪） ships with several built-in skills, and you can install community skills.",
 		"onboard.skill.configure":     "Configure skills now? (recommended)",
 		"onboard.skill.node_missing":  "Node.js not detected. Some skills require Node.js.\nRecommended: install Node.js via Homebrew",
 		"onboard.skill.brew_confirm":  "Show Homebrew install command?",
@@ -85,14 +85,14 @@ func init() {
 
 		// ── cmd/setup_hooks.go ──
 		"onboard.hook.title":   "Hooks",
-		"onboard.hook.intro":   "Hooks let you run custom scripts on specific events.\nClaw Acosmi supports pre-reply, post-reply and other lifecycle hooks.",
+		"onboard.hook.intro":   "Hooks let you run custom scripts on specific events.\nCrab Claw（蟹爪） supports pre-reply, post-reply and other lifecycle hooks.",
 		"onboard.hook.summary": "Hooks configuration complete.",
 		"onboard.hook.none":    "No hooks detected in current directory.\nCreate a hooks/ directory and add scripts to enable.",
 
 		// ── cmd/setup_remote.go ──
 		"onboard.remote.title":          "Remote Connection",
 		"onboard.remote.discover":       "Discover gateway on LAN (Bonjour)?",
-		"onboard.remote.discover_hint":  "Scanning for Claw Acosmi Gateways on the local network...\nThis requires a Gateway to be running on another machine.",
+		"onboard.remote.discover_hint":  "Scanning for Crab Claw Gateways on the local network...\nThis requires a Gateway to be running on another machine.",
 		"onboard.remote.discover_error": "Discovery error: %v",
 		"onboard.remote.discover_none":  "No gateways found",
 		"onboard.remote.discover_found": "Found %d gateway(s)",
@@ -140,10 +140,10 @@ func init() {
 
 		// ── channels/onboarding_whatsapp.go ──
 		"onboard.ch.whatsapp.title":      "WhatsApp",
-		"onboard.ch.whatsapp.link_hint":  "WhatsApp requires linking via QR code.\nAfter completing setup, run: openacosmi gateway start\nThen scan the QR code with your phone.\nDocs: https://docs.openacosmi.dev/whatsapp",
-		"onboard.ch.whatsapp.link_fail":  "WhatsApp linking failed: %s\nYou can link later: openacosmi channels login --channel whatsapp",
+		"onboard.ch.whatsapp.link_hint":  "WhatsApp requires linking via QR code.\nAfter completing setup, run: crabclaw gateway start\nThen scan the QR code with your phone.\nDocs: https://docs.openacosmi.dev/whatsapp",
+		"onboard.ch.whatsapp.link_fail":  "WhatsApp linking failed: %s\nYou can link later: crabclaw channels login --channel whatsapp",
 		"onboard.ch.whatsapp.linked":     "WhatsApp linked",
-		"onboard.ch.whatsapp.link_later": "%s\nLink later: openacosmi channels login --channel whatsapp --verbose",
+		"onboard.ch.whatsapp.link_later": "%s\nLink later: crabclaw channels login --channel whatsapp --verbose",
 		"onboard.ch.whatsapp.selfchat":   "Enable self-chat mode? (use your own number)",
 		"onboard.ch.whatsapp.phone":      "Enter WhatsApp phone number",
 		"onboard.ch.whatsapp.phone_hint": "Phone number format guide",

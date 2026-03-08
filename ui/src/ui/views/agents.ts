@@ -96,7 +96,11 @@ export type AgentsProps = {
   onSubagentRefresh: () => void;
   onStartOpenCoderWizard?: () => void;
   onStartMediaWizard?: () => void;
+  onOpenMediaInWindow?: () => void;
   onNavigateToMedia?: () => void;
+  // P4B: 托管模型（来源标记 + 分组显示）
+  managedModels?: Array<{ id: string; name: string; provider: string; modelId: string }>;
+  isAuthenticated?: boolean;
 };
 
 function getToolSections() {
@@ -458,18 +462,50 @@ function resolveConfiguredModels(
   return options;
 }
 
-function buildModelOptions(configForm: Record<string, unknown> | null, current?: string | null) {
-  const options = resolveConfiguredModels(configForm);
-  const hasCurrent = current ? options.some((option) => option.value === current) : false;
+function buildModelOptions(
+  configForm: Record<string, unknown> | null,
+  current?: string | null,
+  managedModels?: Array<{ id: string; name: string; provider: string; modelId: string }>,
+  isAuthenticated?: boolean,
+) {
+  const customOptions = resolveConfiguredModels(configForm);
+  const hasCurrent = current ? customOptions.some((option) => option.value === current) : false;
   if (current && !hasCurrent) {
-    options.unshift({ value: current, label: t("agents.overview.currentModel", { model: current }) });
+    customOptions.unshift({ value: current, label: t("agents.overview.currentModel", { model: current }) });
   }
-  if (options.length === 0) {
+
+  // P4B: 托管模型 optgroup
+  const managedList = (managedModels ?? []).map((m) => ({
+    value: `${m.provider}/${m.modelId}`,
+    label: m.name || `${m.provider}/${m.modelId}`,
+  }));
+
+  // 有托管模型时用 optgroup 分组
+  if (managedList.length > 0 && customOptions.length > 0) {
+    return html`
+      <optgroup label=${t("agents.overview.managedGroup")}>
+        ${managedList.map((o) => html`<option value=${o.value}>${o.label}</option>`)}
+      </optgroup>
+      <optgroup label=${t("agents.overview.customGroup")}>
+        ${customOptions.map((o) => html`<option value=${o.value}>${o.label}</option>`)}
+      </optgroup>
+    `;
+  }
+
+  // 仅有一种来源时不分组
+  const allOptions = [...managedList, ...customOptions];
+  if (allOptions.length === 0) {
+    // 未登录提示
+    if (!isAuthenticated) {
+      return html`
+        <option value="" disabled>${t("agents.overview.loginForManaged")}</option>
+      `;
+    }
     return html`
       <option value="" disabled>${t("agents.overview.noModels")}</option>
     `;
   }
-  return options.map((option) => html`<option value=${option.value}>${option.label}</option>`);
+  return allOptions.map((option) => html`<option value=${option.value}>${option.label}</option>`);
 }
 
 type CompiledPattern =
@@ -672,6 +708,8 @@ export function renderAgents(props: AgentsProps) {
               onConfigSave: props.onConfigSave,
               onModelChange: props.onModelChange,
               onModelFallbacksChange: props.onModelFallbacksChange,
+              managedModels: props.managedModels,
+              isAuthenticated: props.isAuthenticated,
             })
             : nothing
           }
@@ -935,6 +973,9 @@ function renderSubagentDetailPanel(agent: GatewayAgentRow, props: AgentsProps) {
               ${props.onNavigateToMedia
           ? html`<button class="btn" @click=${() => props.onNavigateToMedia!()}>${t("subagents.media.manage")}</button>`
           : nothing}
+              ${props.onOpenMediaInWindow
+          ? html`<button class="btn" @click=${() => props.onOpenMediaInWindow!()}>${t("subagents.media.openWindow")}</button>`
+          : nothing}
               ${props.onStartMediaWizard
           ? html`<button class="btn primary" @click=${() => props.onStartMediaWizard!()}>
                     ${subEntry.configured ? t("subagents.media.reconfigure") : t("subagents.media.setup")}
@@ -1021,6 +1062,8 @@ function renderAgentOverview(params: {
   onConfigSave: () => void;
   onModelChange: (agentId: string, modelId: string | null) => void;
   onModelFallbacksChange: (agentId: string, fallbacks: string[]) => void;
+  managedModels?: Array<{ id: string; name: string; provider: string; modelId: string }>;
+  isAuthenticated?: boolean;
 }) {
   const {
     agent,
@@ -1123,7 +1166,7 @@ function renderAgentOverview(params: {
                       </option>
                     `
     }
-              ${buildModelOptions(configForm, effectivePrimary ?? undefined)}
+              ${buildModelOptions(configForm, effectivePrimary ?? undefined, params.managedModels, params.isAuthenticated)}
             </select>
           </label>
           <label class="field" style="min-width: 260px; flex: 1;">

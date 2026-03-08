@@ -190,6 +190,9 @@ func TestBuildSlackAppManifest(t *testing.T) {
 	if !contains(manifest, "TestBot") {
 		t.Error("manifest should contain bot name")
 	}
+	if !contains(manifest, "Crab Claw（蟹爪）") {
+		t.Error("manifest should contain the new brand description")
+	}
 }
 
 // ---------- Telegram ----------

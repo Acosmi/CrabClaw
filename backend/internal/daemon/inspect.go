@@ -298,14 +298,14 @@ func isOpenAcosmiGatewayLaunchdService(label, contents string) bool {
 	if !strings.Contains(strings.ToLower(contents), "gateway") {
 		return false
 	}
-	return strings.HasPrefix(label, "ai.openacosmi.")
+	return isCompatibleGatewayLaunchAgentLabel(label)
 }
 
 func isOpenAcosmiGatewaySystemdService(name, contents string) bool {
 	if hasGatewayServiceMarker(contents) {
 		return true
 	}
-	if !strings.HasPrefix(name, "openacosmi-gateway") {
+	if !isCompatibleGatewaySystemdServiceName(name) {
 		return false
 	}
 	return strings.Contains(strings.ToLower(contents), "gateway")
@@ -316,8 +316,25 @@ func isOpenAcosmiGatewayTaskName(name string) bool {
 	if normalized == "" {
 		return false
 	}
-	defaultName := strings.ToLower(ResolveGatewayWindowsTaskName(""))
-	return normalized == defaultName || strings.HasPrefix(normalized, "openacosmi gateway")
+	for _, candidate := range ResolveCompatibleGatewayWindowsTaskNames("") {
+		if normalized == strings.ToLower(candidate) {
+			return true
+		}
+	}
+	return strings.HasPrefix(normalized, "openacosmi gateway") ||
+		strings.HasPrefix(normalized, "crab claw gateway")
+}
+
+func isCompatibleGatewayLaunchAgentLabel(label string) bool {
+	normalized := strings.TrimSpace(strings.ToLower(label))
+	return strings.HasPrefix(normalized, "ai.openacosmi.") ||
+		strings.HasPrefix(normalized, "ai.crabclaw.")
+}
+
+func isCompatibleGatewaySystemdServiceName(name string) bool {
+	normalized := strings.TrimSpace(strings.ToLower(name))
+	return strings.HasPrefix(normalized, "openacosmi-gateway") ||
+		strings.HasPrefix(normalized, "crabclaw-gateway")
 }
 
 func tryExtractPlistLabelInline(contents string) string {

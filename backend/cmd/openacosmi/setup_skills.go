@@ -357,7 +357,7 @@ func SetupSkills(
 				} else if result.Stdout != "" {
 					slog.Info(strings.TrimSpace(result.Stdout))
 				}
-				slog.Info("Tip: run `openacosmi doctor` to review skills + requirements.")
+				slog.Info("Tip: run `crabclaw doctor` to review skills + requirements.")
 				slog.Info("Docs: docs/skills/")
 			}
 		}

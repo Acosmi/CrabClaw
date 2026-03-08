@@ -14,5 +14,5 @@ func ResolveChannelDefaultAccountID(accountIDs []string) string {
 
 // FormatPairingApproveHint 格式化配对审批提示
 func FormatPairingApproveHint(channelID string) string {
-	return fmt.Sprintf("Approve via: `openacosmi pairing list %s` / `openacosmi pairing approve %s <code>`", channelID, channelID)
+	return fmt.Sprintf("Approve via: `crabclaw pairing list %s` / `crabclaw pairing approve %s <code>`", channelID, channelID)
 }

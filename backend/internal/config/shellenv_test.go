@@ -74,10 +74,13 @@ func TestResolveShell(t *testing.T) {
 
 func TestResolveShellEnvFallbackTimeoutMs(t *testing.T) {
 	orig := os.Getenv("OPENACOSMI_SHELL_ENV_TIMEOUT_MS")
+	origCrab := os.Getenv("CRABCLAW_SHELL_ENV_TIMEOUT_MS")
 	defer os.Setenv("OPENACOSMI_SHELL_ENV_TIMEOUT_MS", orig)
+	defer os.Setenv("CRABCLAW_SHELL_ENV_TIMEOUT_MS", origCrab)
 
 	t.Run("default", func(t *testing.T) {
 		os.Setenv("OPENACOSMI_SHELL_ENV_TIMEOUT_MS", "")
+		os.Setenv("CRABCLAW_SHELL_ENV_TIMEOUT_MS", "")
 		if got := ResolveShellEnvFallbackTimeoutMs(); got != defaultShellEnvTimeoutMs {
 			t.Fatalf("got %d, want %d", got, defaultShellEnvTimeoutMs)
 		}
@@ -85,13 +88,23 @@ func TestResolveShellEnvFallbackTimeoutMs(t *testing.T) {
 
 	t.Run("custom", func(t *testing.T) {
 		os.Setenv("OPENACOSMI_SHELL_ENV_TIMEOUT_MS", "5000")
+		os.Setenv("CRABCLAW_SHELL_ENV_TIMEOUT_MS", "")
 		if got := ResolveShellEnvFallbackTimeoutMs(); got != 5000 {
 			t.Fatalf("got %d, want 5000", got)
 		}
 	})
 
+	t.Run("crabclaw override wins", func(t *testing.T) {
+		os.Setenv("OPENACOSMI_SHELL_ENV_TIMEOUT_MS", "5000")
+		os.Setenv("CRABCLAW_SHELL_ENV_TIMEOUT_MS", "7000")
+		if got := ResolveShellEnvFallbackTimeoutMs(); got != 7000 {
+			t.Fatalf("got %d, want 7000", got)
+		}
+	})
+
 	t.Run("invalid", func(t *testing.T) {
 		os.Setenv("OPENACOSMI_SHELL_ENV_TIMEOUT_MS", "abc")
+		os.Setenv("CRABCLAW_SHELL_ENV_TIMEOUT_MS", "")
 		if got := ResolveShellEnvFallbackTimeoutMs(); got != defaultShellEnvTimeoutMs {
 			t.Fatalf("got %d, want %d", got, defaultShellEnvTimeoutMs)
 		}
@@ -99,6 +112,7 @@ func TestResolveShellEnvFallbackTimeoutMs(t *testing.T) {
 
 	t.Run("negative clamped to zero", func(t *testing.T) {
 		os.Setenv("OPENACOSMI_SHELL_ENV_TIMEOUT_MS", "-100")
+		os.Setenv("CRABCLAW_SHELL_ENV_TIMEOUT_MS", "")
 		if got := ResolveShellEnvFallbackTimeoutMs(); got != 0 {
 			t.Fatalf("got %d, want 0", got)
 		}
@@ -107,16 +121,26 @@ func TestResolveShellEnvFallbackTimeoutMs(t *testing.T) {
 
 func TestShouldEnableShellEnvFallback(t *testing.T) {
 	orig := os.Getenv("OPENACOSMI_LOAD_SHELL_ENV")
+	origCrab := os.Getenv("CRABCLAW_LOAD_SHELL_ENV")
 	defer os.Setenv("OPENACOSMI_LOAD_SHELL_ENV", orig)
+	defer os.Setenv("CRABCLAW_LOAD_SHELL_ENV", origCrab)
 
 	os.Setenv("OPENACOSMI_LOAD_SHELL_ENV", "true")
+	os.Setenv("CRABCLAW_LOAD_SHELL_ENV", "")
 	if !ShouldEnableShellEnvFallback() {
 		t.Fatal("expected true when env=true")
 	}
 
 	os.Setenv("OPENACOSMI_LOAD_SHELL_ENV", "")
+	os.Setenv("CRABCLAW_LOAD_SHELL_ENV", "")
 	if ShouldEnableShellEnvFallback() {
 		t.Fatal("expected false when env is empty")
+	}
+
+	os.Setenv("OPENACOSMI_LOAD_SHELL_ENV", "")
+	os.Setenv("CRABCLAW_LOAD_SHELL_ENV", "true")
+	if !ShouldEnableShellEnvFallback() {
+		t.Fatal("expected true when crabclaw env=true")
 	}
 }
 

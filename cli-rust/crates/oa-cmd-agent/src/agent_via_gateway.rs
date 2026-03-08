@@ -5,7 +5,6 @@
 /// is available; the CLI falls back to local execution on failure.
 ///
 /// Source: `src/commands/agent-via-gateway.ts`
-
 use anyhow::{Result, bail};
 
 use oa_agents::scope::list_agent_ids;
@@ -22,9 +21,10 @@ use crate::types::{AgentCliOpts, AgentGatewayPayload, GatewayAgentResponse};
 pub fn parse_timeout_seconds(timeout: Option<&str>, config_timeout: Option<u64>) -> Result<u64> {
     let raw = match timeout {
         Some(t) => {
-            let parsed: i64 = t.trim().parse().map_err(|_| {
-                anyhow::anyhow!("--timeout must be a positive integer (seconds)")
-            })?;
+            let parsed: i64 = t
+                .trim()
+                .parse()
+                .map_err(|_| anyhow::anyhow!("--timeout must be a positive integer (seconds)"))?;
             parsed
         }
         None => {
@@ -114,7 +114,7 @@ pub async fn agent_via_gateway_command(opts: &AgentCliOpts) -> Result<GatewayAge
             if !known.contains(&normalized) {
                 Err(anyhow::anyhow!(
                     "Unknown agent id \"{raw}\". Use \"{}\" to see configured agents.",
-                    format_cli_command("openacosmi agents list")
+                    format_cli_command("crabclaw agents list")
                 ))
             } else {
                 Ok(normalized)
@@ -145,10 +145,7 @@ pub async fn agent_via_gateway_command(opts: &AgentCliOpts) -> Result<GatewayAge
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .map_or_else(
-            || uuid::Uuid::new_v4().to_string(),
-            String::from,
-        );
+        .map_or_else(|| uuid::Uuid::new_v4().to_string(), String::from);
 
     // TODO: Make the actual gateway RPC call.
     // The full implementation calls `call_gateway` with method "agent" and

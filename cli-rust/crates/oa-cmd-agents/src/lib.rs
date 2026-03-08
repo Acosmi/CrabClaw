@@ -1,11 +1,10 @@
-/// Agent management commands (plural) for Claw Acosmi CLI.
+/// Agent management commands (plural) for Crab Claw CLI.
 ///
 /// Provides subcommands for listing, adding, deleting agents, and
 /// managing agent identity and bindings. Mirrors the TypeScript commands
 /// in `src/commands/agents*.ts`.
 ///
 /// Source: `src/commands/agents.ts`, `src/commands/agents.*.ts`
-
 pub mod add;
 pub mod bindings;
 pub mod command_shared;

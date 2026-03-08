@@ -16,7 +16,7 @@ const ACPProtocolVersion = "2025-03-26"
 // ACPAgentInfo ACP Agent 元信息（对应 TS ACP_AGENT_INFO）。
 var ACPAgentInfo = AgentInfo{
 	Name:    "openacosmi-acp",
-	Title:   "OpenAcosmi ACP Gateway",
+	Title:   "Crab Claw ACP Gateway",
 	Version: config.BuildVersion,
 }
 

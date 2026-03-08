@@ -1,19 +1,20 @@
 ---
 name: openrouter
-description: "通过 OpenRouter 统一 API 在创宇太虚中访问多种模型"
+description: "Use OpenRouter's unified API to access many models in Crab Claw（蟹爪）"
 ---
 
 # OpenRouter
 
-OpenRouter 提供**统一 API**，通过单一端点和 API 密钥将请求路由到多种模型。它兼容 OpenAI，大多数 OpenAI SDK 只需切换 base URL 即可使用。
+OpenRouter provides a **unified API** that routes requests to many models behind a single
+endpoint and API key. It is OpenAI-compatible, so most OpenAI SDKs work by switching the base URL.
 
-## CLI 设置
+## CLI setup
 
 ```bash
-openacosmi onboard --auth-choice apiKey --token-provider openrouter --token "$OPENROUTER_API_KEY"
+crabclaw onboard --auth-choice apiKey --token-provider openrouter --token "$OPENROUTER_API_KEY"
 ```
 
-## 配置示例
+## Config snippet
 
 ```json5
 {
@@ -26,8 +27,8 @@ openacosmi onboard --auth-choice apiKey --token-provider openrouter --token "$OP
 }
 ```
 
-## 备注
+## Notes
 
-- 模型引用格式为 `openrouter/<provider>/<model>`。
-- 更多模型/供应商选项参见 [/concepts/model-providers](/concepts/model-providers)。
-- OpenRouter 底层使用 Bearer token 配合你的 API 密钥。
+- Model refs are `openrouter/<provider>/<model>`.
+- For more model/provider options, see [/concepts/model-providers](/concepts/model-providers).
+- OpenRouter uses a Bearer token with your API key under the hood.

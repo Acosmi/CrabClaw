@@ -46,7 +46,7 @@ func CreateBrowserTool(controller BrowserController) *AgentTool {
 	return &AgentTool{
 		Name:        "browser",
 		Label:       "Browser",
-		Description: "Control a browser: navigate, observe (ARIA tree), click_ref/fill_ref (by ref), screenshot, ai_browse (intent-level), and more. Recommended workflow: observe → click_ref/fill_ref → screenshot.",
+		Description: "Control a browser: navigate, observe (ARIA tree), click_ref/fill_ref (by ref), screenshot, ai_browse (intent-level), and more. Recommended workflow: observe → click_ref/fill_ref → screenshot. If the browser tool returns 'not available', guide the user to the browser extension setup page at /browser-extension/ on the Gateway.",
 		Parameters: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -84,7 +84,18 @@ func CreateBrowserTool(controller BrowserController) *AgentTool {
 				return softText(fmt.Sprintf("[Browser error: %s]", err)), nil
 			}
 			if controller == nil {
-				return softText("[Browser tool is not configured. Enable browser in config and ensure CDP is running.]"), nil
+				guideURL := "http://127.0.0.1:26222/browser-extension/"
+				return softText(fmt.Sprintf(
+					"[Browser tool is not available — extension not installed or not connected.\n"+
+						"浏览器工具不可用 — 扩展未安装或未连接。\n\n"+
+						"Setup guide / 安装引导: %s\n\n"+
+						"Steps / 步骤:\n"+
+						"1. Download extension zip from the guide page / 从引导页下载扩展 zip\n"+
+						"2. Open chrome://extensions → Enable Developer Mode → Load Unpacked\n"+
+						"   打开 chrome://extensions → 启用开发者模式 → 加载已解压的扩展\n"+
+						"3. Extension auto-connects to Gateway / 扩展自动连接 Gateway]",
+					guideURL,
+				)), nil
 			}
 
 			// browserErr returns a soft-error result (consistent with tool_executor.go).

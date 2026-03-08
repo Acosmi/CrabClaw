@@ -1,40 +1,43 @@
 ---
 name: multi-agent-sandbox-tools
-description: "每 Agent 沙箱 + 工具限制、优先级和示例"
+description: "Per-agent sandbox + tool restrictions, precedence, and examples"
 ---
 
-# 多 Agent 沙箱与工具配置
+# Multi-Agent Sandbox & Tools Configuration
 
-## 概述
+## Overview
 
-多 Agent 配置中，每个 Agent 可以有自己的：
+Each agent in a multi-agent setup can now have its own:
 
-- **沙箱配置**（`agents.list[].sandbox` 覆盖 `agents.defaults.sandbox`）
-- **工具限制**（`tools.allow` / `tools.deny`，加上 `agents.list[].tools`）
+- **Sandbox configuration** (`agents.list[].sandbox` overrides `agents.defaults.sandbox`)
+- **Tool restrictions** (`tools.allow` / `tools.deny`, plus `agents.list[].tools`)
 
-这允许您以不同的安全配置运行多个 Agent：
+This allows you to run multiple agents with different security profiles:
 
-- 拥有完全访问权限的个人助手
-- 工具受限的家庭/工作 Agent
-- 在沙箱中运行的公开 Agent
+- Personal assistant with full access
+- Family/work agents with restricted tools
+- Public-facing agents in sandboxes
 
-`setupCommand` 属于 `sandbox.docker`（全局或每 Agent），在容器创建时运行一次。
+`setupCommand` belongs under `sandbox.docker` (global or per-agent) and runs once
+when the container is created.
 
-认证按 Agent 隔离：每个 Agent 从自己的 `agentDir` 认证存储读取：
+Auth is per-agent: each agent reads from its own `agentDir` auth store at:
 
 ```
 ~/.openacosmi/agents/<agentId>/agent/auth-profiles.json
 ```
 
-凭据**不会**在 Agent 间共享。绝不要在 Agent 间复用 `agentDir`。如需共享凭据，将 `auth-profiles.json` 复制到其他 Agent 的 `agentDir`。
+Credentials are **not** shared between agents. Never reuse `agentDir` across agents.
+If you want to share creds, copy `auth-profiles.json` into the other agent's `agentDir`.
 
-了解沙箱运行时行为，参见 [沙箱](/gateway/sandboxing)。调试"为什么被阻止"，参见 [沙箱 vs 工具策略 vs 提权](/gateway/sandbox-vs-tool-policy-vs-elevated) 和 `openacosmi sandbox explain`。
+For how sandboxing behaves at runtime, see [Sandboxing](/gateway/sandboxing).
+For debugging “why is this blocked?”, see [Sandbox vs Tool Policy vs Elevated](/gateway/sandbox-vs-tool-policy-vs-elevated) and `crabclaw sandbox explain`.
 
 ---
 
-## 配置示例
+## Configuration Examples
 
-### 示例 1：个人 + 受限家庭 Agent
+### Example 1: Personal + Restricted Family Agent
 
 ```json
 {
@@ -78,14 +81,14 @@ description: "每 Agent 沙箱 + 工具限制、优先级和示例"
 }
 ```
 
-**结果：**
+**Result:**
 
-- `main` Agent：在宿主机上运行，完全工具访问
-- `family` Agent：在 Docker 中运行（每 Agent 一个容器），仅 `read` 工具
+- `main` agent: Runs on host, full tool access
+- `family` agent: Runs in Docker (one container per agent), only `read` tool
 
 ---
 
-### 示例 2：共享沙箱的工作 Agent
+### Example 2: Work Agent with Shared Sandbox
 
 ```json
 {
@@ -116,7 +119,7 @@ description: "每 Agent 沙箱 + 工具限制、优先级和示例"
 
 ---
 
-### 示例 2b：全局编码 Profile + 仅消息 Agent
+### Example 2b: Global coding profile + messaging-only agent
 
 ```json
 {
@@ -132,21 +135,21 @@ description: "每 Agent 沙箱 + 工具限制、优先级和示例"
 }
 ```
 
-**结果：**
+**Result:**
 
-- 默认 Agent 获得编码工具
-- `support` Agent 仅消息（+ Slack 工具）
+- default agents get coding tools
+- `support` agent is messaging-only (+ Slack tool)
 
 ---
 
-### 示例 3：每 Agent 不同的沙箱模式
+### Example 3: Different Sandbox Modes per Agent
 
 ```json
 {
   "agents": {
     "defaults": {
       "sandbox": {
-        "mode": "non-main",
+        "mode": "non-main", // Global default
         "scope": "session"
       }
     },
@@ -155,14 +158,14 @@ description: "每 Agent 沙箱 + 工具限制、优先级和示例"
         "id": "main",
         "workspace": "~/.openacosmi/workspace",
         "sandbox": {
-          "mode": "off"
+          "mode": "off" // Override: main never sandboxed
         }
       },
       {
         "id": "public",
         "workspace": "~/.openacosmi/workspace-public",
         "sandbox": {
-          "mode": "all",
+          "mode": "all", // Override: public always sandboxed
           "scope": "agent"
         },
         "tools": {
@@ -177,13 +180,13 @@ description: "每 Agent 沙箱 + 工具限制、优先级和示例"
 
 ---
 
-## 配置优先级
+## Configuration Precedence
 
-当全局（`agents.defaults.*`）和 Agent 特定（`agents.list[].*`）配置同时存在时：
+When both global (`agents.defaults.*`) and agent-specific (`agents.list[].*`) configs exist:
 
-### 沙箱配置
+### Sandbox Config
 
-Agent 特定设置覆盖全局：
+Agent-specific settings override global:
 
 ```
 agents.list[].sandbox.mode > agents.defaults.sandbox.mode
@@ -195,55 +198,58 @@ agents.list[].sandbox.browser.* > agents.defaults.sandbox.browser.*
 agents.list[].sandbox.prune.* > agents.defaults.sandbox.prune.*
 ```
 
-**说明：**
+**Notes:**
 
-- `agents.list[].sandbox.{docker,browser,prune}.*` 覆盖该 Agent 的 `agents.defaults.sandbox.{docker,browser,prune}.*`（当沙箱 scope 解析为 `"shared"` 时忽略）。
+- `agents.list[].sandbox.{docker,browser,prune}.*` overrides `agents.defaults.sandbox.{docker,browser,prune}.*` for that agent (ignored when sandbox scope resolves to `"shared"`).
 
-### 工具限制
+### Tool Restrictions
 
-过滤顺序：
+The filtering order is:
 
-1. **工具 Profile**（`tools.profile` 或 `agents.list[].tools.profile`）
-2. **Provider 工具 Profile**（`tools.byProvider[provider].profile` 或 `agents.list[].tools.byProvider[provider].profile`）
-3. **全局工具策略**（`tools.allow` / `tools.deny`）
-4. **Provider 工具策略**（`tools.byProvider[provider].allow/deny`）
-5. **Agent 特定工具策略**（`agents.list[].tools.allow/deny`）
-6. **Agent Provider 策略**（`agents.list[].tools.byProvider[provider].allow/deny`）
-7. **沙箱工具策略**（`tools.sandbox.tools` 或 `agents.list[].tools.sandbox.tools`）
-8. **子 Agent 工具策略**（`tools.subagents.tools`，如适用）
+1. **Tool profile** (`tools.profile` or `agents.list[].tools.profile`)
+2. **Provider tool profile** (`tools.byProvider[provider].profile` or `agents.list[].tools.byProvider[provider].profile`)
+3. **Global tool policy** (`tools.allow` / `tools.deny`)
+4. **Provider tool policy** (`tools.byProvider[provider].allow/deny`)
+5. **Agent-specific tool policy** (`agents.list[].tools.allow/deny`)
+6. **Agent provider policy** (`agents.list[].tools.byProvider[provider].allow/deny`)
+7. **Sandbox tool policy** (`tools.sandbox.tools` or `agents.list[].tools.sandbox.tools`)
+8. **Subagent tool policy** (`tools.subagents.tools`, if applicable)
 
-每一级只能进一步限制工具，不能恢复先前级别拒绝的工具。如果设置了 `agents.list[].tools.sandbox.tools`，它会替换该 Agent 的 `tools.sandbox.tools`。如果设置了 `agents.list[].tools.profile`，它会覆盖该 Agent 的 `tools.profile`。Provider 工具键接受 `provider`（如 `google-antigravity`）或 `provider/model`（如 `openai/gpt-5.2`）。
+Each level can further restrict tools, but cannot grant back denied tools from earlier levels.
+If `agents.list[].tools.sandbox.tools` is set, it replaces `tools.sandbox.tools` for that agent.
+If `agents.list[].tools.profile` is set, it overrides `tools.profile` for that agent.
+Provider tool keys accept either `provider` (e.g. `google-antigravity`) or `provider/model` (e.g. `openai/gpt-5.2`).
 
-### 工具组（简写）
+### Tool groups (shorthands)
 
-工具策略（全局、Agent、沙箱）支持 `group:*` 条目，展开为多个具体工具：
+Tool policies (global, agent, sandbox) support `group:*` entries that expand to multiple concrete tools:
 
-- `group:runtime`：`bash`
-- `group:fs`：`read_file`、`write_file`、`list_dir`
-- `group:sessions`：`sessions_list`、`sessions_history`、`sessions_send`、`sessions_spawn`、`session_status`
-- `group:memory`：`memory_search`、`memory_get`
-- `group:ui`：`browser`、`canvas`
-- `group:automation`：`cron`、`gateway`
-- `group:messaging`：`message`
-- `group:nodes`：`nodes`
-- `group:openacosmi`：所有内置 Claw Acosmi 工具（不含 Provider 插件）
+- `group:runtime`: `exec`, `bash`, `process`
+- `group:fs`: `read`, `write`, `edit`, `apply_patch`
+- `group:sessions`: `sessions_list`, `sessions_history`, `sessions_send`, `sessions_spawn`, `session_status`
+- `group:memory`: `memory_search`, `memory_get`
+- `group:ui`: `browser`, `canvas`
+- `group:automation`: `cron`, `gateway`
+- `group:messaging`: `message`
+- `group:nodes`: `nodes`
+- `group:openacosmi`: all built-in Crab Claw（蟹爪） tools (excludes provider plugins)
 
-### 提权模式
+### Elevated Mode
 
-`tools.elevated` 是全局基线（基于发送者的白名单）。`agents.list[].tools.elevated` 可以进一步限制特定 Agent 的提权（两者都必须允许）。
+`tools.elevated` is the global baseline (sender-based allowlist). `agents.list[].tools.elevated` can further restrict elevated for specific agents (both must allow).
 
-缓解模式：
+Mitigation patterns:
 
-- 拒绝不信任 Agent 的 `exec`（`agents.list[].tools.deny: ["exec"]`）
-- 避免将发送者白名单路由到受限 Agent
-- 如果只需要沙箱执行，全局禁用提权（`tools.elevated.enabled: false`）
-- 为敏感 Profile 禁用每 Agent 提权（`agents.list[].tools.elevated.enabled: false`）
+- Deny `exec` for untrusted agents (`agents.list[].tools.deny: ["exec"]`)
+- Avoid allowlisting senders that route to restricted agents
+- Disable elevated globally (`tools.elevated.enabled: false`) if you only want sandboxed execution
+- Disable elevated per agent (`agents.list[].tools.elevated.enabled: false`) for sensitive profiles
 
 ---
 
-## 从单 Agent 迁移
+## Migration from Single Agent
 
-**之前（单 Agent）：**
+**Before (single agent):**
 
 ```json
 {
@@ -266,7 +272,7 @@ agents.list[].sandbox.prune.* > agents.defaults.sandbox.prune.*
 }
 ```
 
-**之后（不同 Profile 的多 Agent）：**
+**After (multi-agent with different profiles):**
 
 ```json
 {
@@ -283,13 +289,13 @@ agents.list[].sandbox.prune.* > agents.defaults.sandbox.prune.*
 }
 ```
 
-旧版 `agent.*` 配置由 `openacosmi doctor` 迁移；今后优先使用 `agents.defaults` + `agents.list`。
+Legacy `agent.*` configs are migrated by `crabclaw doctor`; prefer `agents.defaults` + `agents.list` going forward.
 
 ---
 
-## 工具限制示例
+## Tool Restriction Examples
 
-### 只读 Agent
+### Read-only Agent
 
 ```json
 {
@@ -300,7 +306,7 @@ agents.list[].sandbox.prune.* > agents.defaults.sandbox.prune.*
 }
 ```
 
-### 安全执行 Agent（不修改文件）
+### Safe Execution Agent (no file modifications)
 
 ```json
 {
@@ -311,7 +317,7 @@ agents.list[].sandbox.prune.* > agents.defaults.sandbox.prune.*
 }
 ```
 
-### 仅通信 Agent
+### Communication-only Agent
 
 ```json
 {
@@ -324,33 +330,36 @@ agents.list[].sandbox.prune.* > agents.defaults.sandbox.prune.*
 
 ---
 
-## 常见陷阱："non-main"
+## Common Pitfall: "non-main"
 
-`agents.defaults.sandbox.mode: "non-main"` 基于 `session.mainKey`（默认 `"main"`），而非 Agent ID。群组/渠道会话总是有自己的键，因此被视为 non-main 并将被沙箱化。如果希望某个 Agent 从不沙箱，设置 `agents.list[].sandbox.mode: "off"`。
+`agents.defaults.sandbox.mode: "non-main"` is based on `session.mainKey` (default `"main"`),
+not the agent id. Group/channel sessions always get their own keys, so they
+are treated as non-main and will be sandboxed. If you want an agent to never
+sandbox, set `agents.list[].sandbox.mode: "off"`.
 
 ---
 
-## 测试
+## Testing
 
-配置多 Agent 沙箱和工具后：
+After configuring multi-agent sandbox and tools:
 
-1. **检查 Agent 路由：**
+1. **Check agent resolution:**
 
    ```exec
-   openacosmi agents list --bindings
+   crabclaw agents list --bindings
    ```
 
-2. **验证沙箱容器：**
+2. **Verify sandbox containers:**
 
    ```exec
    docker ps --filter "name=openacosmi-sbx-"
    ```
 
-3. **测试工具限制：**
-   - 发送需要受限工具的消息
-   - 验证 Agent 无法使用被拒绝的工具
+3. **Test tool restrictions:**
+   - Send a message requiring restricted tools
+   - Verify the agent cannot use denied tools
 
-4. **监控日志：**
+4. **Monitor logs:**
 
    ```exec
    tail -f "${OPENACOSMI_STATE_DIR:-$HOME/.openacosmi}/logs/gateway.log" | grep -E "routing|sandbox|tools"
@@ -358,28 +367,28 @@ agents.list[].sandbox.prune.* > agents.defaults.sandbox.prune.*
 
 ---
 
-## 故障排除
+## Troubleshooting
 
-### 尽管 `mode: "all"` Agent 未被沙箱化
+### Agent not sandboxed despite `mode: "all"`
 
-- 检查是否有全局 `agents.defaults.sandbox.mode` 覆盖了它
-- Agent 特定配置优先，因此设置 `agents.list[].sandbox.mode: "all"`
+- Check if there's a global `agents.defaults.sandbox.mode` that overrides it
+- Agent-specific config takes precedence, so set `agents.list[].sandbox.mode: "all"`
 
-### 尽管有拒绝列表工具仍然可用
+### Tools still available despite deny list
 
-- 检查工具过滤顺序：全局 → Agent → 沙箱 → 子 Agent
-- 每一级只能进一步限制，不能恢复
-- 通过日志验证：`[tools] filtering tools for agent:${agentId}`
+- Check tool filtering order: global → agent → sandbox → subagent
+- Each level can only further restrict, not grant back
+- Verify with logs: `[tools] filtering tools for agent:${agentId}`
 
-### 容器未按 Agent 隔离
+### Container not isolated per agent
 
-- 在 Agent 特定沙箱配置中设置 `scope: "agent"`
-- 默认为 `"session"`，每个会话创建一个容器
+- Set `scope: "agent"` in agent-specific sandbox config
+- Default is `"session"` which creates one container per session
 
 ---
 
-## 另请参阅
+## See Also
 
-- [多 Agent 路由](/concepts/multi-agent)
-- [沙箱配置](/gateway/configuration#agentsdefaults-sandbox)
-- [会话管理](/concepts/session)
+- [Multi-Agent Routing](/concepts/multi-agent)
+- [Sandbox Configuration](/gateway/configuration#agentsdefaults-sandbox)
+- [Session Management](/concepts/session)

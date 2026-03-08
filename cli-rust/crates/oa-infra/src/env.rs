@@ -4,7 +4,6 @@
 /// normalizing environment variables (e.g., ZAI key aliases).
 ///
 /// Source: `src/infra/env.ts`
-
 use tracing::info;
 
 /// Truthy string values recognized by [`is_truthy_env_value`].
@@ -50,6 +49,35 @@ pub fn parse_boolean_value(value: Option<&str>) -> Option<bool> {
     None
 }
 
+/// Return the first non-empty environment variable value from a prioritized list.
+pub fn preferred_env_value(keys: &[&str]) -> Option<String> {
+    for key in keys {
+        if let Ok(value) = std::env::var(key) {
+            let trimmed = value.trim().to_string();
+            if !trimmed.is_empty() {
+                return Some(trimmed);
+            }
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+fn preferred_env_value_from_map(
+    values: &std::collections::HashMap<&str, &str>,
+    keys: &[&str],
+) -> Option<String> {
+    for key in keys {
+        if let Some(value) = values.get(key) {
+            let trimmed = value.trim().to_string();
+            if !trimmed.is_empty() {
+                return Some(trimmed);
+            }
+        }
+    }
+    None
+}
+
 /// Format an environment variable value for logging, optionally redacting it.
 ///
 /// If `redact` is true, returns `<redacted>`. Otherwise, collapses whitespace
@@ -76,7 +104,12 @@ pub fn log_accepted_env_option(key: &str, description: &str, redact: bool) {
         Some(v) if !v.trim().is_empty() => v.as_str(),
         _ => return,
     };
-    info!("env: {}={} ({})", key, format_env_value(raw, redact), description);
+    info!(
+        "env: {}={} ({})",
+        key,
+        format_env_value(raw, redact),
+        description
+    );
 }
 
 /// Normalize ZAI environment variables.
@@ -123,6 +156,7 @@ pub fn normalize_env() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn test_is_truthy_env_value() {
@@ -196,7 +230,10 @@ mod tests {
 
         normalize_zai_env();
 
-        assert_eq!(std::env::var("ZAI_API_KEY").ok().as_deref(), Some("test-key"));
+        assert_eq!(
+            std::env::var("ZAI_API_KEY").ok().as_deref(),
+            Some("test-key")
+        );
 
         // Restore
         unsafe {
@@ -209,5 +246,21 @@ mod tests {
                 std::env::set_var("Z_AI_API_KEY", v);
             }
         }
+    }
+
+    #[test]
+    fn test_preferred_env_value_from_map_prefers_first_non_empty() {
+        let values = HashMap::from([
+            ("OPENACOSMI_UPDATE_IN_PROGRESS", "1"),
+            ("CRABCLAW_UPDATE_IN_PROGRESS", "0"),
+        ]);
+        let preferred = preferred_env_value_from_map(
+            &values,
+            &[
+                "CRABCLAW_UPDATE_IN_PROGRESS",
+                "OPENACOSMI_UPDATE_IN_PROGRESS",
+            ],
+        );
+        assert_eq!(preferred.as_deref(), Some("0"));
     }
 }

@@ -35,6 +35,7 @@ type ChannelsConfig struct {
 	WeChatMP    *WeChatMPConfig        `json:"wechat_mp,omitempty"`
 	Xiaohongshu *XiaohongshuConfig     `json:"xiaohongshu,omitempty"`
 	Website     *WebsiteConfig         `json:"website,omitempty"`
+	Email       *EmailConfig           `json:"email,omitempty"`
 	// Extra 存储未知频道的配置 (前向兼容插件频道)
 	Extra map[string]interface{} `json:"-"`
 }
@@ -56,6 +57,7 @@ var channelsConfigKnownKeys = map[string]bool{
 	"wechat_mp":   true,
 	"xiaohongshu": true,
 	"website":     true,
+	"email":       true,
 }
 
 // UnmarshalJSON 自定义反序列化：已知键解析到对应字段，未知键收集到 Extra

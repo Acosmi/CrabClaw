@@ -1,0 +1,95 @@
+import { describe, expect, it } from "vitest";
+import {
+  createChatReadonlyRunState,
+  isReadonlyRunActive,
+  setChatReadonlyRunTerminal,
+  startChatReadonlyRun,
+  updateChatReadonlyRunFromChat,
+  updateChatReadonlyRunFromProgress,
+  updateChatReadonlyRunFromTool,
+} from "./readonly-run-state.ts";
+
+function createHost() {
+  return {
+    sessionKey: "main",
+    chatReadonlyRun: createChatReadonlyRunState("main"),
+  };
+}
+
+describe("readonly run state", () => {
+  it("transitions from starting to working to drafting", () => {
+    const host = createHost();
+    startChatReadonlyRun(host, "run-1", 100, "main");
+
+    expect(host.chatReadonlyRun.phase).toBe("starting");
+
+    updateChatReadonlyRunFromTool(host, {
+      runId: "run-1",
+      sessionKey: "main",
+      ts: 120,
+      toolCallId: "tool-1",
+      name: "read_files",
+      phase: "start",
+    });
+
+    expect(host.chatReadonlyRun.phase).toBe("working");
+    expect(host.chatReadonlyRun.toolSteps).toHaveLength(1);
+    expect(host.chatReadonlyRun.toolSteps[0]?.status).toBe("running");
+
+    updateChatReadonlyRunFromProgress(host, {
+      runId: "run-1",
+      sessionKey: "main",
+      ts: 150,
+      summary: "Collected the relevant files.",
+      phase: "analysis",
+    });
+
+    expect(host.chatReadonlyRun.latestProgress).toBe("Collected the relevant files.");
+
+    updateChatReadonlyRunFromChat(host, {
+      runId: "run-1",
+      sessionKey: "main",
+      state: "delta",
+      ts: 180,
+      text: "I found the issue and I'm preparing a fix.",
+    });
+
+    expect(host.chatReadonlyRun.phase).toBe("drafting");
+    expect(host.chatReadonlyRun.draftingText).toContain("preparing a fix");
+  });
+
+  it("resets to idle when the run finalizes", () => {
+    const host = createHost();
+    startChatReadonlyRun(host, "run-2", 100, "main");
+
+    updateChatReadonlyRunFromChat(host, {
+      runId: "run-2",
+      sessionKey: "main",
+      state: "final",
+      ts: 220,
+      text: "Done.",
+    });
+
+    expect(host.chatReadonlyRun.runId).toBeNull();
+    expect(host.chatReadonlyRun.phase).toBe("idle");
+    expect(host.chatReadonlyRun.sessionKey).toBe("main");
+  });
+
+  it("marks terminal errors without keeping the run active", () => {
+    const host = createHost();
+    startChatReadonlyRun(host, "run-3", 100, "main");
+
+    expect(isReadonlyRunActive(host.chatReadonlyRun)).toBe(true);
+
+    setChatReadonlyRunTerminal(host, "error", {
+      sessionKey: "main",
+      ts: 180,
+      errorMessage: "disconnected (1006): no reason",
+    });
+
+    expect(host.chatReadonlyRun.runId).toBeNull();
+    expect(host.chatReadonlyRun.phase).toBe("error");
+    expect(host.chatReadonlyRun.lastError).toBe("disconnected (1006): no reason");
+    expect(isReadonlyRunActive(host.chatReadonlyRun)).toBe(false);
+  });
+});

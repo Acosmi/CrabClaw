@@ -1,10 +1,10 @@
-# OpenAcosmi 沙箱架构设计与使用说明
+# CrabClaw 沙箱架构设计与使用说明
 
-本文档详细介绍了 OpenAcosmi 项目中的核心沙箱（Sandbox）架构选型、设计理念，以及 Native Rust CLI 与 Docker 之间的优先级关系和使用说明。
+本文档详细介绍了 CrabClaw 项目中的核心沙箱（Sandbox）架构选型、设计理念，以及 Native Rust CLI 与 Docker 之间的优先级关系和使用说明。
 
 ## 1. 架构核心结论
 
-在 OpenAcosmi 的架构设计中，**原生 Rust CLI 沙箱是绝对的第一优先级（Primary），而 Docker 容器仅仅是备用与特定场景的补充（Fallback / Specialized）**。
+在 CrabClaw 的架构设计中，**原生 Rust CLI 沙箱是绝对的第一优先级（Primary），而 Docker 容器仅仅是备用与特定场景的补充（Fallback / Specialized）**。
 
 在网关启动流程（`backend/internal/gateway/boot.go`）中，系统会优先探测并拉起基于 Rust 的原生 `openacosmi` 进程作为沙箱 Worker。只有当原生二进制文件彻底丢失或不可用时，系统才会勉强初始化 Docker 容器池进行兜底。
 
@@ -50,7 +50,7 @@
 👉 **如果您想强制指定使用自己编译好的 Rust 调试版本：**
 
 ```bash
-export OA_CLI_BINARY="/path/to/your/OpenAcosmi-rust+go/cli-rust/target/debug/openacosmi"
+export OA_CLI_BINARY="/path/to/your/CrabClaw/cli-rust/target/debug/openacosmi"
 npm run dev # 或 go run main.go
 ```
 

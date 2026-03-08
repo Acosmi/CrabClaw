@@ -450,6 +450,7 @@ func (c *DelegationContract) ApplyConstraints(params *ToolExecParams) {
 	if c.Constraints.NoNetwork {
 		params.BrowserController = nil
 		params.MediaSender = nil
+		params.EmailSender = nil    // send_email 依赖 SMTP 网络（Phase 7）
 		params.MediaSubsystem = nil // 媒体子工具（trending_topics 等）依赖网络
 		params.MountRequests = nil  // 受限合约不应扩展文件系统
 	}

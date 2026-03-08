@@ -5,10 +5,10 @@
 /// persists config changes, and runs post-configuration health checks.
 ///
 /// Source: `src/commands/configure.wizard.ts`
-
 use anyhow::Result;
 use tracing::info;
 
+use oa_cli_shared::command_format::format_cli_command;
 use oa_config::io::{read_config_file_snapshot, write_config_file};
 use oa_config::paths::resolve_gateway_port;
 use oa_types::config::OpenAcosmiConfig;
@@ -115,11 +115,7 @@ pub fn summarize_existing_config(config: &OpenAcosmiConfig) -> String {
 /// Apply wizard metadata (run timestamp, version, command, mode) to the config.
 ///
 /// Source: `src/commands/onboard-helpers.ts` - `applyWizardMetadata`
-pub fn apply_wizard_metadata(
-    cfg: OpenAcosmiConfig,
-    command: &str,
-    mode: &str,
-) -> OpenAcosmiConfig {
+pub fn apply_wizard_metadata(cfg: OpenAcosmiConfig, command: &str, mode: &str) -> OpenAcosmiConfig {
     use oa_types::config::WizardConfig;
 
     let commit = std::env::var("GIT_COMMIT")
@@ -167,9 +163,8 @@ pub async fn run_configure_wizard(params: ConfigureWizardParams) -> Result<()> {
     };
 
     if snapshot.exists && !snapshot.valid {
-        anyhow::bail!(
-            "Config invalid. Run `openacosmi doctor` to repair it, then re-run configure."
-        );
+        let repair_cmd = format_cli_command("crabclaw doctor");
+        anyhow::bail!("Config invalid. Run `{repair_cmd}` to repair it, then re-run configure.");
     }
 
     if snapshot.exists {
@@ -185,10 +180,7 @@ pub async fn run_configure_wizard(params: ConfigureWizardParams) -> Result<()> {
 
     // Ensure gateway mode is local if not already set
     let did_set_gateway_mode = {
-        let current_mode = next_config
-            .gateway
-            .as_ref()
-            .and_then(|g| g.mode.as_ref());
+        let current_mode = next_config.gateway.as_ref().and_then(|g| g.mode.as_ref());
         if current_mode != Some(&GatewayMode::Local) {
             let mut gw = next_config.gateway.unwrap_or_default();
             gw.mode = Some(GatewayMode::Local);
@@ -208,21 +200,13 @@ pub async fn run_configure_wizard(params: ConfigureWizardParams) -> Result<()> {
         }
 
         // Apply wizard metadata
-        next_config = apply_wizard_metadata(
-            next_config,
-            &params.command.to_string(),
-            "local",
-        );
+        next_config = apply_wizard_metadata(next_config, &params.command.to_string(), "local");
         write_config_file(&next_config).await?;
         info!("Config updated.");
     } else {
         // In interactive mode, if no sections were selected, just note that
         if did_set_gateway_mode {
-            next_config = apply_wizard_metadata(
-                next_config,
-                &params.command.to_string(),
-                "local",
-            );
+            next_config = apply_wizard_metadata(next_config, &params.command.to_string(), "local");
             write_config_file(&next_config).await?;
             info!("Gateway mode set to local.");
             return Ok(());

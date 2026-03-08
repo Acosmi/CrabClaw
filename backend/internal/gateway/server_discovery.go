@@ -54,7 +54,7 @@ func StartGatewayDiscovery(params DiscoveryParams, reg infra.BonjourRegistrar) *
 
 	// mDNS 可通过配置（mdnsMode: off）或环境变量禁用
 	bonjourEnabled := mdnsMode != "off" &&
-		os.Getenv("OPENACOSMI_DISABLE_BONJOUR") != "1" &&
+		preferredGatewayEnvValue("CRABCLAW_DISABLE_BONJOUR", "OPENACOSMI_DISABLE_BONJOUR") != "1" &&
 		os.Getenv("GO_TEST_MODE") != "1"
 
 	mdnsMinimal := mdnsMode != "full"
@@ -62,7 +62,7 @@ func StartGatewayDiscovery(params DiscoveryParams, reg infra.BonjourRegistrar) *
 	// SSH 端口（仅 full 模式）
 	sshPort := 0
 	if !mdnsMinimal {
-		if portStr := os.Getenv("OPENACOSMI_SSH_PORT"); portStr != "" {
+		if portStr := preferredGatewayEnvValue("CRABCLAW_SSH_PORT", "OPENACOSMI_SSH_PORT"); portStr != "" {
 			fmt.Sscanf(portStr, "%d", &sshPort)
 		}
 	}

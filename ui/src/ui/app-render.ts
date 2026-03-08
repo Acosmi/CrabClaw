@@ -69,6 +69,7 @@ import {
 import { loadUsage, loadSessionTimeSeries, loadSessionLogs } from "./controllers/usage.ts";
 import { icons } from "./icons.ts";
 import { normalizeBasePath, getTabGroups, subtitleForTab, titleForTab, type Tab } from "./navigation.ts";
+import { createChatReadonlyRunState } from "./chat/readonly-run-state.ts";
 
 // Module-scope debounce for usage date changes (avoids type-unsafe hacks on state object)
 let usageDateDebounceTimeout: number | null = null;
@@ -81,6 +82,7 @@ const debouncedLoadUsage = (state: UsageState) => {
 import { renderAgents } from "./views/agents.ts";
 import { renderPlugins } from "./views/plugins.ts";
 import { savePluginConfig, loadTools, loadBrowserToolConfig, saveBrowserToolConfig } from "./controllers/plugins.ts";
+import { browsePackages, loadMorePackages, installPackage, removePackage } from "./controllers/packages.ts";
 import { renderChannels } from "./views/channels.ts";
 import { renderChat } from "./views/chat.ts";
 import { showPermissionPopup, hidePermissionPopup, type PermissionDeniedEvent } from "./views/permission-popup.ts";
@@ -108,11 +110,29 @@ import { renderUsage } from "./views/usage.ts";
 import { renderWizardV2 } from "./views/wizard-v2.ts";
 import { renderNotificationCenter } from "./views/notification-center.ts";
 import { renderMediaConfig, loadMediaConfig } from "./views/media-config.ts";
-import { renderMediaManage } from "./views/media-manage.ts";
+import { buildMediaManageUrl, renderMediaManage } from "./views/media-manage.ts";
+import { openMediaManageWindow } from "./media-manage-window.ts";
 import { loadMediaDashboard } from "./controllers/media-dashboard.ts";
 import { renderTaskKanban } from "./views/task-kanban.ts";
 import { renderMcpServers } from "./views/mcp-servers.ts";
 import { loadMcpDashboard } from "./controllers/mcp-servers.ts";
+
+// P4B: 从 models.list 结果中提取 source=managed 的模型
+function extractManagedModels(
+  debugModels: unknown[],
+): Array<{ id: string; name: string; provider: string; modelId: string }> {
+  if (!Array.isArray(debugModels)) return [];
+  return debugModels
+    .filter((m): m is Record<string, unknown> =>
+      typeof m === "object" && m !== null && (m as Record<string, unknown>).source === "managed",
+    )
+    .map((m) => ({
+      id: String(m.id ?? ""),
+      name: String(m.name ?? m.id ?? ""),
+      provider: String(m.provider ?? ""),
+      modelId: String(m.id ?? ""),
+    }));
+}
 
 const AVATAR_DATA_RE = /^data:/i;
 const AVATAR_HTTP_RE = /^https?:\/\//i;
@@ -194,12 +214,13 @@ export function renderApp(state: AppViewState) {
         <div class="topbar-left">
           <div class="brand brand--topbar">
             <div class="brand-logo">
-              <img src=${basePath ? `${basePath}/logo1.png` : "/logo1.png"} alt="创宇太虚" />
+              <img src=${basePath ? `${basePath}/logo1.png` : "/logo1.png"} alt="Crab Claw（蟹爪）" />
             </div>
             <div class="brand-text">
               <div class="brand-title">
-                <span style="font-weight: bold; line-height: 28px;">创宇太虚</span><span style="font-weight: 300; line-height: 28px;">（Claw Acosmi）</span>
+                <span style="font-weight: bold; line-height: 28px;">Crab Claw（蟹爪）</span>
               </div>
+              <div style="font-size: 11px; line-height: 16px; color: var(--muted, #8a8f98);">@ Acosmi.ai</div>
             </div>
           </div>
         </div>
@@ -324,7 +345,7 @@ export function renderApp(state: AppViewState) {
           <div class="nav-group__items">
             <a
               class="nav-item nav-item--external"
-              href="https://github.com/Acosmi/ClawAcosmi"
+              href="https://github.com/Acosmi/CrabClaw"
               target="_blank"
               rel="noreferrer"
               title="${t("topbar.docsTooltip")}"
@@ -408,6 +429,7 @@ export function renderApp(state: AppViewState) {
         onSessionKeyChange: (next) => {
           state.sessionKey = next;
           state.chatMessage = "";
+          state.chatReadonlyRun = createChatReadonlyRunState(next);
           state.resetToolStream();
           state.applySettings({
             ...state.settings,
@@ -485,6 +507,24 @@ export function renderApp(state: AppViewState) {
         browserEdits: state.browserToolEdits,
         gatewayUrl: state.settings.gatewayUrl,
         skillsView,
+        packagesLoading: state.packagesLoading,
+        packagesItems: state.packagesItems,
+        packagesTotal: state.packagesTotal,
+        packagesError: state.packagesError,
+        packagesKindFilter: state.packagesKindFilter,
+        packagesKeyword: state.packagesKeyword,
+        packagesBusyId: state.packagesBusyId,
+        onPackagesKindChange: (kind) => {
+          state.packagesKindFilter = kind;
+          void browsePackages(state);
+        },
+        onPackagesKeywordChange: (keyword) => {
+          state.packagesKeyword = keyword;
+        },
+        onPackagesSearch: () => void browsePackages(state),
+        onPackagesInstall: (id, _kind) => void installPackage(state, id),
+        onPackagesRemove: (id) => void removePackage(state, id),
+        onPackagesLoadMore: () => void loadMorePackages(state),
         onEditChange: (pluginId, key, value) => {
           state.pluginsEditValues = {
             ...state.pluginsEditValues,
@@ -500,6 +540,8 @@ export function renderApp(state: AppViewState) {
             if (!state.browserToolConfig) void loadBrowserToolConfig(state);
           } else if (panel === "skills") {
             if (!state.skillsReport) void loadSkills(state, { clearMessages: true });
+          } else if (panel === "packages") {
+            if (state.packagesItems.length === 0) void browsePackages(state);
           }
         },
         onBrowserEditChange: (key, value) => {
@@ -882,10 +924,17 @@ export function renderApp(state: AppViewState) {
           state.setTab("media");
           void loadMediaDashboard(state);
         },
+        onOpenMediaInWindow: () => {
+          void openMediaManageWindow(buildMediaManageUrl(state.basePath, "overview"), "overview", "agents");
+        },
         onNavigateToMedia: () => {
           state.setTab("media");
           void loadMediaDashboard(state);
         },
+        // P4B: 托管模型 & 认证状态
+        // 认证状态从 managed models 存在性推断：有托管模型 → 已认证
+        managedModels: extractManagedModels(state.debugModels),
+        isAuthenticated: extractManagedModels(state.debugModels).length > 0,
         onRefresh: async () => {
           await loadAgents(state);
           const agentIds = state.agentsList?.agents?.map((entry) => entry.id) ?? [];
@@ -896,6 +945,10 @@ export function renderApp(state: AppViewState) {
           import("./controllers/subagents.ts").then((m) =>
             m.loadSubAgents(state as any),
           );
+          // P4B: 刷新 models 列表（含 managed models）
+          if (state.debugModels.length === 0) {
+            void loadDebug(state);
+          }
         },
         onSelectAgent: (agentId) => {
           if (state.agentsSelectedId === agentId) {
@@ -1432,6 +1485,7 @@ export function renderApp(state: AppViewState) {
           state.sessionKey = next;
           state.chatMessage = "";
           state.chatAttachments = [];
+          state.chatReadonlyRun = createChatReadonlyRunState(next);
           state.chatStream = null;
           state.chatStreamStartedAt = null;
           state.chatRunId = null;
@@ -1455,6 +1509,8 @@ export function renderApp(state: AppViewState) {
         assistantAvatarUrl: chatAvatarUrl,
         messages: state.chatMessages,
         toolMessages: state.chatToolMessages,
+        uxMode: state.chatUxMode,
+        readonlyRun: state.chatReadonlyRun,
         stream: state.chatStream,
         streamStartedAt: state.chatStreamStartedAt,
         draft: state.chatMessage,
@@ -1505,6 +1561,16 @@ export function renderApp(state: AppViewState) {
         onSplitRatioChange: (ratio: number) => state.handleSplitRatioChange(ratio),
         assistantName: state.assistantName,
         assistantAvatar: state.assistantAvatar,
+        // Model selector in composer
+        models: state.chatModels,
+        currentModel: state.chatCurrentModel,
+        onModelChange: (model: string) => {
+          import("./controllers/chat.ts").then((m) =>
+            m.setChatModel(state as any, model),
+          );
+        },
+        browserExtBannerDismissed: state.browserExtBannerDismissed,
+        onDismissBrowserExtBanner: () => { state.browserExtBannerDismissed = true; },
         requestUpdate: () => { (state as unknown as { requestUpdate: () => void }).requestUpdate?.(); },
         permissionPopupCallbacks: {
           // 自动提权已在后端创建 pending 请求（OnPermissionDenied 回调），

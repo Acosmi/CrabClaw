@@ -1,6 +1,6 @@
 /**
  * @file vision_bridge.h
- * @brief Open Acosmi 视觉处理 C++ 桥接接口
+ * @brief Crab Claw（蟹爪）视觉处理 C++ 桥接接口
  * 
  * 提供 extern "C" 接口供 Go CGO 调用。
  * 所有函数名以 acosmi_ 前缀命名空间。

@@ -59,9 +59,101 @@ func TestConfigCandidates(t *testing.T) {
 	if len(candidates) == 0 {
 		t.Fatal("expected non-empty candidates")
 	}
-	// 第一个应该是 openacosmi.json
+	// 第一个候选文件名应该仍然是 openacosmi.json（目录优先级可变，文件名在本阶段不变）
 	if filepath.Base(candidates[0]) != ConfigFilename {
 		t.Errorf("expected first candidate to be %s, got %s", ConfigFilename, filepath.Base(candidates[0]))
+	}
+}
+
+func TestResolveStateDirPrefersCrabClawWhenItContainsManagedState(t *testing.T) {
+	tmpHome := t.TempDir()
+	oldHome := os.Getenv("OPENACOSMI_HOME")
+	t.Cleanup(func() {
+		_ = os.Setenv("OPENACOSMI_HOME", oldHome)
+	})
+	_ = os.Setenv("OPENACOSMI_HOME", tmpHome)
+
+	crabDir := filepath.Join(tmpHome, CompatibilityStateDirname)
+	openDir := filepath.Join(tmpHome, NewStateDirname)
+	if err := os.MkdirAll(filepath.Join(crabDir, "credentials"), 0o755); err != nil {
+		t.Fatalf("mkdir crab credentials: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(openDir, "credentials"), 0o755); err != nil {
+		t.Fatalf("mkdir open credentials: %v", err)
+	}
+
+	got := ResolveStateDir()
+	if got != crabDir {
+		t.Fatalf("expected state dir %s, got %s", crabDir, got)
+	}
+}
+
+func TestResolveStateDirKeepsOpenAcosmiWhenCrabClawIsEmpty(t *testing.T) {
+	tmpHome := t.TempDir()
+	oldHome := os.Getenv("OPENACOSMI_HOME")
+	t.Cleanup(func() {
+		_ = os.Setenv("OPENACOSMI_HOME", oldHome)
+	})
+	_ = os.Setenv("OPENACOSMI_HOME", tmpHome)
+
+	crabDir := filepath.Join(tmpHome, CompatibilityStateDirname)
+	openDir := filepath.Join(tmpHome, NewStateDirname)
+	if err := os.MkdirAll(crabDir, 0o755); err != nil {
+		t.Fatalf("mkdir crab dir: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(openDir, "sessions"), 0o755); err != nil {
+		t.Fatalf("mkdir open sessions: %v", err)
+	}
+
+	got := ResolveStateDir()
+	if got != openDir {
+		t.Fatalf("expected state dir %s, got %s", openDir, got)
+	}
+}
+
+func TestResolveConfigPathPrefersCrabClawConfigWhenPresent(t *testing.T) {
+	tmpHome := t.TempDir()
+	oldHome := os.Getenv("OPENACOSMI_HOME")
+	t.Cleanup(func() {
+		_ = os.Setenv("OPENACOSMI_HOME", oldHome)
+	})
+	_ = os.Setenv("OPENACOSMI_HOME", tmpHome)
+
+	crabConfig := filepath.Join(tmpHome, CompatibilityStateDirname, ConfigFilename)
+	openConfig := filepath.Join(tmpHome, NewStateDirname, ConfigFilename)
+	if err := os.MkdirAll(filepath.Dir(crabConfig), 0o755); err != nil {
+		t.Fatalf("mkdir crab dir: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(openConfig), 0o755); err != nil {
+		t.Fatalf("mkdir open dir: %v", err)
+	}
+	if err := os.WriteFile(openConfig, []byte("{}"), 0o600); err != nil {
+		t.Fatalf("write open config: %v", err)
+	}
+	if err := os.WriteFile(crabConfig, []byte("{}"), 0o600); err != nil {
+		t.Fatalf("write crab config: %v", err)
+	}
+
+	got := ResolveConfigPath()
+	if got != crabConfig {
+		t.Fatalf("expected config path %s, got %s", crabConfig, got)
+	}
+}
+
+func TestResolveStateDirUsesCrabClawEnvOverride(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldCrab := os.Getenv("CRABCLAW_STATE_DIR")
+	oldOpen := os.Getenv("OPENACOSMI_STATE_DIR")
+	t.Cleanup(func() {
+		_ = os.Setenv("CRABCLAW_STATE_DIR", oldCrab)
+		_ = os.Setenv("OPENACOSMI_STATE_DIR", oldOpen)
+	})
+	_ = os.Setenv("OPENACOSMI_STATE_DIR", "")
+	_ = os.Setenv("CRABCLAW_STATE_DIR", tmpDir)
+
+	got := ResolveStateDir()
+	if got != tmpDir {
+		t.Fatalf("expected state dir %s, got %s", tmpDir, got)
 	}
 }
 

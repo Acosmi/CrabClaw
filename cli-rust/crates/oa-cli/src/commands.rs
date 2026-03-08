@@ -1,4 +1,4 @@
-/// Subcommand routing for the Claw Acosmi CLI.
+/// Subcommand routing for the Crab Claw CLI.
 ///
 /// Defines the `Commands` enum connecting all command crates, defines
 /// Clap `Args` wrappers for each command group, and provides the `dispatch`
@@ -61,22 +61,22 @@ pub enum Commands {
     /// Run or send a message to an AI agent.
     Agent(AgentArgs),
 
-    /// Open the Claw Acosmi dashboard in a browser.
+    /// Open the Crab Claw dashboard in a browser.
     Dashboard(DashboardArgs),
 
     /// Launch the native desktop shell.
     Desktop(DesktopArgs),
 
-    /// Search Claw Acosmi documentation.
+    /// Search Crab Claw documentation.
     Docs(DocsArgs),
 
-    /// Reset Claw Acosmi state (config, sessions, workspace).
+    /// Reset Crab Claw state (config, sessions, workspace).
     Reset(ResetArgs),
 
     /// Initial workspace setup.
     Setup(SetupArgs),
 
-    /// Uninstall Claw Acosmi components.
+    /// Uninstall Crab Claw components.
     Uninstall(UninstallArgs),
 
     /// Send a message through a channel.
@@ -165,6 +165,10 @@ pub enum Commands {
     /// Skill management (list, info, check).
     #[command(subcommand_required = true, arg_required_else_help = true)]
     Skills(SkillsCommand),
+
+    /// Package management (browse, detail, install, remove, installed).
+    #[command(subcommand_required = true, arg_required_else_help = true)]
+    Packages(PackagesCommand),
 
     /// Plugin management (list, info, install, enable, disable, doctor).
     #[command(subcommand_required = true, arg_required_else_help = true)]
@@ -428,6 +432,8 @@ pub struct ModelsCommand {
 pub enum ModelsAction {
     /// List configured models.
     List(ModelsListArgs),
+    /// Show current default model.
+    Get,
     /// Set the primary model.
     Set(ModelsSetArgs),
     /// Set the primary image model.
@@ -441,6 +447,9 @@ pub enum ModelsAction {
     /// Manage image model fallbacks.
     #[command(subcommand_required = true, arg_required_else_help = true)]
     ImageFallbacks(ModelsImageFallbacksCommand),
+    /// Wallet balance and usage (managed models).
+    #[command(subcommand_required = true, arg_required_else_help = true)]
+    Wallet(ModelsWalletCommand),
 }
 
 #[derive(Debug, Args)]
@@ -586,6 +595,37 @@ pub struct ModelsImageFallbacksAddArgs {
 pub struct ModelsImageFallbacksRemoveArgs {
     /// Model identifier.
     pub model: String,
+}
+
+// -- Models wallet subcommands ----------------------------------------------
+
+/// Wallet subcommand group (managed models billing).
+#[derive(Debug, Args)]
+pub struct ModelsWalletCommand {
+    #[command(subcommand)]
+    pub action: ModelsWalletAction,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ModelsWalletAction {
+    /// Show wallet balance.
+    Balance(ModelsWalletBalanceArgs),
+    /// Show recent usage/transactions.
+    Usage(ModelsWalletUsageArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct ModelsWalletBalanceArgs {
+    /// Output as JSON.
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct ModelsWalletUsageArgs {
+    /// Output as JSON.
+    #[arg(long)]
+    pub json: bool,
 }
 
 // -- Agents subcommands -----------------------------------------------------
@@ -2020,6 +2060,83 @@ pub struct SkillsCheckArgs {
     pub json: bool,
 }
 
+// -- Packages subcommands ---------------------------------------------------
+
+/// Packages subcommand group.
+#[derive(Debug, Args)]
+pub struct PackagesCommand {
+    #[command(subcommand)]
+    pub action: PackagesAction,
+}
+
+/// Individual packages actions.
+#[derive(Debug, Subcommand)]
+pub enum PackagesAction {
+    /// Browse available packages.
+    Browse(PackagesBrowseArgs),
+    /// Show package details.
+    Detail(PackagesDetailArgs),
+    /// Install a package.
+    Install(PackagesInstallArgs),
+    /// Remove a package.
+    Remove(PackagesRemoveArgs),
+    /// List installed packages.
+    Installed(PackagesInstalledArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct PackagesBrowseArgs {
+    /// Filter by kind (skill, plugin, bundle).
+    #[arg(long)]
+    pub kind: Option<String>,
+    /// Search keyword.
+    #[arg(long)]
+    pub keyword: Option<String>,
+    /// Output result as JSON.
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct PackagesDetailArgs {
+    /// Package ID.
+    pub id: String,
+    /// Output result as JSON.
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct PackagesInstallArgs {
+    /// Package ID.
+    pub id: String,
+    /// Package kind (skill, plugin, bundle). Defaults to skill.
+    #[arg(long, default_value = "skill")]
+    pub kind: String,
+    /// Output result as JSON.
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct PackagesRemoveArgs {
+    /// Package ID.
+    pub id: String,
+    /// Output result as JSON.
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct PackagesInstalledArgs {
+    /// Filter by kind (skill, plugin, bundle).
+    #[arg(long)]
+    pub kind: Option<String>,
+    /// Output result as JSON.
+    #[arg(long)]
+    pub json: bool,
+}
+
 // -- Plugins subcommands ----------------------------------------------------
 
 /// Plugins subcommand group.
@@ -3138,6 +3255,7 @@ pub async fn dispatch(cmd: Commands, json: bool, verbose: bool) -> Result<()> {
 
         // -- Tier 7: Skills, Plugins, Security, Hooks, Browser -----------------
         Commands::Skills(cmd) => dispatch_skills(cmd, json).await,
+        Commands::Packages(cmd) => dispatch_packages(cmd, json).await,
         Commands::Plugins(cmd) => dispatch_plugins(cmd, json).await,
         Commands::Security(args) => {
             let sa = oa_cmd_security::SecurityAuditArgs {
@@ -3157,7 +3275,7 @@ pub async fn dispatch(cmd: Commands, json: bool, verbose: bool) -> Result<()> {
         // -- Shell completions -----------------------------------------------
         Commands::Completion(args) => {
             let mut cmd = <crate::Cli as clap::CommandFactory>::command();
-            clap_complete::generate(args.shell, &mut cmd, "openacosmi", &mut std::io::stdout());
+            clap_complete::generate(args.shell, &mut cmd, "crabclaw", &mut std::io::stdout());
             Ok(())
         }
     }
@@ -3254,15 +3372,54 @@ async fn dispatch_models(cmd: ModelsCommand, json: bool) -> Result<()> {
         ModelsAction::List(args) => {
             let cfg = oa_config::io::load_config().unwrap_or_default();
             let entries = oa_cmd_models::list_configured::resolve_configured_entries(&cfg);
+
+            // Try to fetch managed models from Gateway RPC
+            let managed_models = fetch_managed_models_from_gateway().await;
+
             let output = if json || args.json {
-                serde_json::to_string_pretty(&entries)?
-            } else {
-                entries
+                // Merge custom entries with managed into a unified JSON array
+                let mut all: Vec<serde_json::Value> = entries
                     .iter()
                     .map(|e| {
-                        let tags: Vec<&String> = e.tags.iter().collect();
-                        format!(
-                            "{} ({}/{}) [{}]",
+                        let mut v = serde_json::to_value(e).unwrap_or_default();
+                        if let Some(obj) = v.as_object_mut() {
+                            obj.insert("source".into(), serde_json::Value::String("custom".into()));
+                        }
+                        v
+                    })
+                    .collect();
+                for m in &managed_models {
+                    all.push(m.clone());
+                }
+                serde_json::to_string_pretty(&all)?
+            } else {
+                let mut lines: Vec<String> = Vec::new();
+
+                // Managed models first (if any)
+                if !managed_models.is_empty() {
+                    lines.push("── Platform Models [managed] ──".to_owned());
+                    for m in &managed_models {
+                        let id = m.get("id").and_then(|v| v.as_str()).unwrap_or("-");
+                        let name = m.get("name").and_then(|v| v.as_str()).unwrap_or(id);
+                        let provider = m.get("provider").and_then(|v| v.as_str()).unwrap_or("-");
+                        let model_id = m.get("modelId").and_then(|v| v.as_str()).unwrap_or(id);
+                        let is_default = m.get("isDefault").and_then(|v| v.as_bool()).unwrap_or(false);
+                        let tag = if is_default { " [managed, default]" } else { " [managed]" };
+                        lines.push(format!("  {name} ({provider}/{model_id}){tag}"));
+                    }
+                }
+
+                // Custom models
+                if !entries.is_empty() {
+                    if !managed_models.is_empty() {
+                        lines.push(String::new());
+                    }
+                    lines.push("── Custom Models [custom] ──".to_owned());
+                    for e in &entries {
+                        let mut tags: Vec<&String> = e.tags.iter().collect();
+                        tags.sort();
+                        lines.push(format!(
+                            "  {} ({}/{}) [custom, {}]",
                             e.key,
                             e.ref_provider,
                             e.ref_model,
@@ -3270,12 +3427,39 @@ async fn dispatch_models(cmd: ModelsCommand, json: bool) -> Result<()> {
                                 .map(|s| s.as_str())
                                 .collect::<Vec<_>>()
                                 .join(", ")
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n")
+                        ));
+                    }
+                }
+
+                if lines.is_empty() {
+                    "No models configured.".to_owned()
+                } else {
+                    lines.join("\n")
+                }
             };
             println!("{output}");
+            Ok(())
+        }
+        ModelsAction::Get => {
+            let cfg = oa_config::io::load_config().unwrap_or_default();
+            let default_model = cfg
+                .agents
+                .as_ref()
+                .and_then(|a| a.defaults.as_ref())
+                .and_then(|d| d.model.as_ref())
+                .and_then(|m| m.primary.as_ref())
+                .cloned();
+            match default_model {
+                Some(model) => println!("Default model: {model}"),
+                None => {
+                    let fallback = format!(
+                        "{}/{}",
+                        oa_cmd_models::shared::DEFAULT_PROVIDER,
+                        oa_cmd_models::shared::DEFAULT_MODEL,
+                    );
+                    println!("Default model: {fallback} (built-in)");
+                }
+            }
             Ok(())
         }
         ModelsAction::Set(args) => {
@@ -3291,6 +3475,34 @@ async fn dispatch_models(cmd: ModelsCommand, json: bool) -> Result<()> {
         ModelsAction::Aliases(cmd) => dispatch_models_aliases(cmd, json).await,
         ModelsAction::Fallbacks(cmd) => dispatch_models_fallbacks(cmd, json).await,
         ModelsAction::ImageFallbacks(cmd) => dispatch_models_image_fallbacks(cmd, json).await,
+        ModelsAction::Wallet(cmd) => dispatch_models_wallet(cmd, json).await,
+    }
+}
+
+/// Attempt to fetch managed models from the Gateway RPC.
+/// Returns an empty vec on failure (gateway not running, etc.).
+async fn fetch_managed_models_from_gateway() -> Vec<serde_json::Value> {
+    use oa_gateway_rpc::call::{call_gateway, CallGatewayOptions};
+
+    let opts = CallGatewayOptions {
+        method: "models.managed.list".to_string(),
+        params: None,
+        timeout_ms: Some(5_000),
+        ..Default::default()
+    };
+    let result: Result<serde_json::Value> = call_gateway(opts).await;
+    match result {
+        Ok(val) => {
+            // Response is { "models": [...] } or just [...]
+            if let Some(arr) = val.get("models").and_then(serde_json::Value::as_array) {
+                arr.clone()
+            } else if let Some(arr) = val.as_array() {
+                arr.clone()
+            } else {
+                Vec::new()
+            }
+        }
+        Err(_) => Vec::new(), // Gateway not available — silently skip
     }
 }
 
@@ -3379,6 +3591,79 @@ async fn dispatch_models_image_fallbacks(
             let msg =
                 oa_cmd_models::image_fallbacks::models_image_fallbacks_clear_command().await?;
             println!("{msg}");
+            Ok(())
+        }
+    }
+}
+
+/// Dispatch wallet subcommands (P5).
+async fn dispatch_models_wallet(cmd: ModelsWalletCommand, json: bool) -> Result<()> {
+    use oa_gateway_rpc::call::{call_gateway, CallGatewayOptions};
+
+    match cmd.action {
+        ModelsWalletAction::Balance(args) => {
+            let opts = CallGatewayOptions {
+                method: "models.wallet.balance".to_string(),
+                params: None,
+                timeout_ms: Some(10_000),
+                ..Default::default()
+            };
+            let result: serde_json::Value = call_gateway(opts).await?;
+            if json || args.json {
+                println!("{}", serde_json::to_string_pretty(&result)?);
+            } else {
+                let balance = result
+                    .get("balance")
+                    .and_then(serde_json::Value::as_f64)
+                    .unwrap_or(0.0);
+                let monthly = result
+                    .get("monthlyConsumption")
+                    .and_then(serde_json::Value::as_f64)
+                    .unwrap_or(0.0);
+                let recharge = result
+                    .get("monthlyRecharge")
+                    .and_then(serde_json::Value::as_f64)
+                    .unwrap_or(0.0);
+                println!("Balance:       {balance:.2} TK");
+                println!("Monthly usage: {monthly:.4} TK");
+                println!("Monthly topup: {recharge:.2} TK");
+            }
+            Ok(())
+        }
+        ModelsWalletAction::Usage(args) => {
+            let opts = CallGatewayOptions {
+                method: "models.wallet.usage".to_string(),
+                params: None,
+                timeout_ms: Some(10_000),
+                ..Default::default()
+            };
+            let result: serde_json::Value = call_gateway(opts).await?;
+            if json || args.json {
+                println!("{}", serde_json::to_string_pretty(&result)?);
+            } else if let Some(arr) = result.as_array() {
+                if arr.is_empty() {
+                    println!("No transactions found.");
+                } else {
+                    println!(
+                        "{:<20} {:<10} {:>10} {}",
+                        "Time", "Type", "Amount", "Remark"
+                    );
+                    println!("{}", "-".repeat(60));
+                    for tx in arr {
+                        let at = tx
+                            .get("createdAt")
+                            .and_then(serde_json::Value::as_str)
+                            .unwrap_or("-");
+                        let t = tx.get("type").and_then(serde_json::Value::as_str).unwrap_or("-");
+                        let amt = tx.get("amount").and_then(serde_json::Value::as_f64).unwrap_or(0.0);
+                        let remark =
+                            tx.get("remark").and_then(serde_json::Value::as_str).unwrap_or("");
+                        println!("{at:<20} {t:<10} {amt:>10.4} {remark}");
+                    }
+                }
+            } else {
+                println!("{}", serde_json::to_string_pretty(&result)?);
+            }
             Ok(())
         }
     }
@@ -3887,6 +4172,49 @@ async fn dispatch_skills(cmd: SkillsCommand, json: bool) -> Result<()> {
                 json: json || args.json,
             };
             oa_cmd_skills::skills_check_command(&sa).await
+        }
+    }
+}
+
+/// Dispatch packages subcommands.
+async fn dispatch_packages(cmd: PackagesCommand, json: bool) -> Result<()> {
+    match cmd.action {
+        PackagesAction::Browse(args) => {
+            let pa = oa_cmd_packages::PackagesBrowseArgs {
+                kind: args.kind,
+                keyword: args.keyword,
+                json: json || args.json,
+            };
+            oa_cmd_packages::packages_browse_command(&pa).await
+        }
+        PackagesAction::Detail(args) => {
+            let pa = oa_cmd_packages::PackagesDetailArgs {
+                id: args.id,
+                json: json || args.json,
+            };
+            oa_cmd_packages::packages_detail_command(&pa).await
+        }
+        PackagesAction::Install(args) => {
+            let pa = oa_cmd_packages::PackagesInstallArgs {
+                id: args.id,
+                kind: args.kind,
+                json: json || args.json,
+            };
+            oa_cmd_packages::packages_install_command(&pa).await
+        }
+        PackagesAction::Remove(args) => {
+            let pa = oa_cmd_packages::PackagesRemoveArgs {
+                id: args.id,
+                json: json || args.json,
+            };
+            oa_cmd_packages::packages_remove_command(&pa).await
+        }
+        PackagesAction::Installed(args) => {
+            let pa = oa_cmd_packages::PackagesInstalledArgs {
+                kind: args.kind,
+                json: json || args.json,
+            };
+            oa_cmd_packages::packages_installed_command(&pa).await
         }
     }
 }

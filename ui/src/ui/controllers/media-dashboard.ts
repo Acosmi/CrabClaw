@@ -2,19 +2,24 @@
 // 管理热点话题、草稿列表的数据加载逻辑。
 
 import type { AppViewState } from "../app-view-state.ts";
+import { runMediaMutation } from "./media-mutations.ts";
 
 // ---------- 配置类型 ----------
 
 export interface MediaToolInfo {
   name: string;
   description: string;
-  enabled: boolean;
-  scope: string; // "media" | "shared"
+  status?: string; // "builtin" | "configured" | "needs_configuration" | "enabled" | "disabled"
+  configured?: boolean;
+  enabled?: boolean;
+  scope?: string; // "media" | "shared"
 }
 
 export interface MediaSourceInfo {
   name: string;
-  status: string; // "registered" | "configured"
+  status?: string; // "default_enabled" | "configured" | "disabled"
+  configured?: boolean;
+  enabled?: boolean;
 }
 
 export interface TrendingStrategy {
@@ -44,6 +49,7 @@ export interface MediaConfig {
   };
   trending_strategy?: TrendingStrategy;
   enabled_sources_configured?: boolean;
+  enabled_sources?: string[];
 }
 
 export interface SourceHealthInfo {
@@ -142,26 +148,40 @@ export async function loadDraftsList(state: AppViewState, platform?: string): Pr
 }
 
 export async function deleteDraft(state: AppViewState, id: string): Promise<boolean> {
-  if (!state.client || !state.connected) return false;
-  try {
-    await state.client.request("media.drafts.delete", { id });
-    // 刷新列表
-    await loadDraftsList(state);
-    return true;
-  } catch {
-    return false;
-  }
+  return runMediaMutation(state, {
+    label: "deleteDraft",
+    run: (client) => client.request("media.drafts.delete", { id }),
+    onSuccess: (nextState) => {
+      if (nextState.mediaDraftDetail?.id === id) {
+        nextState.mediaDraftDetail = null;
+      }
+      if (nextState.mediaDraftEdit?.id === id) {
+        nextState.mediaDraftEdit = null;
+      }
+    },
+    invalidate: [
+      async (nextState) => {
+        await loadDraftsList(nextState, selectedDraftPlatform(nextState));
+      },
+    ],
+  });
 }
 
 export async function approveDraft(state: AppViewState, id: string): Promise<boolean> {
-  if (!state.client || !state.connected) return false;
-  try {
-    await state.client.request("media.drafts.approve", { id });
-    await loadDraftsList(state);
-    return true;
-  } catch {
-    return false;
-  }
+  return runMediaMutation(state, {
+    label: "approveDraft",
+    run: (client) => client.request("media.drafts.approve", { id }),
+    invalidate: [
+      async (nextState) => {
+        await loadDraftsList(nextState, selectedDraftPlatform(nextState));
+      },
+      async (nextState) => {
+        if (nextState.mediaDraftDetail?.id === id) {
+          await loadDraftDetail(nextState, id);
+        }
+      },
+    ],
+  });
 }
 
 export async function updateDraft(
@@ -169,15 +189,23 @@ export async function updateDraft(
   id: string,
   updates: { title?: string; body?: string; platform?: string; tags?: string[] },
 ): Promise<boolean> {
-  if (!state.client || !state.connected) return false;
-  try {
-    await state.client.request("media.drafts.update", { id, ...updates });
-    state.mediaDraftEdit = null;
-    await loadDraftsList(state);
-    return true;
-  } catch {
-    return false;
-  }
+  return runMediaMutation(state, {
+    label: "updateDraft",
+    run: (client) => client.request("media.drafts.update", { id, ...updates }),
+    onSuccess: (nextState) => {
+      nextState.mediaDraftEdit = null;
+    },
+    invalidate: [
+      async (nextState) => {
+        await loadDraftsList(nextState, selectedDraftPlatform(nextState));
+      },
+      async (nextState) => {
+        if (nextState.mediaDraftDetail?.id === id) {
+          await loadDraftDetail(nextState, id);
+        }
+      },
+    ],
+  });
 }
 
 export function openDraftEdit(state: AppViewState, draft: DraftEntry): void {
@@ -278,13 +306,15 @@ export async function loadMediaConfig(state: AppViewState): Promise<void> {
 }
 
 export async function updateMediaConfig(state: AppViewState, patch: Record<string, unknown>): Promise<void> {
-  if (!state.client || !state.connected) return;
-  try {
-    await state.client.request("media.config.update", patch);
-    await loadMediaConfig(state);
-  } catch (err) {
-    console.error("updateMediaConfig failed", err);
-  }
+  await runMediaMutation(state, {
+    label: "updateMediaConfig",
+    run: (client) => client.request("media.config.update", patch),
+    invalidate: [
+      async (nextState) => {
+        await loadMediaConfig(nextState);
+      },
+    ],
+  });
 }
 
 // ---------- 巡检任务 ----------
@@ -333,26 +363,27 @@ export async function checkTrendingSourceHealth(state: AppViewState): Promise<vo
 // ---------- 工具/源 Toggle ----------
 
 export async function toggleMediaTool(state: AppViewState, tool: string, enabled: boolean): Promise<void> {
-  if (!state.client || !state.connected) return;
-  try {
-    await state.client.request("media.tools.toggle", { tool, enabled });
-    await loadMediaConfig(state);
-  } catch (err) {
-    console.error("toggleMediaTool failed", err);
-    // 失败后强制重渲染，回滚 checkbox 视觉状态
-    state.requestUpdate();
-  }
+  await runMediaMutation(state, {
+    label: "toggleMediaTool",
+    run: (client) => client.request("media.tools.toggle", { tool, enabled }),
+    invalidate: [
+      async (nextState) => {
+        await loadMediaConfig(nextState);
+      },
+    ],
+  });
 }
 
 export async function toggleMediaSource(state: AppViewState, source: string, enabled: boolean): Promise<void> {
-  if (!state.client || !state.connected) return;
-  try {
-    await state.client.request("media.sources.toggle", { source, enabled });
-    await loadMediaConfig(state);
-  } catch (err) {
-    console.error("toggleMediaSource failed", err);
-    state.requestUpdate();
-  }
+  await runMediaMutation(state, {
+    label: "toggleMediaSource",
+    run: (client) => client.request("media.sources.toggle", { source, enabled }),
+    invalidate: [
+      async (nextState) => {
+        await loadMediaConfig(nextState);
+      },
+    ],
+  });
 }
 
 export async function loadMediaDashboard(state: AppViewState): Promise<void> {
@@ -364,4 +395,9 @@ export async function loadMediaDashboard(state: AppViewState): Promise<void> {
     loadMediaPatrolJobs(state),
     checkTrendingSourceHealth(state),
   ]);
+}
+
+function selectedDraftPlatform(state: AppViewState): string | undefined {
+  const platform = state.mediaDraftsSelectedPlatform?.trim();
+  return platform ? platform : undefined;
 }

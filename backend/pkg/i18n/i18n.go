@@ -34,8 +34,8 @@ var (
 func init() {
 	// 注册中文语言包
 	bundles[LangZhCN] = map[string]string{
-		"app.starting":          "Open Acosmi v{version} 正在启动...",
-		"app.shutdown":          "Open Acosmi 已关闭",
+		"app.starting":          "Crab Claw（蟹爪） v{version} 正在启动...",
+		"app.shutdown":          "Crab Claw（蟹爪） 已关闭",
 		"app.gateway.listening": "网关服务器已启动，监听端口 {port}",
 		"app.gateway.stopping":  "正在停止网关服务器...",
 		"app.config.loaded":     "配置已加载: {path}",
@@ -55,8 +55,8 @@ func init() {
 
 	// 注册英文语言包
 	bundles[LangEnUS] = map[string]string{
-		"app.starting":          "Open Acosmi v{version} starting...",
-		"app.shutdown":          "Open Acosmi has been shut down",
+		"app.starting":          "Crab Claw（蟹爪） v{version} starting...",
+		"app.shutdown":          "Crab Claw（蟹爪） has been shut down",
 		"app.gateway.listening": "Gateway server started, listening on port {port}",
 		"app.gateway.stopping":  "Stopping gateway server...",
 		"app.config.loaded":     "Configuration loaded: {path}",
@@ -83,9 +83,9 @@ func Init(lang Lang) {
 }
 
 // InitFromEnv 从环境变量自动检测并设置语言。
-// 优先级: OPENACOSMI_LANG > LC_ALL > LANG > 默认 zh-CN。
+// 优先级: CRABCLAW_LANG > OPENACOSMI_LANG > LC_ALL > LANG > 默认 zh-CN。
 func InitFromEnv() {
-	for _, env := range []string{"OPENACOSMI_LANG", "LC_ALL", "LANG"} {
+	for _, env := range []string{"CRABCLAW_LANG", "OPENACOSMI_LANG", "LC_ALL", "LANG"} {
 		v := os.Getenv(env)
 		if v == "" {
 			continue
@@ -126,8 +126,8 @@ func GetLang() Lang {
 // 用法：
 //
 //	i18n.T("app.starting", map[string]string{"version": "1.0.0"})
-//	// 中文: "Open Acosmi v1.0.0 正在启动..."
-//	// 英文: "Open Acosmi v1.0.0 starting..."
+//	// 中文: "Crab Claw（蟹爪） v1.0.0 正在启动..."
+//	// 英文: "Crab Claw（蟹爪） v1.0.0 starting..."
 func T(key string, params map[string]string) string {
 	mu.RLock()
 	lang := current

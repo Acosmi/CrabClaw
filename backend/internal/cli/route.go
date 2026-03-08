@@ -37,7 +37,7 @@ func RegisterRoutedCommand(path []string, handler RoutedCommandHandler) {
 // 对应 TS route.ts tryRouteCli()。
 func TryRouteCli(argv []string) (bool, error) {
 	// 环境变量禁用快速路由
-	if IsTruthyEnv("OPENACOSMI_DISABLE_ROUTE_FIRST") {
+	if IsTruthyAnyEnv("CRABCLAW_DISABLE_ROUTE_FIRST", "OPENACOSMI_DISABLE_ROUTE_FIRST") {
 		return false, nil
 	}
 	// --help/--version 不走快速路由

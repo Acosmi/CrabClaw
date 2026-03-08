@@ -1,7 +1,7 @@
-// Package main 是 Open Acosmi CLI 的入口程序。
+// Package main 是 Crab Claw（蟹爪）兼容 CLI 的入口程序。
 // 基于 Cobra 框架构建，对应 TS 端 src/cli/program/ 的完整 CLI 框架。
 //
-// DEPRECATED: Go CLI (openacosmi) 已弃用。请使用 Rust CLI 替代。
+// DEPRECATED: Go CLI (openacosmi) 已弃用。请使用 Rust CLI（主命令 crabclaw）替代。
 // Go 端仅保留 Gateway 服务 (cmd/acosmi)。
 // 参见 docs/adr/001-rust-cli-go-gateway.md
 package main
@@ -19,8 +19,8 @@ import (
 // rootCmd 根命令（对应 TS buildProgram() + configureProgramHelp()）
 var rootCmd = &cobra.Command{
 	Use:   cli.CLIName,
-	Short: "🦜 Claw Acosmi — AI Agent 管理平台",
-	Long: `🦜 Claw Acosmi — 你的 AI Agent 管理平台
+	Short: "🦀 Crab Claw（蟹爪） — AI Agent 管理平台",
+	Long: `🦀 Crab Claw（蟹爪） — 你的 AI Agent 管理平台
 
 管理 AI Agent、消息频道、插件和服务。
 支持 WhatsApp、Telegram、Discord、Slack、Signal、iMessage 等频道。`,
@@ -32,7 +32,7 @@ var rootCmd = &cobra.Command{
 		// Go CLI 已弃用，引导用户使用 Rust CLI
 		fmt.Fprintln(os.Stderr, "")
 		fmt.Fprintln(os.Stderr, "⚠️  DEPRECATED: Go CLI (openacosmi) 已弃用。")
-		fmt.Fprintln(os.Stderr, "   请使用 Rust 版本的 openacosmi CLI 替代。")
+		fmt.Fprintln(os.Stderr, "   请使用 Rust CLI：crabclaw（openacosmi 为兼容别名）管理 Crab Claw（蟹爪）。")
 		fmt.Fprintln(os.Stderr, "   Gateway 服务请使用: acosmi (cmd/acosmi)")
 		fmt.Fprintln(os.Stderr, "   参见: docs/adr/001-rust-cli-go-gateway.md")
 		fmt.Fprintln(os.Stderr, "")

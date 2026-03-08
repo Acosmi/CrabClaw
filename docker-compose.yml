@@ -1,4 +1,4 @@
-# OpenAcosmi Docker Compose
+# CrabClaw Docker Compose
 #
 # Architecture: Rust CLI (openacosmi) + Go Gateway (acosmi)
 # See docs/adr/001-rust-cli-go-gateway.md
@@ -8,12 +8,12 @@
 #   docker compose run cli health     # Run CLI command
 #
 # To use the legacy Node.js gateway, set:
-#   OPENACOSMI_GATEWAY_IMAGE=openacosmi:local
+#   OPENACOSMI_GATEWAY_IMAGE=crabclaw:local
 
 services:
   # Go Gateway (primary)
   gateway:
-    image: ${OPENACOSMI_GATEWAY_IMAGE:-openacosmi-gateway:local}
+    image: ${OPENACOSMI_GATEWAY_IMAGE:-crabclaw-gateway:local}
     build:
       context: .
       dockerfile: Dockerfile.gateway
@@ -29,12 +29,12 @@ services:
       - "${OPENACOSMI_GATEWAY_PORT:-19001}:19001"
     init: true
     restart: unless-stopped
-    command: ["-port", "19001"]
+    command: [ "-port", "19001" ]
 
   # Legacy Node.js Gateway (for backward compatibility)
   gateway-legacy:
-    image: ${OPENACOSMI_IMAGE:-openacosmi:local}
-    profiles: ["legacy"]
+    image: ${OPENACOSMI_IMAGE:-crabclaw:local}
+    profiles: [ "legacy" ]
     environment:
       HOME: /home/node
       TERM: xterm-256color
@@ -50,13 +50,4 @@ services:
       - "${OPENACOSMI_BRIDGE_PORT:-18790}:18790"
     init: true
     restart: unless-stopped
-    command:
-      [
-        "node",
-        "dist/index.js",
-        "gateway",
-        "--bind",
-        "${OPENACOSMI_GATEWAY_BIND:-lan}",
-        "--port",
-        "18789",
-      ]
+    command: [ "node", "dist/index.js", "gateway", "--bind", "${OPENACOSMI_GATEWAY_BIND:-lan}", "--port", "18789" ]

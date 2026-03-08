@@ -1,6 +1,6 @@
-# Open Acosmi — 构建系统
+# Crab Claw（蟹爪）— 构建系统
 #
-# 架构: Rust CLI (openacosmi) + Go Gateway (acosmi)
+# 架构: Rust CLI (crabclaw，兼容别名 openacosmi) + Go Gateway (acosmi)
 # 参见 docs/adr/001-rust-cli-go-gateway.md
 #
 # 用法:
@@ -26,9 +26,9 @@ RUST_FFI_WORKSPACE := ../cli-rust/libs/openviking-rs
 
 # --- 默认目标 ---
 help: ## 显示帮助信息
-	@echo "Open Acosmi 构建命令："
+	@echo "Crab Claw（蟹爪）构建命令："
 	@echo ""
-	@echo "  架构: Rust CLI (openacosmi) + Go Gateway (acosmi)"
+	@echo "  架构: Rust CLI (crabclaw，兼容别名 openacosmi) + Go Gateway (acosmi)"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 	@echo ""
@@ -58,15 +58,18 @@ gateway-dev: gateway ## 编译并启动 Gateway (dev profile)
 cli: ## 编译 Rust CLI (release)
 	@echo "🦀 编译 Rust CLI..."
 	cd ../cli-rust && cargo build --workspace --release
-	@echo "✅ Rust CLI 编译完成: ../cli-rust/target/release/openacosmi"
+	@echo "✅ Rust CLI 编译完成: ../cli-rust/target/release/{crabclaw,openacosmi}"
 
 test-rust: ## 运行 Rust CLI 测试
 	cd ../cli-rust && cargo test --workspace
 
 install-cli: cli ## 安装 Rust CLI 到 ~/.local/bin
 	@mkdir -p $(HOME)/.local/bin
+	cp ../cli-rust/target/release/crabclaw $(HOME)/.local/bin/crabclaw
 	cp ../cli-rust/target/release/openacosmi $(HOME)/.local/bin/openacosmi
-	@echo "✅ Rust CLI 已安装: $(HOME)/.local/bin/openacosmi"
+	@echo "✅ Rust CLI 已安装:"
+	@echo "   - $(HOME)/.local/bin/crabclaw"
+	@echo "   - $(HOME)/.local/bin/openacosmi (兼容别名)"
 
 # --- C++ 构建 ---
 build-cpp: ## 编译 C++ 库
@@ -81,7 +84,7 @@ build-all: gateway cli ## 编译 Gateway + Rust CLI
 
 # --- Go CLI (已弃用) ---
 build-go-cli-deprecated: fmt vet ## [已弃用] 编译 Go CLI
-	@echo "⚠️  Go CLI (openacosmi) 已弃用，请使用 Rust CLI"
+	@echo "⚠️  Go CLI (openacosmi) 已弃用，请使用 Rust CLI（主命令 crabclaw）"
 	@echo "   运行 'make cli' 编译 Rust CLI"
 	@echo "   运行 'make gateway' 编译 Go Gateway"
 	go build $(LDFLAGS) -o build/openacosmi-go ./cmd/openacosmi

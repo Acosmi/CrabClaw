@@ -35,6 +35,28 @@ func TestLoadDotEnv_StateDirFallback(t *testing.T) {
 	}
 }
 
+func TestLoadDotEnv_CrabClawStateDirFallback(t *testing.T) {
+	tmpDir := t.TempDir()
+	globalDir := filepath.Join(tmpDir, ".crabclaw")
+	if err := os.MkdirAll(globalDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+
+	envContent := "TEST_DOTENV_CRAB=hello_from_crab\n"
+	if err := os.WriteFile(filepath.Join(globalDir, ".env"), []byte(envContent), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("CRABCLAW_STATE_DIR", globalDir)
+	os.Unsetenv("TEST_DOTENV_CRAB")
+
+	LoadDotEnv(true)
+
+	if got := os.Getenv("TEST_DOTENV_CRAB"); got != "hello_from_crab" {
+		t.Errorf("TEST_DOTENV_CRAB = %q, want %q", got, "hello_from_crab")
+	}
+}
+
 // TestLoadDotEnv_CwdPriority 验证 CWD .env 优先于全局 .env。
 func TestLoadDotEnv_CwdPriority(t *testing.T) {
 	// 创建临时目录

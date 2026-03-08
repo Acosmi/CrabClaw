@@ -1,4 +1,4 @@
-/// System event, heartbeat, and presence commands for Claw Acosmi CLI.
+/// System event, heartbeat, and presence commands for Crab Claw CLI.
 ///
 /// Provides subcommands: event, heartbeat (last/enable/disable), presence.
 ///

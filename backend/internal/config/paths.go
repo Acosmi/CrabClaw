@@ -17,8 +17,10 @@ import (
 // ----- 常量 -----
 
 const (
-	// NewStateDirname 新版状态目录名
+	// NewStateDirname 当前默认写入状态目录名
 	NewStateDirname = ".openacosmi"
+	// CompatibilityStateDirname 新品牌兼容状态目录名（双读阶段）
+	CompatibilityStateDirname = ".crabclaw"
 	// ConfigFilename 配置文件名
 	ConfigFilename = "openacosmi.json"
 	// DefaultGatewayPort 默认网关端口
@@ -39,7 +41,7 @@ var LegacyConfigFilenames = []string{"openclaw.json", "clawdbot.json", "moltbot.
 
 // IsNixMode 检测当前是否 Nix 模式运行
 func IsNixMode() bool {
-	if os.Getenv("OPENACOSMI_NIX_MODE") == "1" {
+	if envTrimmedCompat("CRABCLAW_NIX_MODE", "OPENACOSMI_NIX_MODE") == "1" {
 		return true
 	}
 	return os.Getenv("OPENCLAW_NIX_MODE") == "1"
@@ -49,7 +51,7 @@ func IsNixMode() bool {
 
 // ResolveHomeDir 解析用户主目录（支持 OPENACOSMI_HOME 环境变量覆盖，旧名 OPENCLAW_HOME fallback）
 func ResolveHomeDir() string {
-	if v := strings.TrimSpace(os.Getenv("OPENACOSMI_HOME")); v != "" {
+	if v := envTrimmedCompat("CRABCLAW_HOME", "OPENACOSMI_HOME"); v != "" {
 		return expandTilde(v)
 	}
 	if v := strings.TrimSpace(os.Getenv("OPENCLAW_HOME")); v != "" {
@@ -93,9 +95,14 @@ func resolveUserPath(input string) string {
 // ----- 状态目录 -----
 
 // ResolveStateDir 解析状态目录
-// 优先级: OPENACOSMI_STATE_DIR → OPENCLAW_STATE_DIR → CLAWDBOT_STATE_DIR → 已存在的目录 → ~/.openacosmi
+// 优先级:
+// 1. OPENACOSMI_STATE_DIR / OPENCLAW_STATE_DIR / CLAWDBOT_STATE_DIR
+// 2. 已存在且包含受管状态内容的 ~/.crabclaw
+// 3. 已存在的 ~/.openacosmi
+// 4. 已存在的旧版目录
+// 5. 默认 ~/.openacosmi（保持旧默认写路径不变）
 func ResolveStateDir() string {
-	if v := envTrimmed("OPENACOSMI_STATE_DIR"); v != "" {
+	if v := envTrimmedCompat("CRABCLAW_STATE_DIR", "OPENACOSMI_STATE_DIR"); v != "" {
 		return resolveUserPath(v)
 	}
 	if v := envTrimmed("OPENCLAW_STATE_DIR"); v != "" {
@@ -106,11 +113,22 @@ func ResolveStateDir() string {
 	}
 
 	home := ResolveHomeDir()
+	compatDir := filepath.Join(home, CompatibilityStateDirname)
 	newDir := filepath.Join(home, NewStateDirname)
 
-	// 检测新版目录
+	// 优先使用已存在且具备受管状态内容的新兼容目录。
+	if stateDirHasManagedContent(compatDir) {
+		return compatDir
+	}
+
+	// 继续优先旧默认目录，避免空的 .crabclaw 抢占现有状态。
 	if dirExists(newDir) {
 		return newDir
+	}
+
+	// 如果只有 .crabclaw 存在，则允许直接读取它。
+	if dirExists(compatDir) {
+		return compatDir
 	}
 
 	// 检测旧版目录
@@ -128,7 +146,7 @@ func ResolveStateDir() string {
 
 // ResolveCanonicalConfigPath 获取规范配置文件路径
 func ResolveCanonicalConfigPath() string {
-	if v := envTrimmed("OPENACOSMI_CONFIG_PATH"); v != "" {
+	if v := envTrimmedCompat("CRABCLAW_CONFIG_PATH", "OPENACOSMI_CONFIG_PATH"); v != "" {
 		return resolveUserPath(v)
 	}
 	if v := envTrimmed("OPENCLAW_CONFIG_PATH"); v != "" {
@@ -142,7 +160,7 @@ func ResolveCanonicalConfigPath() string {
 
 // ResolveConfigPath 解析活跃配置路径（优先选择已存在的文件）
 func ResolveConfigPath() string {
-	if v := envTrimmed("OPENACOSMI_CONFIG_PATH"); v != "" {
+	if v := envTrimmedCompat("CRABCLAW_CONFIG_PATH", "OPENACOSMI_CONFIG_PATH"); v != "" {
 		return resolveUserPath(v)
 	}
 	if v := envTrimmed("OPENCLAW_CONFIG_PATH"); v != "" {
@@ -162,7 +180,7 @@ func ResolveConfigPath() string {
 
 // ResolveConfigCandidates 生成所有配置文件候选路径
 func ResolveConfigCandidates() []string {
-	if v := envTrimmed("OPENACOSMI_CONFIG_PATH"); v != "" {
+	if v := envTrimmedCompat("CRABCLAW_CONFIG_PATH", "OPENACOSMI_CONFIG_PATH"); v != "" {
 		return []string{resolveUserPath(v)}
 	}
 	if v := envTrimmed("OPENCLAW_CONFIG_PATH"); v != "" {
@@ -176,7 +194,7 @@ func ResolveConfigCandidates() []string {
 	home := ResolveHomeDir()
 
 	// 状态目录覆盖
-	for _, envKey := range []string{"OPENACOSMI_STATE_DIR", "OPENCLAW_STATE_DIR", "CLAWDBOT_STATE_DIR"} {
+	for _, envKey := range []string{"CRABCLAW_STATE_DIR", "OPENACOSMI_STATE_DIR", "OPENCLAW_STATE_DIR", "CLAWDBOT_STATE_DIR"} {
 		if v := envTrimmed(envKey); v != "" {
 			dir := resolveUserPath(v)
 			candidates = append(candidates, filepath.Join(dir, ConfigFilename))
@@ -186,8 +204,11 @@ func ResolveConfigCandidates() []string {
 		}
 	}
 
-	// 默认目录
-	allDirs := []string{filepath.Join(home, NewStateDirname)}
+	// 默认目录：先尝试新兼容目录，再尝试旧默认目录与更早的历史目录。
+	allDirs := []string{
+		filepath.Join(home, CompatibilityStateDirname),
+		filepath.Join(home, NewStateDirname),
+	}
 	for _, name := range LegacyStateDirnames {
 		allDirs = append(allDirs, filepath.Join(home, name))
 	}
@@ -205,7 +226,7 @@ func ResolveConfigCandidates() []string {
 
 // ResolveGatewayPort 解析网关端口 (env > config > default)
 func ResolveGatewayPort(cfgPort *int) int {
-	for _, key := range []string{"OPENACOSMI_GATEWAY_PORT", "OPENCLAW_GATEWAY_PORT", "CLAWDBOT_GATEWAY_PORT"} {
+	for _, key := range []string{"CRABCLAW_GATEWAY_PORT", "OPENACOSMI_GATEWAY_PORT", "OPENCLAW_GATEWAY_PORT", "CLAWDBOT_GATEWAY_PORT"} {
 		if v := envTrimmed(key); v != "" {
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
 				return n
@@ -234,7 +255,7 @@ func ResolveGatewayLockDir() string {
 
 // ResolveOAuthDir 解析 OAuth 凭证目录
 func ResolveOAuthDir() string {
-	if v := envTrimmed("OPENACOSMI_OAUTH_DIR"); v != "" {
+	if v := envTrimmedCompat("CRABCLAW_OAUTH_DIR", "OPENACOSMI_OAUTH_DIR"); v != "" {
 		return resolveUserPath(v)
 	}
 	if v := envTrimmed("OPENCLAW_OAUTH_DIR"); v != "" {
@@ -254,6 +275,15 @@ func envTrimmed(key string) string {
 	return strings.TrimSpace(os.Getenv(key))
 }
 
+func envTrimmedCompat(keys ...string) string {
+	for _, key := range keys {
+		if v := envTrimmed(key); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
 func dirExists(p string) bool {
 	info, err := os.Stat(p)
 	return err == nil && info.IsDir()
@@ -262,4 +292,29 @@ func dirExists(p string) bool {
 func fileExists(p string) bool {
 	info, err := os.Stat(p)
 	return err == nil && !info.IsDir()
+}
+
+func stateDirHasManagedContent(dir string) bool {
+	if !dirExists(dir) {
+		return false
+	}
+
+	markers := []string{
+		ConfigFilename,
+		"credentials",
+		"sessions",
+		"agents",
+		"memory",
+		"extensions",
+		"logs",
+		"exec-approvals.json",
+		"oauth.json",
+	}
+	for _, marker := range markers {
+		p := filepath.Join(dir, marker)
+		if dirExists(p) || fileExists(p) {
+			return true
+		}
+	}
+	return false
 }

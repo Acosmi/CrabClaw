@@ -1,20 +1,24 @@
 ---
 name: plugin
-description: "Claw Acosmi plugins/extensions: discovery, config, and safety"
+description: "Crab Claw（蟹爪） plugins/extensions: discovery, config, and safety"
 ---
 
 # Plugins (Extensions)
 
 ## Quick start (new to plugins?)
 
-A plugin is just a **small code module** that extends Claw Acosmi with extra
+A plugin is just a **small code module** that extends Crab Claw（蟹爪） with extra
 features (commands, tools, and Gateway RPC).
 
 Most of the time, you’ll use plugins when you want a feature that’s not built
-into core Claw Acosmi yet (or you want to keep optional features out of your main
+into core Crab Claw（蟹爪） yet (or you want to keep optional features out of your main
 install).
 
 Fast path:
+
+Primary Rust CLI name: `crabclaw`. Plugin package names, manifest keys, state
+paths, and other `openacosmi` technical identifiers remain compatibility
+markers unless a dedicated migration changes them.
 
 1. Enable a bundled plugin in `~/.openacosmi/openacosmi.json`:
 
@@ -58,7 +62,7 @@ See [Voice Call](/plugins/voice-call) for a concrete example plugin.
 - Qwen OAuth (provider auth) — bundled as `qwen-portal-auth` (disabled by default)
 - Copilot Proxy (provider auth) — local VS Code Copilot Proxy bridge; distinct from built-in `github-copilot` device login (bundled, disabled by default)
 
-Claw Acosmi plugins are **TypeScript modules** loaded at runtime via jiti. **Config
+Crab Claw（蟹爪） plugins are **TypeScript modules** loaded at runtime via jiti. **Config
 validation does not execute plugin code**; it uses the plugin manifest and JSON
 Schema instead. See [Plugin manifest](/plugins/manifest).
 
@@ -82,7 +86,7 @@ Plugins can access selected core helpers via `api.runtime`. For telephony TTS:
 
 ```ts
 const result = await api.runtime.tts.textToSpeechTelephony({
-  text: "Hello from Claw Acosmi",
+  text: "Hello from Crab Claw",
   cfg: api.config,
 });
 ```
@@ -95,7 +99,7 @@ Notes:
 
 ## Discovery & precedence
 
-Claw Acosmi scans, in order:
+Crab Claw（蟹爪） scans, in order:
 
 1. Config paths
 
@@ -111,7 +115,7 @@ Claw Acosmi scans, in order:
 - `~/.openacosmi/extensions/*.ts`
 - `~/.openacosmi/extensions/*/index.ts`
 
-4. Bundled extensions (shipped with Claw Acosmi, **disabled by default**)
+4. Bundled extensions (shipped with Crab Claw（蟹爪）, **disabled by default**)
 
 - `<openacosmi>/extensions/*`
 
@@ -175,7 +179,7 @@ Example:
 }
 ```
 
-Claw Acosmi can also merge **external channel catalogs** (for example, an MPM
+Crab Claw（蟹爪） can also merge **external channel catalogs** (for example, an MPM
 registry export). Drop a JSON file at one of:
 
 - `~/.openacosmi/mpm/plugins.json`
@@ -193,7 +197,7 @@ Default plugin ids:
 - Package packs: `package.json` `name`
 - Standalone file: file base name (`~/.../voice-call.ts` → `voice-call`)
 
-If a plugin exports `id`, Claw Acosmi uses it but warns when it doesn’t match the
+If a plugin exports `id`, Crab Claw（蟹爪） uses it but warns when it doesn’t match the
 configured id.
 
 ## Config
@@ -253,7 +257,7 @@ are disabled with diagnostics.
 
 The Control UI uses `config.schema` (JSON Schema + `uiHints`) to render better forms.
 
-Claw Acosmi augments `uiHints` at runtime based on discovered plugins:
+Crab Claw（蟹爪） augments `uiHints` at runtime based on discovered plugins:
 
 - Adds per-plugin labels for `plugins.entries.<id>` / `.enabled` / `.config`
 - Merges optional plugin-provided config field hints under:
@@ -285,13 +289,13 @@ Example:
 ## CLI
 
 ```bash
-openacosmi plugins list
-openacosmi plugins info <id>
-openacosmi plugins install <path-or-spec>
-openacosmi plugins install -l ./my-plugin   # link (no copy) for dev
-openacosmi plugins enable <id>
-openacosmi plugins disable <id>
-openacosmi plugins doctor
+crabclaw plugins list
+crabclaw plugins info <id>
+crabclaw plugins install <path-or-spec>
+crabclaw plugins install -l ./my-plugin   # link (no copy) for dev
+crabclaw plugins enable <id>
+crabclaw plugins disable <id>
+crabclaw plugins doctor
 ```
 
 完整 CLI 参考: `docs/cli/plugins.md`。
@@ -332,12 +336,12 @@ Notes:
 ## Provider plugins (model auth)
 
 Plugins can register **model provider auth** flows so users can run OAuth or
-API-key setup inside Claw Acosmi (no external scripts needed).
+API-key setup inside Crab Claw（蟹爪） (no external scripts needed).
 
 Register a provider via `api.registerProvider(...)`. Each provider exposes one
 or more auth methods (OAuth, API key, device code, etc.). These methods power:
 
-- `openacosmi models auth login --provider <id> [--method <id>]` (Rust CLI)
+- `crabclaw models auth login --provider <id> [--method <id>]` (Rust CLI; `openacosmi` remains a compatibility alias)
 
 Example:
 
@@ -563,7 +567,7 @@ Command handler context:
 - `isAuthorizedSender`: Whether the sender is an authorized user
 - `args`: Arguments passed after the command (if `acceptsArgs: true`)
 - `commandBody`: The full command text
-- `config`: The current Claw Acosmi config
+- `config`: The current Crab Claw（蟹爪） config
 
 Command options:
 

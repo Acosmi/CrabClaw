@@ -1,26 +1,29 @@
 ---
 name: deepgram
-description: "Deepgram 语音转录用于入站语音消息"
+description: "Deepgram transcription for inbound voice notes"
 ---
 
-# Deepgram（音频转录）
+# Deepgram (Audio Transcription)
 
-Deepgram 是语音转文字 API。在创宇太虚中用于通过 `tools.media.audio` 进行**入站音频/语音消息转录**。
+Deepgram is a speech-to-text API. In Crab Claw（蟹爪） it is used for **inbound audio/voice note
+transcription** via `tools.media.audio`.
 
-启用后，创宇太虚将音频文件上传至 Deepgram 并将转录文本注入回复管线（`{{Transcript}}` + `[Audio]` 块）。这**不是**流式的；使用的是预录制转录端点。
+When enabled, Crab Claw（蟹爪） uploads the audio file to Deepgram and injects the transcript
+into the reply pipeline (`{{Transcript}}` + `[Audio]` block). This is **not streaming**;
+it uses the pre-recorded transcription endpoint.
 
-官网：[https://deepgram.com](https://deepgram.com)
-文档：[https://developers.deepgram.com](https://developers.deepgram.com)
+Website: [https://deepgram.com](https://deepgram.com)  
+Docs: [https://developers.deepgram.com](https://developers.deepgram.com)
 
-## 快速开始
+## Quick start
 
-1. 设置 API 密钥：
+1. Set your API key:
 
-```bash
+```
 DEEPGRAM_API_KEY=dg_...
 ```
 
-1. 启用供应商：
+2. Enable the provider:
 
 ```json5
 {
@@ -35,15 +38,15 @@ DEEPGRAM_API_KEY=dg_...
 }
 ```
 
-## 选项
+## Options
 
-- `model`：Deepgram 模型 ID（默认：`nova-3`）
-- `language`：语言提示（可选）
-- `tools.media.audio.providerOptions.deepgram.detect_language`：启用语言检测（可选）
-- `tools.media.audio.providerOptions.deepgram.punctuate`：启用标点（可选）
-- `tools.media.audio.providerOptions.deepgram.smart_format`：启用智能格式化（可选）
+- `model`: Deepgram model id (default: `nova-3`)
+- `language`: language hint (optional)
+- `tools.media.audio.providerOptions.deepgram.detect_language`: enable language detection (optional)
+- `tools.media.audio.providerOptions.deepgram.punctuate`: enable punctuation (optional)
+- `tools.media.audio.providerOptions.deepgram.smart_format`: enable smart formatting (optional)
 
-带语言的示例：
+Example with language:
 
 ```json5
 {
@@ -58,7 +61,7 @@ DEEPGRAM_API_KEY=dg_...
 }
 ```
 
-带 Deepgram 选项的示例：
+Example with Deepgram options:
 
 ```json5
 {
@@ -80,8 +83,8 @@ DEEPGRAM_API_KEY=dg_...
 }
 ```
 
-## 备注
+## Notes
 
-- 认证遵循标准供应商认证顺序；`DEEPGRAM_API_KEY` 是最简单的方式。
-- 使用代理时可通过 `tools.media.audio.baseUrl` 和 `tools.media.audio.headers` 覆盖端点或头。
-- 输出遵循与其他供应商相同的音频规则（大小限制、超时、转录注入）。
+- Authentication follows the standard provider auth order; `DEEPGRAM_API_KEY` is the simplest path.
+- Override endpoints or headers with `tools.media.audio.baseUrl` and `tools.media.audio.headers` when using a proxy.
+- Output follows the same audio rules as other providers (size caps, timeouts, transcript injection).

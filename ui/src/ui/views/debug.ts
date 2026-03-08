@@ -56,7 +56,7 @@ export function renderDebug(props: DebugProps) {
             ${securitySummary
       ? html`<div class="callout ${securityTone}" style="margin-top: 8px;">
                   ${t("debug.securityAudit", { label: securityLabel })}${info > 0 ? t("debug.securityInfo", { count: info }) : ""}
-                  <span class="mono">openacosmi security audit --deep</span> ${t("debug.securityAuditSuffix")}
+                  <span class="mono">crabclaw security audit --deep</span> ${t("debug.securityAuditSuffix")}
                 </div>`
       : nothing
     }

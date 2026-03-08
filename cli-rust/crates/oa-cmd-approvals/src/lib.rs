@@ -1,4 +1,4 @@
-/// Exec approval management commands for Claw Acosmi CLI.
+/// Exec approval management commands for Crab Claw CLI.
 ///
 /// Provides subcommands: get, set, allowlist add/remove.
 ///

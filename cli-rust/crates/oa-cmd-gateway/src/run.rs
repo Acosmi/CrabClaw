@@ -6,7 +6,6 @@
 /// or a shutdown signal is received.
 ///
 /// Source: `src/commands/gateway-run.ts`
-
 use std::path::PathBuf;
 use std::process::Stdio;
 
@@ -15,6 +14,7 @@ use tracing::info;
 
 use oa_config::io::load_config;
 use oa_config::paths::resolve_gateway_port;
+use oa_infra::env::preferred_env_value;
 use oa_terminal::theme::Theme;
 
 /// Default gateway port when no config or CLI override is provided.
@@ -25,23 +25,24 @@ const GATEWAY_BINARY_NAME: &str = "acosmi";
 
 /// Environment variable to override the gateway binary path.
 const GATEWAY_BINARY_ENV: &str = "OPENACOSMI_GATEWAY_BINARY";
+const PRIMARY_GATEWAY_BINARY_ENV: &str = "CRABCLAW_GATEWAY_BINARY";
 
 /// Resolve the Go Gateway binary path.
 ///
 /// Discovery order:
-/// 1. `OPENACOSMI_GATEWAY_BINARY` environment variable (explicit override)
+/// 1. `CRABCLAW_GATEWAY_BINARY` / `OPENACOSMI_GATEWAY_BINARY` environment variable (explicit override)
 /// 2. Sibling of the current executable: `<exe_dir>/acosmi`
 /// 3. PATH lookup via `which`
 fn resolve_gateway_binary() -> Result<PathBuf> {
     // 1. Explicit override.
-    if let Ok(explicit) = std::env::var(GATEWAY_BINARY_ENV) {
+    if let Some(explicit) = preferred_env_value(&[PRIMARY_GATEWAY_BINARY_ENV, GATEWAY_BINARY_ENV]) {
         let path = PathBuf::from(&explicit);
         if path.exists() {
             info!(path = %path.display(), "gateway binary from env");
             return Ok(path);
         }
         anyhow::bail!(
-            "{GATEWAY_BINARY_ENV} is set to \"{explicit}\" but the file does not exist"
+            "{PRIMARY_GATEWAY_BINARY_ENV} / {GATEWAY_BINARY_ENV} points to \"{explicit}\" but the file does not exist"
         );
     }
 
@@ -74,7 +75,7 @@ fn resolve_gateway_binary() -> Result<PathBuf> {
     anyhow::bail!(
         "Go Gateway binary \"{GATEWAY_BINARY_NAME}\" not found.\n\
          Searched:\n\
-         - ${GATEWAY_BINARY_ENV} (not set)\n\
+         - ${PRIMARY_GATEWAY_BINARY_ENV} / ${GATEWAY_BINARY_ENV} (not set)\n\
          - sibling of current executable\n\
          - PATH\n\n\
          Build it with: cd backend && go build -o build/{GATEWAY_BINARY_NAME} ./cmd/{GATEWAY_BINARY_NAME}"
@@ -96,10 +97,7 @@ fn resolve_gateway_binary() -> Result<PathBuf> {
 /// waits for it to exit cleanly.
 ///
 /// Source: `src/commands/gateway-run.ts` - `gatewayRunCommand`
-pub async fn gateway_run_command(
-    port: Option<u16>,
-    control_ui_dir: Option<&str>,
-) -> Result<()> {
+pub async fn gateway_run_command(port: Option<u16>, control_ui_dir: Option<&str>) -> Result<()> {
     let config = load_config().unwrap_or_default();
 
     // Resolve the effective port.
@@ -130,11 +128,7 @@ pub async fn gateway_run_command(
     );
 
     if let Some(ui_dir) = control_ui_dir {
-        println!(
-            "  {} {}",
-            Theme::info("Control UI:"),
-            Theme::muted(ui_dir),
-        );
+        println!("  {} {}", Theme::info("Control UI:"), Theme::muted(ui_dir),);
     }
 
     println!(
@@ -228,5 +222,10 @@ mod tests {
     #[test]
     fn gateway_binary_env_var_name() {
         assert_eq!(GATEWAY_BINARY_ENV, "OPENACOSMI_GATEWAY_BINARY");
+    }
+
+    #[test]
+    fn primary_gateway_binary_env_var_name() {
+        assert_eq!(PRIMARY_GATEWAY_BINARY_ENV, "CRABCLAW_GATEWAY_BINARY");
     }
 }

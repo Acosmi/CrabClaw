@@ -1,10 +1,9 @@
-// Package cli 提供 Open Acosmi CLI 框架的工具函数和共享组件。
+// Package cli 提供 Crab Claw（蟹爪）CLI 框架的工具函数和共享组件。
 // 对应 TS 端 src/cli/ 目录的基础设施层。
 package cli
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 )
@@ -30,7 +29,7 @@ func ResolveCommitHash() string {
 		return CommitHash
 	}
 	// 尝试从环境变量读取
-	if envHash := os.Getenv("OPENACOSMI_COMMIT"); envHash != "" {
+	if envHash := envValueCompat("CRABCLAW_COMMIT", "OPENACOSMI_COMMIT"); envHash != "" {
 		return envHash
 	}
 	// 尝试 git rev-parse

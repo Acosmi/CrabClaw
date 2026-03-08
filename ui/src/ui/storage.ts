@@ -1,6 +1,7 @@
 const KEY = "openacosmi.control.settings.v1";
 
 import type { Locale } from "./i18n.js";
+import type { ChatUxMode } from "./chat/readonly-run-state.ts";
 import type { ThemeMode } from "./theme.js";
 
 export type UiSettings = {
@@ -12,6 +13,7 @@ export type UiSettings = {
   locale: Locale; // UI language: 'zh' | 'en', default 'zh'
   chatFocusMode: boolean;
   chatShowThinking: boolean;
+  chatUxMode: ChatUxMode;
   splitRatio: number; // Sidebar split ratio (0.4 to 0.7, default 0.6)
   navCollapsed: boolean; // Collapsible sidebar state
   navGroupsCollapsed: Record<string, boolean>; // Which nav groups are collapsed
@@ -35,6 +37,7 @@ export function loadSettings(): UiSettings {
     locale: "zh",
     chatFocusMode: false,
     chatShowThinking: true,
+    chatUxMode: "classic",
     splitRatio: 0.6,
     navCollapsed: false,
     navGroupsCollapsed: {},
@@ -75,6 +78,10 @@ export function loadSettings(): UiSettings {
         typeof parsed.chatShowThinking === "boolean"
           ? parsed.chatShowThinking
           : defaults.chatShowThinking,
+      chatUxMode:
+        parsed.chatUxMode === "classic" || parsed.chatUxMode === "codex-readonly"
+          ? parsed.chatUxMode
+          : defaults.chatUxMode,
       splitRatio:
         typeof parsed.splitRatio === "number" &&
           parsed.splitRatio >= 0.4 &&

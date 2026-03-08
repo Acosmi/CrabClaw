@@ -237,7 +237,7 @@ func CollectWhatsAppStatusIssues(accounts []map[string]interface{}) []ChannelSta
 				AccountID: accountID,
 				Kind:      "auth",
 				Message:   "Not linked (no WhatsApp Web session).",
-				Fix:       "Run: `openacosmi channels login` (scan QR on the gateway host).",
+				Fix:       "Run: `crabclaw channels login` (scan QR on the gateway host).",
 			})
 			continue
 		}
@@ -256,7 +256,7 @@ func CollectWhatsAppStatusIssues(accounts []map[string]interface{}) []ChannelSta
 				AccountID: accountID,
 				Kind:      "runtime",
 				Message:   msg,
-				Fix:       "Run: `openacosmi doctor` (or restart the gateway).",
+				Fix:       "Run: `crabclaw doctor` (or restart the gateway).",
 			})
 		}
 	}

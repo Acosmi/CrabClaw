@@ -1,14 +1,13 @@
 /// Configuration guard for ensuring valid config before command execution.
 ///
-/// Validates that the Claw Acosmi configuration file exists and is parseable
+/// Validates that the Crab Claw configuration file exists and is parseable
 /// before allowing a command to proceed. Certain safe commands (e.g.,
 /// `doctor`, `health`, `status`) bypass validation.
 ///
 /// Source: `src/cli/program/config-guard.ts`
-
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use oa_config::paths::resolve_config_path;
-use oa_terminal::theme::{is_rich, Theme};
+use oa_terminal::theme::{Theme, is_rich};
 
 use crate::command_format::format_cli_command;
 
@@ -21,7 +20,15 @@ const SAFE_COMMANDS: &[&str] = &["doctor", "logs", "health", "help", "status"];
 ///
 /// Source: `src/cli/program/config-guard.ts` – `ALLOWED_INVALID_GATEWAY_SUBCOMMANDS`
 const SAFE_GATEWAY_SUBCOMMANDS: &[&str] = &[
-    "status", "probe", "health", "discover", "call", "install", "uninstall", "start", "stop",
+    "status",
+    "probe",
+    "health",
+    "discover",
+    "call",
+    "install",
+    "uninstall",
+    "start",
+    "stop",
     "restart",
 ];
 
@@ -41,7 +48,7 @@ pub fn is_safe_gateway_subcommand(sub: &str) -> bool {
 
 /// Determine whether the given command path should skip config validation.
 ///
-/// A command path is `&["gateway", "status"]` for `openacosmi gateway status`.
+/// A command path is `&["gateway", "status"]` for `crabclaw gateway status`.
 ///
 /// Source: `src/cli/program/config-guard.ts` – `allowInvalid` logic
 pub fn should_skip_validation(command_path: &[&str]) -> bool {
@@ -67,7 +74,7 @@ pub fn should_skip_validation(command_path: &[&str]) -> bool {
 ///
 /// Checks that the config file exists on disk. If it does not exist
 /// and the command is not in the safe list, returns an error with
-/// guidance to run `openacosmi doctor --fix`.
+/// guidance to run `crabclaw doctor --fix`.
 ///
 /// For the full validation path (parsing, schema checks) the caller
 /// should use `oa_config::io::load_config` or
@@ -102,7 +109,7 @@ pub fn ensure_config_ready(command_path: &[&str]) -> Result<()> {
     } else {
         format!("File: {path_display}")
     };
-    let fix_cmd = format_cli_command("openacosmi doctor --fix");
+    let fix_cmd = format_cli_command("crabclaw doctor --fix");
     let run_label = if rich {
         format!("{} {}", Theme::muted("Run:"), Theme::command(&fix_cmd))
     } else {
@@ -115,7 +122,7 @@ pub fn ensure_config_ready(command_path: &[&str]) -> Result<()> {
     eprintln!("{run_label}");
 
     bail!(
-        "Config file not found at {}. Run `openacosmi doctor --fix` to create one.",
+        "Config file not found at {}. Run `{fix_cmd}` to create one.",
         path_display
     );
 }

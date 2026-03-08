@@ -42,7 +42,7 @@ func newNodesListCmd() *cobra.Command {
 				return nil
 			}
 			fmt.Println("📋 Nodes: (none configured)")
-			fmt.Println("  Use `openacosmi nodes add` to register a node.")
+			fmt.Println("  Use `crabclaw nodes add` to register a node.")
 			return nil
 		},
 	}

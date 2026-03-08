@@ -17,19 +17,17 @@ describe("i18n", () => {
   describe("t()", () => {
     it("returns Chinese translation for known key", () => {
       initLocale("zh");
-      expect(t("nav.tab.chat")).toBe("聊天");
+      expect(t("nav.tab.chat")).toBe("开始对话");
     });
 
     it("returns English translation for known key", () => {
       setLocale("en");
-      expect(t("nav.tab.chat")).toBe("Chat");
+      expect(t("nav.tab.chat")).toBe("Start Chat");
     });
 
-    it("falls back to English when key missing in current locale", () => {
-      // 如果将来某个 key 只在 en 中定义
+    it("returns key itself when a locale entry no longer exists", () => {
       initLocale("zh");
-      // 使用一个已知的 key 并确认它存在
-      expect(t("topbar.brand")).toBe("OPENACOSMI");
+      expect(t("topbar.brand")).toBe("topbar.brand");
     });
 
     it("returns key itself when not found in any locale", () => {
@@ -52,6 +50,14 @@ describe("i18n", () => {
         role: "管理员",
       });
       expect(result).toBe("撤销 设备A (管理员) 的令牌？");
+    });
+
+    it("supports {var} interpolation", () => {
+      setLocale("en");
+      const result = t("chat.readonly.activity.tool.running", {
+        tool: "read_files",
+      });
+      expect(result).toBe("Running read_files");
     });
 
     it("supports multiple interpolation params", () => {

@@ -8,6 +8,7 @@ package skills
 //   GET  /api/v4/skill-store/{id}/download — 下载技能 ZIP
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -184,8 +185,41 @@ func (c *SkillStoreClient) Download(id string) ([]byte, string, error) {
 	return data, filename, nil
 }
 
+// HealthCheck 连通性检查（HEAD 请求，5s 超时）。
+// [FIX P1-L01: 添加 HealthCheck 方法]
+func (c *SkillStoreClient) HealthCheck() error {
+	if !c.Available() {
+		return fmt.Errorf("skill store client not configured")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "HEAD", c.baseURL, nil)
+	if err != nil {
+		return fmt.Errorf("create health check request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("health check failed: %w", err)
+	}
+	resp.Body.Close()
+	return nil
+}
+
 // doGet 执行带认证的 GET 请求，返回响应体。
+// [FIX P1-L02: 单次重试逻辑]
 func (c *SkillStoreClient) doGet(endpoint string) ([]byte, error) {
+	body, err := c.doGetOnce(endpoint)
+	if err != nil {
+		// 单次重试，间隔 1s
+		time.Sleep(1 * time.Second)
+		return c.doGetOnce(endpoint)
+	}
+	return body, nil
+}
+
+// doGetOnce 执行单次带认证的 GET 请求。
+func (c *SkillStoreClient) doGetOnce(endpoint string) ([]byte, error) {
 	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)

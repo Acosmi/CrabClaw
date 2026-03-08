@@ -1,4 +1,4 @@
-# OpenAcosmi CLI - TypeScript to Rust Migration Tracking
+# CrabClaw CLI - TypeScript to Rust Migration Tracking
 
 ## Project Status
 

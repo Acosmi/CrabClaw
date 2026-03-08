@@ -42,6 +42,6 @@ func RenderSystemdUnavailableHints(wsl bool) []string {
 	}
 	return []string{
 		"systemd user services are unavailable; install/enable systemd or run the gateway under your supervisor.",
-		"If you're in a container, run the gateway in the foreground instead of `openacosmi gateway`.",
+		"If you're in a container, run the gateway in the foreground instead of `crabclaw gateway`.",
 	}
 }

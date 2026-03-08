@@ -5,10 +5,10 @@
 /// e.g., saving session context to memory on `/new`.
 ///
 /// Source: `src/commands/onboard-hooks.ts`
-
 use anyhow::Result;
 use tracing::info;
 
+use oa_cli_shared::command_format::format_cli_command;
 use oa_types::config::OpenAcosmiConfig;
 use oa_types::hooks::{HookConfig, InternalHooksConfig};
 
@@ -72,7 +72,7 @@ pub fn build_hooks_primer_text() -> String {
         "Hooks let you automate actions when agent commands are issued.",
         "Example: Save session context to memory when you issue /new.",
         "",
-        "Learn more: https://github.com/Acosmi/Claw-Acosmi/tree/main/docs/cli/hooks",
+        "Learn more: https://github.com/Acosmi/CrabClaw/tree/main/docs/cli/hooks.md",
     ]
     .join("\n")
 }
@@ -84,13 +84,16 @@ pub fn build_hooks_configured_text(selected: &[String]) -> String {
     let count = selected.len();
     let plural = if count > 1 { "s" } else { "" };
     let names = selected.join(", ");
+    let list_cmd = format_cli_command("crabclaw hooks list");
+    let enable_cmd = format_cli_command("crabclaw hooks enable <name>");
+    let disable_cmd = format_cli_command("crabclaw hooks disable <name>");
     [
         &format!("Enabled {count} hook{plural}: {names}"),
         "",
         "You can manage hooks later with:",
-        "  openacosmi hooks list",
-        "  openacosmi hooks enable <name>",
-        "  openacosmi hooks disable <name>",
+        &format!("  {list_cmd}"),
+        &format!("  {enable_cmd}"),
+        &format!("  {disable_cmd}"),
     ]
     .join("\n")
 }
@@ -139,10 +142,7 @@ mod tests {
             entries.get("memory-save").and_then(|e| e.enabled),
             Some(true)
         );
-        assert_eq!(
-            entries.get("auto-tag").and_then(|e| e.enabled),
-            Some(true)
-        );
+        assert_eq!(entries.get("auto-tag").and_then(|e| e.enabled), Some(true));
     }
 
     #[test]
@@ -183,7 +183,7 @@ mod tests {
     fn hooks_primer_text_content() {
         let text = build_hooks_primer_text();
         assert!(text.contains("Hooks let you automate"));
-        assert!(text.contains("github.com/Acosmi/Claw-Acosmi"));
+        assert!(text.contains("github.com/Acosmi/CrabClaw"));
     }
 
     #[test]
@@ -195,10 +195,7 @@ mod tests {
 
     #[test]
     fn hooks_configured_text_plural() {
-        let text = build_hooks_configured_text(&[
-            "hook-a".to_string(),
-            "hook-b".to_string(),
-        ]);
+        let text = build_hooks_configured_text(&["hook-a".to_string(), "hook-b".to_string()]);
         assert!(text.contains("Enabled 2 hooks:"));
         assert!(text.contains("hook-a, hook-b"));
     }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -209,10 +210,14 @@ type sessionStoreCache struct {
 }
 
 // getSessionCacheTTL 返回 session 缓存 TTL。
-// 优先读取 OPENACOSMI_SESSION_CACHE_TTL_MS 环境变量，否则使用默认 45s。
+// 优先读取 CRABCLAW_SESSION_CACHE_TTL_MS / OPENACOSMI_SESSION_CACHE_TTL_MS 环境变量，否则使用默认 45s。
 // TS 参考: src/config/sessions/store.ts — SESSION_CACHE_TTL_MS
 func getSessionCacheTTL() time.Duration {
-	if v := os.Getenv("OPENACOSMI_SESSION_CACHE_TTL_MS"); v != "" {
+	v := strings.TrimSpace(os.Getenv("CRABCLAW_SESSION_CACHE_TTL_MS"))
+	if v == "" {
+		v = strings.TrimSpace(os.Getenv("OPENACOSMI_SESSION_CACHE_TTL_MS"))
+	}
+	if v != "" {
 		if ms, err := strconv.ParseInt(v, 10, 64); err == nil && ms > 0 {
 			return time.Duration(ms) * time.Millisecond
 		}

@@ -1,8 +1,7 @@
-/// Skill management commands for Claw Acosmi CLI.
+/// Skill management commands for Crab Claw CLI.
 ///
 /// Provides `skills` subcommands: list, info, check.
 /// Delegates to Gateway RPC: `skills.status`, `skills.bins`.
-
 use anyhow::Result;
 use clap::Parser;
 
@@ -87,10 +86,7 @@ pub async fn skills_list_command(args: &SkillsListArgs) -> Result<()> {
                 .get("name")
                 .and_then(|n| n.as_str())
                 .unwrap_or("(unknown)");
-            let category = skill
-                .get("category")
-                .and_then(|c| c.as_str())
-                .unwrap_or("");
+            let category = skill.get("category").and_then(|c| c.as_str()).unwrap_or("");
             let eligible = skill
                 .get("eligible")
                 .and_then(|e| e.as_bool())
@@ -118,7 +114,10 @@ pub async fn skills_list_command(args: &SkillsListArgs) -> Result<()> {
             }
         }
     } else {
-        println!("{}", serde_json::to_string_pretty(&result).unwrap_or_default());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&result).unwrap_or_default()
+        );
     }
 
     Ok(())

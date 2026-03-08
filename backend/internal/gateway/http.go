@@ -94,7 +94,7 @@ func CORSMiddleware(allowOrigin string) Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", allowOrigin)
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-OpenAcosmi-Token")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CrabClaw-Token, X-OpenAcosmi-Token, X-CrabClaw-Agent-Id, X-OpenAcosmi-Agent-Id, X-CrabClaw-Agent, X-OpenAcosmi-Agent")
 			w.Header().Set("Access-Control-Max-Age", "86400")
 			if r.Method == http.MethodOptions {
 				w.WriteHeader(http.StatusNoContent)
@@ -109,10 +109,7 @@ func CORSMiddleware(allowOrigin string) Middleware {
 func AuthMiddleware(token string) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			reqToken := GetBearerToken(r)
-			if reqToken == "" {
-				reqToken = r.Header.Get("X-OpenAcosmi-Token")
-			}
+			reqToken := GetGatewayToken(r)
 			if !SafeEqual(reqToken, token) {
 				SendUnauthorized(w)
 				return

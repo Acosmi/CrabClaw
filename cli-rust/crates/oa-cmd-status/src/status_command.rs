@@ -5,22 +5,19 @@
 /// rendering with tables.
 ///
 /// Source: `src/commands/status.command.ts`
-
 use std::collections::HashMap;
 
 use anyhow::Result;
 
 use oa_cli_shared::command_format::format_cli_command;
 use oa_config::paths::resolve_gateway_port;
-use oa_terminal::table::{render_table, BorderStyle, RenderTableOptions, TableColumn, Align};
+use oa_terminal::table::{Align, BorderStyle, RenderTableOptions, TableColumn, render_table};
 use oa_terminal::theme::Theme;
 
 use crate::daemon::{get_daemon_status_summary, get_node_daemon_status_summary};
-use crate::format::{
-    format_duration, format_time_ago, format_tokens_compact, shorten_text,
-};
-use crate::gateway_probe::resolve_gateway_probe_auth;
 use crate::format::format_gateway_auth_used;
+use crate::format::{format_duration, format_time_ago, format_tokens_compact, shorten_text};
+use crate::gateway_probe::resolve_gateway_probe_auth;
 use crate::scan::scan_status;
 use crate::status_all::status_all_command;
 use crate::update::{
@@ -82,9 +79,7 @@ pub async fn status_command(
 
     // Verbose: print gateway connection details.
     if verbose {
-        let details = oa_gateway_rpc::call::build_gateway_connection_details(
-            &scan.cfg, None, None,
-        );
+        let details = oa_gateway_rpc::call::build_gateway_connection_details(&scan.cfg, None, None);
         println!("{}", Theme::info("Gateway connection:"));
         for line in details.message.lines() {
             println!("  {line}");
@@ -188,10 +183,7 @@ pub async fn status_command(
             let active = d
                 .last_active_age_ms
                 .map_or("unknown".to_string(), format_time_ago);
-            format!(
-                " \u{00b7} default {} active {active}",
-                d.id
-            )
+            format!(" \u{00b7} default {} active {active}", d.id)
         });
         format!(
             "{} \u{00b7} {pending} \u{00b7} sessions {}{def_suffix}",
@@ -268,10 +260,11 @@ pub async fn status_command(
     // Tailscale.
     let tailscale_value = if scan.tailscale_mode == "off" {
         Theme::muted("off")
-    } else if let (Some(dns), Some(https_url)) =
-        (&scan.tailscale_dns, &scan.tailscale_https_url)
-    {
-        format!("{} \u{00b7} {dns} \u{00b7} {https_url}", scan.tailscale_mode)
+    } else if let (Some(dns), Some(https_url)) = (&scan.tailscale_dns, &scan.tailscale_https_url) {
+        format!(
+            "{} \u{00b7} {dns} \u{00b7} {https_url}",
+            scan.tailscale_mode
+        )
     } else {
         Theme::warn(&format!(
             "{} \u{00b7} magicdns unknown",
@@ -280,8 +273,7 @@ pub async fn status_command(
     };
 
     // Update.
-    let update_availability =
-        resolve_update_availability(&scan.update, "dev");
+    let update_availability = resolve_update_availability(&scan.update, "dev");
     let update_line = format_update_one_liner(&scan.update, "dev")
         .trim_start_matches("Update: ")
         .to_string();
@@ -328,7 +320,7 @@ pub async fn status_command(
     ];
 
     // Print overview.
-    println!("{}", Theme::heading("OpenAcosmi status"));
+    println!("{}", Theme::heading("Crab Claw status"));
     println!();
     println!("{}", Theme::heading("Overview"));
     println!(
@@ -369,11 +361,11 @@ pub async fn status_command(
     );
     println!(
         "  {}",
-        Theme::muted(&format_cli_command("openacosmi security audit"))
+        Theme::muted(&format_cli_command("crabclaw security audit"))
     );
     println!(
         "  {}",
-        Theme::muted(&format_cli_command("openacosmi security audit --deep"))
+        Theme::muted(&format_cli_command("crabclaw security audit --deep"))
     );
 
     // Channels table.
@@ -479,8 +471,7 @@ pub async fn status_command(
                 m.insert("Kind".to_string(), format!("{:?}", sess.kind));
                 m.insert(
                     "Age".to_string(),
-                    sess.age
-                        .map_or("no activity".to_string(), format_time_ago),
+                    sess.age.map_or("no activity".to_string(), format_time_ago),
                 );
                 m.insert(
                     "Model".to_string(),
@@ -590,8 +581,10 @@ pub async fn status_command(
 
     // Footer.
     println!();
-    println!("FAQ: https://github.com/Acosmi/Claw-Acosmi/tree/main/docs/skills/general/faq");
-    println!("Troubleshooting: https://github.com/Acosmi/Claw-Acosmi/tree/main/docs/skills/general/troubleshooting");
+    println!("FAQ: https://github.com/Acosmi/CrabClaw/tree/main/docs/help/faq.md");
+    println!(
+        "Troubleshooting: https://github.com/Acosmi/CrabClaw/tree/main/docs/help/troubleshooting.md"
+    );
     println!();
     if let Some(update_hint) = format_update_available_hint(&scan.update, "dev") {
         println!("{}", Theme::warn(&update_hint));
@@ -600,21 +593,21 @@ pub async fn status_command(
     println!("Next steps:");
     println!(
         "  Need to share?      {}",
-        format_cli_command("openacosmi status --all")
+        format_cli_command("crabclaw status --all")
     );
     println!(
         "  Need to debug live? {}",
-        format_cli_command("openacosmi logs --follow")
+        format_cli_command("crabclaw logs --follow")
     );
     if scan.gateway_reachable {
         println!(
             "  Need to test channels? {}",
-            format_cli_command("openacosmi status --deep")
+            format_cli_command("crabclaw status --deep")
         );
     } else {
         println!(
             "  Fix reachability first: {}",
-            format_cli_command("openacosmi gateway probe")
+            format_cli_command("crabclaw gateway probe")
         );
     }
 

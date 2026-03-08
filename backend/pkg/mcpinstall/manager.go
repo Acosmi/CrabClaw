@@ -227,8 +227,8 @@ func (m *McpLocalManager) AllTools() []AgentMcpTool {
 		}
 		for _, tool := range bridge.Tools() {
 			result = append(result, AgentMcpTool{
-				ServerName:  name,
-				Tool:        tool,
+				ServerName:   name,
+				Tool:         tool,
 				PrefixedName: "mcp_" + name + "_" + tool.Name,
 			})
 		}

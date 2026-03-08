@@ -1,19 +1,20 @@
 ---
 name: glm
-description: "GLM 模型家族概览及在创宇太虚中的使用方法"
+description: "GLM model family overview + how to use it in Crab Claw（蟹爪）"
 ---
 
-# GLM 模型
+# GLM models
 
-GLM 是一个**模型家族**（非公司），通过 Z.AI 平台提供。在创宇太虚中，GLM 模型通过 `zai` 供应商访问，模型 ID 如 `zai/glm-4.7`。
+GLM is a **model family** (not a company) available through the Z.AI platform. In Crab Claw（蟹爪）, GLM
+models are accessed via the `zai` provider and model IDs like `zai/glm-4.7`.
 
-## CLI 设置
+## CLI setup
 
 ```bash
-openacosmi onboard --auth-choice zai-api-key
+crabclaw onboard --auth-choice zai-api-key
 ```
 
-## 配置示例
+## Config snippet
 
 ```json5
 {
@@ -22,8 +23,8 @@ openacosmi onboard --auth-choice zai-api-key
 }
 ```
 
-## 备注
+## Notes
 
-- GLM 版本和可用性可能变化；请查看 Z.AI 文档获取最新信息。
-- 示例模型 ID 包括 `glm-4.7` 和 `glm-4.6`。
-- 供应商详情参见 [/providers/zai](/providers/zai)。
+- GLM versions and availability can change; check Z.AI's docs for the latest.
+- Example model IDs include `glm-4.7` and `glm-4.6`.
+- For provider details, see [/providers/zai](/providers/zai).

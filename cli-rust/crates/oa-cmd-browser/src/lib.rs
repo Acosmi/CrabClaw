@@ -1,11 +1,10 @@
-/// Browser automation commands for Claw Acosmi CLI.
+/// Browser automation commands for Crab Claw CLI.
 ///
 /// All commands delegate to the Gateway via `browser.request` RPC, which
 /// proxies to the local browser control HTTP service or a remote node.
 ///
 /// RPC method: `browser.request`
 /// Params: `{ method: "GET"|"POST"|"DELETE", path: "/...", query: {...}, body: {...} }`
-
 use anyhow::Result;
 use clap::Parser;
 
@@ -95,12 +94,15 @@ pub struct BrowserStatusArgs {
 /// Execute `browser status`.
 pub async fn browser_status_command(args: &BrowserStatusArgs) -> Result<()> {
     let result = browser_rpc(
-        "GET", "/",
-        None, None,
+        "GET",
+        "/",
+        None,
+        None,
         args.browser_profile.as_deref(),
         "Checking browser status\u{2026}",
         !args.json,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -123,12 +125,15 @@ pub async fn browser_start_command(args: &BrowserStartArgs) -> Result<()> {
         body["headless"] = serde_json::json!(true);
     }
     let result = browser_rpc(
-        "POST", "/start",
-        None, Some(body),
+        "POST",
+        "/start",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Starting browser\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -144,12 +149,15 @@ pub struct BrowserStopArgs {
 /// Execute `browser stop`.
 pub async fn browser_stop_command(args: &BrowserStopArgs) -> Result<()> {
     let _: serde_json::Value = browser_rpc(
-        "POST", "/stop",
-        None, None,
+        "POST",
+        "/stop",
+        None,
+        None,
         args.browser_profile.as_deref(),
         "Stopping browser\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     println!("Browser stopped.");
     Ok(())
 }
@@ -168,12 +176,15 @@ pub struct BrowserTabsArgs {
 /// Execute `browser tabs`.
 pub async fn browser_tabs_command(args: &BrowserTabsArgs) -> Result<()> {
     let result = browser_rpc(
-        "GET", "/tabs",
-        None, None,
+        "GET",
+        "/tabs",
+        None,
+        None,
         args.browser_profile.as_deref(),
         "Loading tabs\u{2026}",
         !args.json,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -191,12 +202,15 @@ pub struct BrowserOpenArgs {
 /// Execute `browser open`.
 pub async fn browser_open_command(args: &BrowserOpenArgs) -> Result<()> {
     let result = browser_rpc(
-        "POST", "/tabs/open",
-        None, Some(serde_json::json!({ "url": args.url })),
+        "POST",
+        "/tabs/open",
+        None,
+        Some(serde_json::json!({ "url": args.url })),
         args.browser_profile.as_deref(),
         "Opening URL\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -214,12 +228,15 @@ pub struct BrowserFocusArgs {
 /// Execute `browser focus`.
 pub async fn browser_focus_command(args: &BrowserFocusArgs) -> Result<()> {
     let result = browser_rpc(
-        "POST", "/tabs/focus",
-        None, Some(serde_json::json!({ "targetId": args.target_id })),
+        "POST",
+        "/tabs/focus",
+        None,
+        Some(serde_json::json!({ "targetId": args.target_id })),
         args.browser_profile.as_deref(),
         "Focusing tab\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -242,12 +259,15 @@ pub async fn browser_close_command(args: &BrowserCloseArgs) -> Result<()> {
         "/tabs/active".to_string()
     };
     let _: serde_json::Value = browser_rpc(
-        "DELETE", &path,
-        None, None,
+        "DELETE",
+        &path,
+        None,
+        None,
         args.browser_profile.as_deref(),
         "Closing tab\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     println!("Tab closed.");
     Ok(())
 }
@@ -299,12 +319,15 @@ pub async fn browser_screenshot_command(args: &BrowserScreenshotArgs) -> Result<
         body["targetId"] = serde_json::json!(tid);
     }
     let result = browser_rpc(
-        "POST", "/screenshot",
-        None, Some(body),
+        "POST",
+        "/screenshot",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Taking screenshot\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -320,12 +343,15 @@ pub struct BrowserProfilesArgs {
 /// Execute `browser profiles`.
 pub async fn browser_profiles_command(args: &BrowserProfilesArgs) -> Result<()> {
     let result = browser_rpc(
-        "GET", "/profiles",
-        None, None,
+        "GET",
+        "/profiles",
+        None,
+        None,
         None,
         "Loading profiles\u{2026}",
         !args.json,
-    ).await?;
+    )
+    .await?;
 
     if args.json {
         print_result(&result);
@@ -376,12 +402,15 @@ pub async fn browser_create_profile_command(args: &BrowserCreateProfileArgs) -> 
         body["driver"] = serde_json::json!(driver);
     }
     let _: serde_json::Value = browser_rpc(
-        "POST", "/profiles/create",
-        None, Some(body),
+        "POST",
+        "/profiles/create",
+        None,
+        Some(body),
         None,
         "Creating profile\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     println!("Profile '{}' created.", args.name);
     Ok(())
 }
@@ -398,12 +427,15 @@ pub struct BrowserDeleteProfileArgs {
 pub async fn browser_delete_profile_command(args: &BrowserDeleteProfileArgs) -> Result<()> {
     let path = format!("/profiles/{}", args.name);
     let _: serde_json::Value = browser_rpc(
-        "DELETE", &path,
-        None, None,
+        "DELETE",
+        &path,
+        None,
+        None,
         None,
         "Deleting profile\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     println!("Profile '{}' deleted.", args.name);
     Ok(())
 }
@@ -419,12 +451,15 @@ pub struct BrowserResetProfileArgs {
 /// Execute `browser reset-profile`.
 pub async fn browser_reset_profile_command(args: &BrowserResetProfileArgs) -> Result<()> {
     let _: serde_json::Value = browser_rpc(
-        "POST", "/profiles/reset",
-        None, None,
+        "POST",
+        "/profiles/reset",
+        None,
+        None,
         args.browser_profile.as_deref(),
         "Resetting profile\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     println!("Browser profile reset.");
     Ok(())
 }
@@ -512,12 +547,15 @@ pub async fn browser_snapshot_command(args: &BrowserSnapshotArgs) -> Result<()> 
         query["out"] = serde_json::json!(out);
     }
     let result = browser_rpc(
-        "GET", "/snapshot",
-        Some(query), None,
+        "GET",
+        "/snapshot",
+        Some(query),
+        None,
         args.browser_profile.as_deref(),
         "Taking snapshot\u{2026}",
         !args.json,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -555,12 +593,15 @@ pub async fn browser_console_command(args: &BrowserConsoleArgs) -> Result<()> {
         query["targetId"] = serde_json::json!(tid);
     }
     let result = browser_rpc(
-        "GET", "/console",
-        Some(query), None,
+        "GET",
+        "/console",
+        Some(query),
+        None,
         args.browser_profile.as_deref(),
         "Reading console\u{2026}",
         !args.json,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -592,12 +633,15 @@ pub async fn browser_errors_command(args: &BrowserErrorsArgs) -> Result<()> {
         query["targetId"] = serde_json::json!(tid);
     }
     let result = browser_rpc(
-        "GET", "/errors",
-        Some(query), None,
+        "GET",
+        "/errors",
+        Some(query),
+        None,
         args.browser_profile.as_deref(),
         "Reading errors\u{2026}",
         !args.json,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -635,12 +679,15 @@ pub async fn browser_requests_command(args: &BrowserRequestsArgs) -> Result<()> 
         query["targetId"] = serde_json::json!(tid);
     }
     let result = browser_rpc(
-        "GET", "/requests",
-        Some(query), None,
+        "GET",
+        "/requests",
+        Some(query),
+        None,
         args.browser_profile.as_deref(),
         "Reading requests\u{2026}",
         !args.json,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -674,12 +721,15 @@ pub async fn browser_responsebody_command(args: &BrowserResponseBodyArgs) -> Res
         body["targetId"] = serde_json::json!(tid);
     }
     let result = browser_rpc(
-        "POST", "/response/body",
-        None, Some(body),
+        "POST",
+        "/response/body",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Reading response body\u{2026}",
         !args.json,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -702,12 +752,15 @@ pub async fn browser_pdf_command(args: &BrowserPdfArgs) -> Result<()> {
         body["targetId"] = serde_json::json!(tid);
     }
     let result = browser_rpc(
-        "POST", "/pdf",
-        None, Some(body),
+        "POST",
+        "/pdf",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Generating PDF\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -737,12 +790,15 @@ pub async fn browser_navigate_command(args: &BrowserNavigateArgs) -> Result<()> 
         body["targetId"] = serde_json::json!(tid);
     }
     let result = browser_rpc(
-        "POST", "/navigate",
-        None, Some(body),
+        "POST",
+        "/navigate",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Navigating\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -773,12 +829,15 @@ pub async fn browser_resize_command(args: &BrowserResizeArgs) -> Result<()> {
         body["targetId"] = serde_json::json!(tid);
     }
     let result = browser_rpc(
-        "POST", "/act",
-        None, Some(body),
+        "POST",
+        "/act",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Resizing viewport\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -824,12 +883,15 @@ pub async fn browser_click_command(args: &BrowserClickArgs) -> Result<()> {
         body["targetId"] = serde_json::json!(tid);
     }
     let result = browser_rpc(
-        "POST", "/act",
-        None, Some(body),
+        "POST",
+        "/act",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Clicking\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -872,12 +934,15 @@ pub async fn browser_type_command(args: &BrowserTypeArgs) -> Result<()> {
         body["targetId"] = serde_json::json!(tid);
     }
     let result = browser_rpc(
-        "POST", "/act",
-        None, Some(body),
+        "POST",
+        "/act",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Typing\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -905,12 +970,15 @@ pub async fn browser_press_command(args: &BrowserPressArgs) -> Result<()> {
         body["targetId"] = serde_json::json!(tid);
     }
     let result = browser_rpc(
-        "POST", "/act",
-        None, Some(body),
+        "POST",
+        "/act",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Pressing key\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -938,12 +1006,15 @@ pub async fn browser_hover_command(args: &BrowserHoverArgs) -> Result<()> {
         body["targetId"] = serde_json::json!(tid);
     }
     let result = browser_rpc(
-        "POST", "/act",
-        None, Some(body),
+        "POST",
+        "/act",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Hovering\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -971,12 +1042,15 @@ pub async fn browser_scrollintoview_command(args: &BrowserScrollIntoViewArgs) ->
         body["targetId"] = serde_json::json!(tid);
     }
     let result = browser_rpc(
-        "POST", "/act",
-        None, Some(body),
+        "POST",
+        "/act",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Scrolling into view\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -1007,12 +1081,15 @@ pub async fn browser_drag_command(args: &BrowserDragArgs) -> Result<()> {
         body["targetId"] = serde_json::json!(tid);
     }
     let result = browser_rpc(
-        "POST", "/act",
-        None, Some(body),
+        "POST",
+        "/act",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Dragging\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -1043,12 +1120,15 @@ pub async fn browser_select_command(args: &BrowserSelectArgs) -> Result<()> {
         body["targetId"] = serde_json::json!(tid);
     }
     let result = browser_rpc(
-        "POST", "/act",
-        None, Some(body),
+        "POST",
+        "/act",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Selecting\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -1078,12 +1158,15 @@ pub async fn browser_download_command(args: &BrowserDownloadArgs) -> Result<()> 
         body["targetId"] = serde_json::json!(tid);
     }
     let result = browser_rpc(
-        "POST", "/download",
-        None, Some(body),
+        "POST",
+        "/download",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Downloading\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -1108,12 +1191,15 @@ pub async fn browser_waitfordownload_command(args: &BrowserWaitForDownloadArgs) 
         body["timeoutMs"] = serde_json::json!(t);
     }
     let result = browser_rpc(
-        "POST", "/wait/download",
-        None, Some(body),
+        "POST",
+        "/wait/download",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Waiting for download\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -1162,12 +1248,15 @@ pub async fn browser_upload_command(args: &BrowserUploadArgs) -> Result<()> {
         body["timeoutMs"] = serde_json::json!(t);
     }
     let result = browser_rpc(
-        "POST", "/hooks/file-chooser",
-        None, Some(body),
+        "POST",
+        "/hooks/file-chooser",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Uploading\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -1204,12 +1293,15 @@ pub async fn browser_fill_command(args: &BrowserFillArgs) -> Result<()> {
         body["targetId"] = serde_json::json!(tid);
     }
     let result = browser_rpc(
-        "POST", "/fill",
-        None, Some(body),
+        "POST",
+        "/fill",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Filling form\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -1257,12 +1349,15 @@ pub async fn browser_dialog_command(args: &BrowserDialogArgs) -> Result<()> {
         body["timeoutMs"] = serde_json::json!(t);
     }
     let result = browser_rpc(
-        "POST", "/hooks/dialog",
-        None, Some(body),
+        "POST",
+        "/hooks/dialog",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Handling dialog\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -1332,12 +1427,15 @@ pub async fn browser_wait_command(args: &BrowserWaitArgs) -> Result<()> {
         body["targetId"] = serde_json::json!(tid);
     }
     let result = browser_rpc(
-        "POST", "/wait",
-        None, Some(body),
+        "POST",
+        "/wait",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Waiting\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -1369,12 +1467,15 @@ pub async fn browser_evaluate_command(args: &BrowserEvaluateArgs) -> Result<()> 
         body["targetId"] = serde_json::json!(tid);
     }
     let result = browser_rpc(
-        "POST", "/evaluate",
-        None, Some(body),
+        "POST",
+        "/evaluate",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Evaluating\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -1399,12 +1500,15 @@ pub async fn browser_highlight_command(args: &BrowserHighlightArgs) -> Result<()
         body["targetId"] = serde_json::json!(tid);
     }
     let result = browser_rpc(
-        "POST", "/highlight",
-        None, Some(body),
+        "POST",
+        "/highlight",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Highlighting\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -1424,12 +1528,15 @@ pub struct BrowserTraceStartArgs {
 /// Execute `browser trace start`.
 pub async fn browser_trace_start_command(args: &BrowserTraceStartArgs) -> Result<()> {
     let _: serde_json::Value = browser_rpc(
-        "POST", "/trace/start",
-        None, None,
+        "POST",
+        "/trace/start",
+        None,
+        None,
         args.browser_profile.as_deref(),
         "Starting trace\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     println!("Trace recording started.");
     Ok(())
 }
@@ -1445,12 +1552,15 @@ pub struct BrowserTraceStopArgs {
 /// Execute `browser trace stop`.
 pub async fn browser_trace_stop_command(args: &BrowserTraceStopArgs) -> Result<()> {
     let result = browser_rpc(
-        "POST", "/trace/stop",
-        None, None,
+        "POST",
+        "/trace/stop",
+        None,
+        None,
         args.browser_profile.as_deref(),
         "Stopping trace\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -1473,12 +1583,15 @@ pub struct BrowserCookiesArgs {
 /// Execute `browser cookies`.
 pub async fn browser_cookies_command(args: &BrowserCookiesArgs) -> Result<()> {
     let result = browser_rpc(
-        "GET", "/cookies",
-        None, None,
+        "GET",
+        "/cookies",
+        None,
+        None,
         args.browser_profile.as_deref(),
         "Reading cookies\u{2026}",
         !args.json,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -1508,12 +1621,15 @@ pub async fn browser_cookies_set_command(args: &BrowserCookiesSetArgs) -> Result
         body["url"] = serde_json::json!(u);
     }
     let _: serde_json::Value = browser_rpc(
-        "POST", "/cookies/set",
-        None, Some(body),
+        "POST",
+        "/cookies/set",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Setting cookie\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     println!("Cookie set.");
     Ok(())
 }
@@ -1529,12 +1645,15 @@ pub struct BrowserCookiesClearArgs {
 /// Execute `browser cookies clear`.
 pub async fn browser_cookies_clear_command(args: &BrowserCookiesClearArgs) -> Result<()> {
     let _: serde_json::Value = browser_rpc(
-        "POST", "/cookies/clear",
-        None, None,
+        "POST",
+        "/cookies/clear",
+        None,
+        None,
         args.browser_profile.as_deref(),
         "Clearing cookies\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     println!("Cookies cleared.");
     Ok(())
 }
@@ -1556,12 +1675,15 @@ pub struct BrowserStorageGetArgs {
 pub async fn browser_storage_get_command(args: &BrowserStorageGetArgs) -> Result<()> {
     let path = format!("/storage/{}", args.kind);
     let result = browser_rpc(
-        "GET", &path,
-        None, None,
+        "GET",
+        &path,
+        None,
+        None,
         args.browser_profile.as_deref(),
         "Reading storage\u{2026}",
         !args.json,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -1584,12 +1706,15 @@ pub struct BrowserStorageSetArgs {
 pub async fn browser_storage_set_command(args: &BrowserStorageSetArgs) -> Result<()> {
     let path = format!("/storage/{}/set", args.kind);
     let result = browser_rpc(
-        "POST", &path,
-        None, Some(serde_json::json!({ "key": args.key, "value": args.value })),
+        "POST",
+        &path,
+        None,
+        Some(serde_json::json!({ "key": args.key, "value": args.value })),
         args.browser_profile.as_deref(),
         "Setting storage\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     print_result(&result);
     Ok(())
 }
@@ -1608,12 +1733,15 @@ pub struct BrowserStorageClearArgs {
 pub async fn browser_storage_clear_command(args: &BrowserStorageClearArgs) -> Result<()> {
     let path = format!("/storage/{}/clear", args.kind);
     let _: serde_json::Value = browser_rpc(
-        "POST", &path,
-        None, None,
+        "POST",
+        &path,
+        None,
+        None,
         args.browser_profile.as_deref(),
         "Clearing storage\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     println!("Storage cleared.");
     Ok(())
 }
@@ -1632,12 +1760,15 @@ pub struct BrowserSetOfflineArgs {
 pub async fn browser_set_offline_command(args: &BrowserSetOfflineArgs) -> Result<()> {
     let offline = args.state == "on" || args.state == "true";
     let _: serde_json::Value = browser_rpc(
-        "POST", "/set/offline",
-        None, Some(serde_json::json!({ "offline": offline })),
+        "POST",
+        "/set/offline",
+        None,
+        Some(serde_json::json!({ "offline": offline })),
         args.browser_profile.as_deref(),
         "Setting offline mode\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     println!("Offline mode: {}.", if offline { "on" } else { "off" });
     Ok(())
 }
@@ -1667,12 +1798,15 @@ pub async fn browser_set_headers_command(args: &BrowserSetHeadersArgs) -> Result
         anyhow::bail!("--json '<headers>' or --clear is required");
     };
     let _: serde_json::Value = browser_rpc(
-        "POST", "/set/headers",
-        None, Some(body),
+        "POST",
+        "/set/headers",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Setting headers\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     println!("Headers updated.");
     Ok(())
 }
@@ -1705,12 +1839,15 @@ pub async fn browser_set_credentials_command(args: &BrowserSetCredentialsArgs) -
         })
     };
     let _: serde_json::Value = browser_rpc(
-        "POST", "/set/credentials",
-        None, Some(body),
+        "POST",
+        "/set/credentials",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Setting credentials\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     if args.clear {
         println!("Credentials cleared.");
     } else {
@@ -1754,12 +1891,15 @@ pub async fn browser_set_geo_command(args: &BrowserSetGeoArgs) -> Result<()> {
         b
     };
     let _: serde_json::Value = browser_rpc(
-        "POST", "/set/geolocation",
-        None, Some(body),
+        "POST",
+        "/set/geolocation",
+        None,
+        Some(body),
         args.browser_profile.as_deref(),
         "Setting geolocation\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     if args.clear {
         println!("Geolocation override cleared.");
     } else {
@@ -1781,12 +1921,15 @@ pub struct BrowserSetMediaArgs {
 /// Execute `browser set media`.
 pub async fn browser_set_media_command(args: &BrowserSetMediaArgs) -> Result<()> {
     let _: serde_json::Value = browser_rpc(
-        "POST", "/set/media",
-        None, Some(serde_json::json!({ "colorScheme": args.scheme })),
+        "POST",
+        "/set/media",
+        None,
+        Some(serde_json::json!({ "colorScheme": args.scheme })),
         args.browser_profile.as_deref(),
         "Setting media preference\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     println!("Media preference set to: {}.", args.scheme);
     Ok(())
 }
@@ -1804,12 +1947,15 @@ pub struct BrowserSetTimezoneArgs {
 /// Execute `browser set timezone`.
 pub async fn browser_set_timezone_command(args: &BrowserSetTimezoneArgs) -> Result<()> {
     let _: serde_json::Value = browser_rpc(
-        "POST", "/set/timezone",
-        None, Some(serde_json::json!({ "timezoneId": args.timezone })),
+        "POST",
+        "/set/timezone",
+        None,
+        Some(serde_json::json!({ "timezoneId": args.timezone })),
         args.browser_profile.as_deref(),
         "Setting timezone\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     println!("Timezone set to: {}.", args.timezone);
     Ok(())
 }
@@ -1827,12 +1973,15 @@ pub struct BrowserSetLocaleArgs {
 /// Execute `browser set locale`.
 pub async fn browser_set_locale_command(args: &BrowserSetLocaleArgs) -> Result<()> {
     let _: serde_json::Value = browser_rpc(
-        "POST", "/set/locale",
-        None, Some(serde_json::json!({ "locale": args.locale })),
+        "POST",
+        "/set/locale",
+        None,
+        Some(serde_json::json!({ "locale": args.locale })),
         args.browser_profile.as_deref(),
         "Setting locale\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     println!("Locale set to: {}.", args.locale);
     Ok(())
 }
@@ -1850,12 +1999,15 @@ pub struct BrowserSetDeviceArgs {
 /// Execute `browser set device`.
 pub async fn browser_set_device_command(args: &BrowserSetDeviceArgs) -> Result<()> {
     let _: serde_json::Value = browser_rpc(
-        "POST", "/set/device",
-        None, Some(serde_json::json!({ "device": args.device })),
+        "POST",
+        "/set/device",
+        None,
+        Some(serde_json::json!({ "device": args.device })),
         args.browser_profile.as_deref(),
         "Setting device\u{2026}",
         true,
-    ).await?;
+    )
+    .await?;
     println!("Device set to: {}.", args.device);
     Ok(())
 }

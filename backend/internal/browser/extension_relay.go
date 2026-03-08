@@ -321,7 +321,7 @@ func (r *ExtensionRelay) handleJSONTargets(w http.ResponseWriter, req *http.Requ
 // handleJSONVersion returns relay version info in CDP /json/version format.
 func (r *ExtensionRelay) handleJSONVersion(w http.ResponseWriter, _ *http.Request) {
 	info := map[string]string{
-		"Browser":              "OpenAcosmi Extension Relay/1.0",
+		"Browser":              "Crab Claw Extension Relay/1.0",
 		"Protocol-Version":     "1.3",
 		"webSocketDebuggerUrl": fmt.Sprintf("ws://127.0.0.1:%d/ws?token=%s", r.port, r.authToken),
 	}

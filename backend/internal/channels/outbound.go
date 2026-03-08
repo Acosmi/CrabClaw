@@ -28,6 +28,11 @@ type OutboundSendParams struct {
 	ReplyToID string
 	ThreadID  string
 
+	// Email-specific fields (Phase 6)
+	Subject    string // 邮件主题
+	Cc         string // 抄送地址（逗号分隔）
+	SessionKey string // 会话 key（用于恢复线程上下文）
+
 	// MediaData 二进制媒体内容（来自 base64 解码），优先于 MediaURL。
 	// 用于 Agent 生成的截图/图表等无公网 URL 的媒体。
 	MediaData []byte
@@ -42,6 +47,7 @@ type OutboundSendResult struct {
 	Channel   string `json:"channel"`
 	MessageID string `json:"messageId,omitempty"`
 	ChatID    string `json:"chatId,omitempty"`
+	Timestamp int64  `json:"timestamp,omitempty"` // 发送时间戳（Phase 6）
 }
 
 // ChannelOutboundConfig 频道出站配置
@@ -111,6 +117,12 @@ var outboundConfigs = map[ChannelID]*ChannelOutboundConfig{
 		DeliveryMode:   DeliveryModeDirect,
 		ChunkerMode:    "text",
 		TextChunkLimit: 2000,
+	},
+	ChannelEmail: {
+		ChannelID:      ChannelEmail,
+		DeliveryMode:   DeliveryModeDirect,
+		ChunkerMode:    "text",
+		TextChunkLimit: 4000,
 	},
 }
 

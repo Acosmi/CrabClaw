@@ -68,7 +68,7 @@ func renderEnvLines(env map[string]string) []string {
 // 生成格式示例：
 //
 //	[Unit]
-//	Description=OpenAcosmi Gateway
+//	Description=Crab Claw Gateway
 //	After=network-online.target
 //	Wants=network-online.target
 //
@@ -86,7 +86,7 @@ func buildSystemdUnitContent(args SystemdUnitArgs) string {
 	// [Unit] 段
 	description := args.Description
 	if strings.TrimSpace(description) == "" {
-		description = "OpenAcosmi Gateway"
+		description = GatewayDisplayName
 	}
 
 	// ExecStart：逐参数 escape 后空格拼接

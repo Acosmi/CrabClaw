@@ -9,6 +9,7 @@ use tracing::info;
 
 use oa_config::io::read_config_file_snapshot;
 use oa_config::paths::resolve_gateway_port;
+use oa_infra::env::preferred_env_value;
 use oa_types::gateway::GatewayBindMode;
 
 /// Options for the dashboard command.
@@ -118,7 +119,7 @@ pub async fn dashboard_command(options: DashboardOptions) -> Result<()> {
         .as_ref()
         .and_then(|g| g.custom_bind_host.as_deref());
 
-    let env_token = std::env::var("OPENACOSMI_GATEWAY_TOKEN").ok();
+    let env_token = preferred_env_value(&["CRABCLAW_GATEWAY_TOKEN", "OPENACOSMI_GATEWAY_TOKEN"]);
     let token = cfg
         .gateway
         .as_ref()

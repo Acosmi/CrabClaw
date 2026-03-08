@@ -195,10 +195,10 @@ func TestModelsHandlers_ListWithCatalog(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected map, got %T", gotPayload)
 	}
-	// Empty catalog should return empty array
-	entries, ok := result["models"].([]models.ModelCatalogEntry)
+	// Empty catalog should return empty array (Phase 4: now returns []ModelEntryWithSource with source field)
+	entries, ok := result["models"].([]ModelEntryWithSource)
 	if !ok {
-		t.Fatalf("expected []ModelCatalogEntry, got %T", result["models"])
+		t.Fatalf("expected []ModelEntryWithSource, got %T", result["models"])
 	}
 	if len(entries) != 0 {
 		t.Errorf("expected 0 models from empty catalog, got %d", len(entries))

@@ -60,7 +60,7 @@ func CollectWhatsAppStatusIssues(cfg *types.OpenAcosmiConfig, snapshot *ChannelA
 			Severity:  SeverityError,
 			Title:     accountLabel + " not linked",
 			Detail:    "No WhatsApp Web session found.",
-			FixHint:   "Run `openacosmi channels login --channel whatsapp` to link.",
+			FixHint:   "Run `crabclaw channels login --channel whatsapp` to link.",
 		})
 		return issues
 	}

@@ -2,11 +2,12 @@
 ///
 /// Resolves the effective home directory from environment variables and
 /// system defaults, following the precedence chain:
-/// `OPENACOSMI_HOME` > `HOME` > `USERPROFILE` > `dirs::home_dir()`.
+/// `CRABCLAW_HOME` > `OPENACOSMI_HOME` > `HOME` > `USERPROFILE` > `dirs::home_dir()`.
 ///
 /// Source: `src/infra/home-dir.ts`
-
 use std::path::{Path, PathBuf};
+
+use crate::env::preferred_env_value;
 
 /// Trim a string and return `None` if the result is empty.
 fn normalize(value: Option<String>) -> Option<String> {
@@ -26,13 +27,13 @@ fn dirs_home_dir_str() -> Option<String> {
 /// Resolve the raw (un-canonicalized) home directory from environment variables.
 ///
 /// Precedence:
-/// 1. `OPENACOSMI_HOME` (with `~` expansion using fallback sources)
+/// 1. `CRABCLAW_HOME` / `OPENACOSMI_HOME` (with `~` expansion using fallback sources)
 /// 2. `HOME`
 /// 3. `USERPROFILE`
 /// 4. `dirs::home_dir()`
 fn resolve_raw_home_dir() -> Option<String> {
-    // 1. Check OPENACOSMI_HOME
-    let explicit_home = normalize(std::env::var("OPENACOSMI_HOME").ok());
+    // 1. Check CRABCLAW_HOME / OPENACOSMI_HOME
+    let explicit_home = preferred_env_value(&["CRABCLAW_HOME", "OPENACOSMI_HOME"]);
     if let Some(ref explicit) = explicit_home {
         if explicit == "~" || explicit.starts_with("~/") || explicit.starts_with("~\\") {
             // Need a fallback home to expand the tilde
@@ -78,7 +79,7 @@ fn replace_tilde_prefix(input: &str, home: &str) -> String {
 ///
 /// Returns the resolved (absolute) home directory path by checking
 /// environment variables in order of precedence:
-/// `OPENACOSMI_HOME` > `HOME` > `USERPROFILE` > `dirs::home_dir()`.
+/// `CRABCLAW_HOME` > `OPENACOSMI_HOME` > `HOME` > `USERPROFILE` > `dirs::home_dir()`.
 ///
 /// Returns `None` if no home directory can be determined.
 pub fn resolve_effective_home_dir() -> Option<String> {
@@ -133,10 +134,10 @@ pub fn expand_home_prefix(input: &str) -> String {
 
 /// Resolve the Claw Acosmi state directory.
 ///
-/// Checks `OPENACOSMI_STATE_DIR` and `CLAWDBOT_STATE_DIR` environment variables
+/// Checks `CRABCLAW_STATE_DIR`, `OPENACOSMI_STATE_DIR`, and `CLAWDBOT_STATE_DIR` environment variables
 /// first, then falls back to `~/.openacosmi`.
 pub fn resolve_state_dir() -> String {
-    let state_override = normalize(std::env::var("OPENACOSMI_STATE_DIR").ok())
+    let state_override = preferred_env_value(&["CRABCLAW_STATE_DIR", "OPENACOSMI_STATE_DIR"])
         .or_else(|| normalize(std::env::var("CLAWDBOT_STATE_DIR").ok()));
 
     if let Some(dir) = state_override {
@@ -144,7 +145,10 @@ pub fn resolve_state_dir() -> String {
     }
 
     let home = resolve_required_home_dir();
-    Path::new(&home).join(".openacosmi").to_string_lossy().to_string()
+    Path::new(&home)
+        .join(".openacosmi")
+        .to_string_lossy()
+        .to_string()
 }
 
 /// Resolve the Claw Acosmi config directory.
@@ -168,8 +172,14 @@ mod tests {
 
     #[test]
     fn test_normalize_non_empty() {
-        assert_eq!(normalize(Some("hello".to_owned())), Some("hello".to_owned()));
-        assert_eq!(normalize(Some("  hello  ".to_owned())), Some("hello".to_owned()));
+        assert_eq!(
+            normalize(Some("hello".to_owned())),
+            Some("hello".to_owned())
+        );
+        assert_eq!(
+            normalize(Some("  hello  ".to_owned())),
+            Some("hello".to_owned())
+        );
     }
 
     #[test]
@@ -222,7 +232,10 @@ mod tests {
         }
 
         let result = resolve_state_dir();
-        assert!(result.ends_with(".openacosmi"), "Expected .openacosmi suffix, got: {result}");
+        assert!(
+            result.ends_with(".openacosmi"),
+            "Expected .openacosmi suffix, got: {result}"
+        );
 
         // Restore
         unsafe {
@@ -231,6 +244,54 @@ mod tests {
             }
             if let Some(v) = saved2 {
                 std::env::set_var("CLAWDBOT_STATE_DIR", v);
+            }
+        }
+    }
+
+    #[test]
+    fn test_resolve_effective_home_dir_prefers_crabclaw_home() {
+        let saved_crab = std::env::var("CRABCLAW_HOME").ok();
+        let saved_open = std::env::var("OPENACOSMI_HOME").ok();
+        unsafe {
+            std::env::set_var("OPENACOSMI_HOME", "/tmp/open-home");
+            std::env::set_var("CRABCLAW_HOME", "/tmp/crab-home");
+        }
+
+        let result = resolve_effective_home_dir();
+        assert_eq!(result.as_deref(), Some("/tmp/crab-home"));
+
+        unsafe {
+            std::env::remove_var("CRABCLAW_HOME");
+            std::env::remove_var("OPENACOSMI_HOME");
+            if let Some(v) = saved_crab {
+                std::env::set_var("CRABCLAW_HOME", v);
+            }
+            if let Some(v) = saved_open {
+                std::env::set_var("OPENACOSMI_HOME", v);
+            }
+        }
+    }
+
+    #[test]
+    fn test_resolve_state_dir_prefers_crabclaw_env() {
+        let saved_crab = std::env::var("CRABCLAW_STATE_DIR").ok();
+        let saved_open = std::env::var("OPENACOSMI_STATE_DIR").ok();
+        unsafe {
+            std::env::set_var("OPENACOSMI_STATE_DIR", "/tmp/open-state");
+            std::env::set_var("CRABCLAW_STATE_DIR", "/tmp/crab-state");
+        }
+
+        let result = resolve_state_dir();
+        assert_eq!(result, "/tmp/crab-state");
+
+        unsafe {
+            std::env::remove_var("CRABCLAW_STATE_DIR");
+            std::env::remove_var("OPENACOSMI_STATE_DIR");
+            if let Some(v) = saved_crab {
+                std::env::set_var("CRABCLAW_STATE_DIR", v);
+            }
+            if let Some(v) = saved_open {
+                std::env::set_var("OPENACOSMI_STATE_DIR", v);
             }
         }
     }

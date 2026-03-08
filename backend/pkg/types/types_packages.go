@@ -24,7 +24,7 @@ type PackageCatalogItem struct {
 	SecurityLevel  string      `json:"securityLevel,omitempty"`
 	SecurityScore  int         `json:"securityScore,omitempty"`
 	DownloadCount  int64       `json:"downloadCount,omitempty"`
-	Source         string      `json:"source"`      // "local" | "remote" | "builtin"
+	Source         string      `json:"source"` // "local" | "remote" | "builtin"
 	IsInstalled    bool        `json:"isInstalled"`
 	InstalledAt    string      `json:"installedAt,omitempty"`
 	// Plugin 特有
@@ -54,7 +54,7 @@ type PackageInstallRecord struct {
 
 // Entitlement 权益条目
 type Entitlement struct {
-	Type      string `json:"type"`      // "managed_models" | "skill_store" | "bundle_xxx"
+	Type      string `json:"type"` // "managed_models" | "skill_store" | "bundle_xxx"
 	Granted   bool   `json:"granted"`
 	ExpiresAt string `json:"expiresAt,omitempty"`
 }

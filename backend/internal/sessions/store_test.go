@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestSessionStoreRoundTrip(t *testing.T) {
@@ -156,5 +157,13 @@ func TestSessionStoreInvalidJSON(t *testing.T) {
 	}
 	if len(all) != 0 {
 		t.Errorf("expected empty store for invalid JSON, got %d entries", len(all))
+	}
+}
+
+func TestGetSessionCacheTTLPrefersCrabClawEnv(t *testing.T) {
+	t.Setenv("OPENACOSMI_SESSION_CACHE_TTL_MS", "2000")
+	t.Setenv("CRABCLAW_SESSION_CACHE_TTL_MS", "1500")
+	if got := getSessionCacheTTL(); got != 1500*time.Millisecond {
+		t.Fatalf("got %s, want %s", got, 1500*time.Millisecond)
 	}
 }

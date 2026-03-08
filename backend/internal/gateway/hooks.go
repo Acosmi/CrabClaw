@@ -111,15 +111,9 @@ func ResolveHooksConfig(raw *HooksRawConfig) (*HooksConfig, error) {
 // ---------- Token 提取 ----------
 
 // ExtractHookToken 从请求中提取 Hook token。
-// 优先从 Authorization: Bearer 头提取，其次从 X-OpenAcosmi-Token 头。
+// 优先从 Authorization: Bearer 头提取，其次从 X-CrabClaw-Token，再回退 X-OpenAcosmi-Token。
 func ExtractHookToken(r *http.Request) string {
-	// 优先使用 Bearer token (复用 net.go 的 GetBearerToken)
-	if token := GetBearerToken(r); token != "" {
-		return token
-	}
-	// 其次检查 X-OpenAcosmi-Token header
-	headerToken := strings.TrimSpace(r.Header.Get("X-OpenAcosmi-Token"))
-	return headerToken
+	return GetGatewayToken(r)
 }
 
 // ---------- Header 标准化 ----------

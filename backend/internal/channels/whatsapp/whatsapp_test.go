@@ -107,6 +107,9 @@ func TestBuildWhatsAppPairingReply(t *testing.T) {
 	if !strings.Contains(reply, "👋") {
 		t.Error("missing greeting emoji")
 	}
+	if !strings.Contains(reply, "Crab Claw（蟹爪）") {
+		t.Error("missing new brand")
+	}
 	if !strings.Contains(reply, "+41796666864") {
 		t.Error("missing sender ID")
 	}

@@ -1,4 +1,4 @@
-# OpenAcosmi — 根级构建系统
+# CrabClaw — 根级构建系统
 #
 # 架构: Go Gateway + Rust CLI + Argus 视觉子智能体 + 前端 UI
 #
@@ -21,7 +21,7 @@ GATEWAY_BIN  := backend/build/acosmi
 
 # ===== 默认目标 =====
 help: ## 显示帮助
-	@echo "OpenAcosmi 构建命令:"
+	@echo "CrabClaw 构建命令:"
 	@echo ""
 	@echo "  快速启动:"
 	@echo "    make start     一键启动（编译 + 启动全部服务 + 打开浏览器）"

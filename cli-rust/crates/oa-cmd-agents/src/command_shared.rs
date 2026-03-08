@@ -1,7 +1,6 @@
 /// Shared utilities for agent management commands.
 ///
 /// Source: `src/commands/agents.command-shared.ts`
-
 use anyhow::Result;
 
 use oa_cli_shared::command_format::format_cli_command;
@@ -29,7 +28,7 @@ pub async fn require_valid_config() -> Result<OpenAcosmiConfig> {
         };
         anyhow::bail!(
             "Config invalid:\n{issues}\nFix the config or run {}.",
-            format_cli_command("openacosmi doctor")
+            format_cli_command("crabclaw doctor")
         );
     }
     Ok(snapshot.config)

@@ -259,7 +259,7 @@ func CreateGatewayTool(opts GatewayOptions) *AgentTool {
 	return &AgentTool{
 		Name:        "gateway",
 		Label:       "Gateway",
-		Description: "Interact with the Claw Acosmi gateway: restart, get/apply/patch configuration, run updates.",
+		Description: "Interact with the Crab Claw（蟹爪） gateway: restart, get/apply/patch configuration, run updates.",
 		Parameters: map[string]any{
 			"type": "object",
 			"properties": map[string]any{

@@ -301,7 +301,7 @@ func FormatElevatedUnavailableMessage(runtimeSandboxed bool, failures []Elevated
 	lines = append(lines, "- agents.list[].tools.elevated.allowFrom.<provider>")
 
 	if sessionKey != "" {
-		lines = append(lines, fmt.Sprintf("See: `openacosmi sandbox explain --session %s`", sessionKey))
+		lines = append(lines, fmt.Sprintf("See: `crabclaw sandbox explain --session %s`", sessionKey))
 	}
 
 	return strings.Join(lines, "\n")

@@ -1,4 +1,4 @@
-/// DNS and mDNS discovery helper commands for Claw Acosmi CLI.
+/// DNS and mDNS discovery helper commands for Crab Claw CLI.
 ///
 /// Provides subcommands: setup.
 ///

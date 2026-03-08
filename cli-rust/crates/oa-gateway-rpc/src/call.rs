@@ -10,10 +10,10 @@
 /// and CLI overrides.
 ///
 /// Source: `src/gateway/call.ts`
-
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
+use oa_infra::env::preferred_env_value;
 use tokio::sync::mpsc;
 // tracing is available for future debug logging.
 use uuid::Uuid;
@@ -23,12 +23,12 @@ use oa_config::paths::{resolve_config_path, resolve_gateway_port};
 use oa_types::config::OpenAcosmiConfig;
 use oa_types::gateway::GatewayMode;
 
-use crate::auth::{ExplicitGatewayAuth, ensure_explicit_gateway_auth, resolve_explicit_gateway_auth};
+use crate::auth::{
+    ExplicitGatewayAuth, ensure_explicit_gateway_auth, resolve_explicit_gateway_auth,
+};
 use crate::client::{GatewayClientError, GatewayClientOptions, connect_gateway};
 use crate::net::pick_primary_lan_ipv4;
-use crate::protocol::{
-    EventFrame, GatewayClientId, GatewayClientMode, PROTOCOL_VERSION,
-};
+use crate::protocol::{EventFrame, GatewayClientId, GatewayClientMode, PROTOCOL_VERSION};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -112,11 +112,7 @@ pub fn build_gateway_connection_details(
 ) -> GatewayConnectionDetails {
     let config_path = config_path_override
         .map(String::from)
-        .unwrap_or_else(|| {
-            resolve_config_path()
-                .to_string_lossy()
-                .to_string()
-        });
+        .unwrap_or_else(|| resolve_config_path().to_string_lossy().to_string());
 
     let gw = config.gateway.as_ref();
     let is_remote_mode = gw
@@ -242,9 +238,7 @@ pub fn build_gateway_connection_details(
 /// connection. Returns the response payload deserialized as type `T`.
 ///
 /// Source: `src/gateway/call.ts` (`callGateway`)
-pub async fn call_gateway<T: serde::de::DeserializeOwned>(
-    opts: CallGatewayOptions,
-) -> Result<T> {
+pub async fn call_gateway<T: serde::de::DeserializeOwned>(opts: CallGatewayOptions) -> Result<T> {
     let timeout_ms = opts.timeout_ms.unwrap_or(10_000);
     let safe_timeout = Duration::from_millis(timeout_ms.max(1).min(2_147_483_647));
 
@@ -257,7 +251,11 @@ pub async fn call_gateway<T: serde::de::DeserializeOwned>(
     let is_remote_mode = gw
         .and_then(|g| g.mode.as_ref())
         .is_some_and(|m| *m == GatewayMode::Remote);
-    let remote = if is_remote_mode { gw.and_then(|g| g.remote.as_ref()) } else { None };
+    let remote = if is_remote_mode {
+        gw.and_then(|g| g.remote.as_ref())
+    } else {
+        None
+    };
 
     let url_override = opts
         .url
@@ -304,73 +302,67 @@ pub async fn call_gateway<T: serde::de::DeserializeOwned>(
     let target_url = connection_details.url.clone();
 
     // Resolve auth token from multiple sources.
-    let auth_token_config = gw.and_then(|g| g.auth.as_ref()).and_then(|a| a.token.clone());
-    let token = explicit_auth
-        .token
-        .or_else(|| {
-            if url_override.is_some() {
-                return None;
-            }
-            if is_remote_mode {
-                remote
-                    .and_then(|r| r.token.as_deref())
-                    .map(str::trim)
-                    .filter(|s| !s.is_empty())
-                    .map(String::from)
-            } else {
-                std::env::var("OPENACOSMI_GATEWAY_TOKEN")
-                    .ok()
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .or_else(|| {
-                        std::env::var("CLAWDBOT_GATEWAY_TOKEN")
-                            .ok()
-                            .map(|s| s.trim().to_string())
-                            .filter(|s| !s.is_empty())
-                    })
-                    .or_else(|| {
-                        auth_token_config
-                            .as_deref()
-                            .map(str::trim)
-                            .filter(|s| !s.is_empty())
-                            .map(String::from)
-                    })
-            }
-        });
-
-    let auth_password_config = gw.and_then(|g| g.auth.as_ref()).and_then(|a| a.password.clone());
-    let password = explicit_auth
-        .password
-        .or_else(|| {
-            if url_override.is_some() {
-                return None;
-            }
-            std::env::var("OPENACOSMI_GATEWAY_PASSWORD")
-                .ok()
-                .map(|s| s.trim().to_string())
+    let auth_token_config = gw
+        .and_then(|g| g.auth.as_ref())
+        .and_then(|a| a.token.clone());
+    let token = explicit_auth.token.or_else(|| {
+        if url_override.is_some() {
+            return None;
+        }
+        if is_remote_mode {
+            remote
+                .and_then(|r| r.token.as_deref())
+                .map(str::trim)
                 .filter(|s| !s.is_empty())
+                .map(String::from)
+        } else {
+            preferred_env_value(&["CRABCLAW_GATEWAY_TOKEN", "OPENACOSMI_GATEWAY_TOKEN"])
                 .or_else(|| {
-                    std::env::var("CLAWDBOT_GATEWAY_PASSWORD")
+                    std::env::var("CLAWDBOT_GATEWAY_TOKEN")
                         .ok()
                         .map(|s| s.trim().to_string())
                         .filter(|s| !s.is_empty())
                 })
                 .or_else(|| {
-                    if is_remote_mode {
-                        remote
-                            .and_then(|r| r.password.as_deref())
-                            .map(str::trim)
-                            .filter(|s| !s.is_empty())
-                            .map(String::from)
-                    } else {
-                        auth_password_config
-                            .as_deref()
-                            .map(str::trim)
-                            .filter(|s| !s.is_empty())
-                            .map(String::from)
-                    }
+                    auth_token_config
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .map(String::from)
                 })
-        });
+        }
+    });
+
+    let auth_password_config = gw
+        .and_then(|g| g.auth.as_ref())
+        .and_then(|a| a.password.clone());
+    let password = explicit_auth.password.or_else(|| {
+        if url_override.is_some() {
+            return None;
+        }
+        preferred_env_value(&["CRABCLAW_GATEWAY_PASSWORD", "OPENACOSMI_GATEWAY_PASSWORD"])
+            .or_else(|| {
+                std::env::var("CLAWDBOT_GATEWAY_PASSWORD")
+                    .ok()
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+            })
+            .or_else(|| {
+                if is_remote_mode {
+                    remote
+                        .and_then(|r| r.password.as_deref())
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .map(String::from)
+                } else {
+                    auth_password_config
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .map(String::from)
+                }
+            })
+    });
 
     let client_opts = GatewayClientOptions {
         url: Some(target_url),

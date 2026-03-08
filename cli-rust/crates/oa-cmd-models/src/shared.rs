@@ -1,12 +1,11 @@
 /// Shared utilities for model management commands.
 ///
 /// Source: `src/commands/models/shared.ts`
-
 use std::collections::HashSet;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use oa_agents::model_selection::{
-    build_model_alias_index, parse_model_ref, resolve_model_ref_from_string, ModelRef,
+    ModelRef, build_model_alias_index, parse_model_ref, resolve_model_ref_from_string,
 };
 use oa_agents::scope::list_agent_ids;
 use oa_cli_shared::command_format::format_cli_command;
@@ -159,7 +158,7 @@ pub fn resolve_known_agent_id(
     if !known_agents.contains(&agent_id) {
         bail!(
             "Unknown agent id \"{raw}\". Use \"{}\" to see configured agents.",
-            format_cli_command("openacosmi agents list")
+            format_cli_command("crabclaw agents list")
         );
     }
     Ok(Some(agent_id))

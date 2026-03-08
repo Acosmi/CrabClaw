@@ -1,11 +1,10 @@
-/// Health check commands for Claw Acosmi CLI.
+/// Health check commands for Crab Claw CLI.
 ///
 /// Provides the `health` command that queries the running gateway for health
 /// status, displays channel probes, agent heartbeat intervals, session store
 /// summaries, and supports `--json` output for machine consumption.
 ///
 /// Source: `src/commands/health.ts`, `src/commands/health-format.ts`
-
 mod format;
 mod snapshot;
 mod types;
@@ -64,11 +63,7 @@ pub async fn execute(args: &HealthArgs) -> Result<()> {
     let summary: HealthSummary = if args.json {
         call_gateway(call_opts).await?
     } else {
-        with_progress(
-            "Checking gateway health\u{2026}",
-            call_gateway(call_opts),
-        )
-        .await?
+        with_progress("Checking gateway health\u{2026}", call_gateway(call_opts)).await?
     };
 
     if args.json {
@@ -79,11 +74,8 @@ pub async fn execute(args: &HealthArgs) -> Result<()> {
         return Ok(());
     }
 
-    let debug_enabled = is_truthy_env_value(
-        std::env::var("OPENACOSMI_DEBUG_HEALTH")
-            .ok()
-            .as_deref(),
-    );
+    let debug_enabled =
+        is_truthy_env_value(std::env::var("OPENACOSMI_DEBUG_HEALTH").ok().as_deref());
 
     if args.verbose {
         let details = build_gateway_connection_details(&cfg, None, None);
@@ -189,14 +181,14 @@ pub async fn execute(args: &HealthArgs) -> Result<()> {
             ))
         );
         for r in &summary.sessions.recent {
-            let age_label = r
-                .updated_at
-                .filter(|&ts| ts > 0)
-                .map_or("no activity".to_string(), |ts| {
-                    let now = now_ms();
-                    let age_minutes = (now.saturating_sub(ts)) / 60_000;
-                    format!("{age_minutes}m ago")
-                });
+            let age_label =
+                r.updated_at
+                    .filter(|&ts| ts > 0)
+                    .map_or("no activity".to_string(), |ts| {
+                        let now = now_ms();
+                        let age_minutes = (now.saturating_sub(ts)) / 60_000;
+                        format!("{age_minutes}m ago")
+                    });
             println!("- {} ({age_label})", r.key);
         }
     } else {
@@ -209,14 +201,14 @@ pub async fn execute(args: &HealthArgs) -> Result<()> {
                 ))
             );
             for r in &agent.sessions.recent {
-                let age_label = r
-                    .updated_at
-                    .filter(|&ts| ts > 0)
-                    .map_or("no activity".to_string(), |ts| {
-                        let now = now_ms();
-                        let age_minutes = (now.saturating_sub(ts)) / 60_000;
-                        format!("{age_minutes}m ago")
-                    });
+                let age_label =
+                    r.updated_at
+                        .filter(|&ts| ts > 0)
+                        .map_or("no activity".to_string(), |ts| {
+                            let now = now_ms();
+                            let age_minutes = (now.saturating_sub(ts)) / 60_000;
+                            format!("{age_minutes}m ago")
+                        });
                 println!("- {} ({age_label})", r.key);
             }
         }
@@ -247,7 +239,10 @@ fn print_debug_info(summary: &HealthSummary) {
                 .collect::<Vec<_>>()
                 .join(", ")
         });
-        println!("  {channel_id}: {}", if probes.is_empty() { "(none)" } else { &probes });
+        println!(
+            "  {channel_id}: {}",
+            if probes.is_empty() { "(none)" } else { &probes }
+        );
     }
 }
 
@@ -304,9 +299,7 @@ pub fn format_health_check_failure(err: &dyn std::error::Error) -> String {
         .filter(|l| !l.is_empty())
         .collect();
 
-    let details_idx = lines
-        .iter()
-        .position(|l| l.starts_with("Gateway target: "));
+    let details_idx = lines.iter().position(|l| l.starts_with("Gateway target: "));
 
     let summary_lines = if let Some(idx) = details_idx {
         &lines[..idx]

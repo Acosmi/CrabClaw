@@ -1,9 +1,11 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { t } from "../i18n.ts";
-import type { PluginInfo, ToolItem, BrowserToolConfig } from "../types.ts";
+import type { PluginInfo, ToolItem, BrowserToolConfig, PackageCatalogItem, PackageKind } from "../types.ts";
+
+export type PluginsPanelType = "plugins" | "tools" | "skills" | "packages";
 
 export type PluginsProps = {
-  panel: "plugins" | "tools" | "skills";
+  panel: PluginsPanelType;
   loading: boolean;
   plugins: PluginInfo[];
   error: string | null;
@@ -19,12 +21,26 @@ export type PluginsProps = {
   browserEdits: Record<string, string | boolean>;
   gatewayUrl: string;
   skillsView?: TemplateResult;
+  // App Center (packages) props
+  packagesLoading: boolean;
+  packagesItems: PackageCatalogItem[];
+  packagesTotal: number;
+  packagesError: string | null;
+  packagesKindFilter: PackageKind | "all";
+  packagesKeyword: string;
+  packagesBusyId: string | null;
   onEditChange: (pluginId: string, key: string, value: string) => void;
   onSave: (pluginId: string) => void;
   onGoToChannels: () => void;
-  onPanelChange: (panel: "plugins" | "tools" | "skills") => void;
+  onPanelChange: (panel: PluginsPanelType) => void;
   onBrowserEditChange: (key: string, value: string | boolean) => void;
   onBrowserSave: () => void;
+  onPackagesKindChange: (kind: PackageKind | "all") => void;
+  onPackagesKeywordChange: (keyword: string) => void;
+  onPackagesSearch: () => void;
+  onPackagesInstall: (id: string, kind: string) => void;
+  onPackagesRemove: (id: string) => void;
+  onPackagesLoadMore: () => void;
 };
 
 export function renderPlugins(props: PluginsProps) {
@@ -39,25 +55,28 @@ export function renderPlugins(props: PluginsProps) {
 
       <!-- Sub-tab bar -->
       <div style="display: flex; gap: 0; margin-top: 16px; border-bottom: 1px solid var(--color-border, rgba(128,128,128,0.15));">
+        ${renderSubTab(t("plugins.tab.packages"), "packages", props.panel, props.onPanelChange)}
         ${renderSubTab(t("plugins.tab.plugins"), "plugins", props.panel, props.onPanelChange)}
         ${renderSubTab(t("plugins.tab.tools"), "tools", props.panel, props.onPanelChange)}
         ${renderSubTab(t("plugins.tab.skills"), "skills", props.panel, props.onPanelChange)}
       </div>
 
-      ${props.panel === "plugins"
-        ? renderPluginsPanel(props)
-        : props.panel === "tools"
-          ? renderToolsPanel(props)
-          : props.skillsView ?? nothing}
+      ${props.panel === "packages"
+        ? renderPackagesPanel(props)
+        : props.panel === "plugins"
+          ? renderPluginsPanel(props)
+          : props.panel === "tools"
+            ? renderToolsPanel(props)
+            : props.skillsView ?? nothing}
     </section>
   `;
 }
 
 function renderSubTab(
   label: string,
-  value: "plugins" | "tools" | "skills",
-  current: "plugins" | "tools" | "skills",
-  onChange: (v: "plugins" | "tools" | "skills") => void,
+  value: PluginsPanelType,
+  current: PluginsPanelType,
+  onChange: (v: PluginsPanelType) => void,
 ) {
   const active = current === value;
   return html`
@@ -587,6 +606,161 @@ function renderToolCard(tool: ToolItem) {
       </div>
       <div style="font-size: 13px; font-weight: 500; opacity: 0.85;">${label}</div>
       <div style="font-size: 12px; opacity: 0.55; line-height: 1.5;">${desc}</div>
+    </div>
+  `;
+}
+
+// ---------- App Center (Packages) Panel ----------
+
+const KIND_FILTERS: Array<{ value: PackageKind | "all"; labelKey: string }> = [
+  { value: "all", labelKey: "packages.filter.all" },
+  { value: "skill", labelKey: "packages.filter.skill" },
+  { value: "plugin", labelKey: "packages.filter.plugin" },
+  { value: "bundle", labelKey: "packages.filter.bundle" },
+];
+
+function renderPackagesPanel(props: PluginsProps) {
+  return html`
+    <div style="margin-top: 16px;">
+      <!-- Kind filter + search -->
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <div style="display: flex; gap: 4px;">
+          ${KIND_FILTERS.map((f) => {
+    const active = props.packagesKindFilter === f.value;
+    return html`
+              <button
+                style="
+                  padding: 4px 12px;
+                  font-size: 12px;
+                  font-weight: ${active ? "600" : "400"};
+                  border: 1px solid ${active ? "var(--color-accent, #f97316)" : "var(--color-border, rgba(128,128,128,0.2))"};
+                  background: ${active ? "rgba(249, 115, 22, 0.1)" : "transparent"};
+                  color: ${active ? "var(--color-accent, #f97316)" : "var(--color-muted)"};
+                  border-radius: 14px;
+                  cursor: pointer;
+                  transition: all 0.15s ease;
+                "
+                @click=${() => props.onPackagesKindChange(f.value)}
+              >
+                ${t(f.labelKey)}
+              </button>
+            `;
+  })}
+        </div>
+        <div style="flex: 1; min-width: 160px; max-width: 300px;">
+          <input
+            class="input"
+            type="text"
+            placeholder="${t("packages.search.placeholder")}"
+            .value=${props.packagesKeyword}
+            @input=${(e: Event) => props.onPackagesKeywordChange((e.target as HTMLInputElement).value)}
+            @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter") props.onPackagesSearch(); }}
+            style="font-size: 13px; width: 100%;"
+          />
+        </div>
+      </div>
+
+      ${props.packagesError
+        ? html`<div class="callout danger" style="margin-top: 12px;">${props.packagesError}</div>`
+        : nothing}
+
+      ${props.packagesLoading && props.packagesItems.length === 0
+        ? html`<div class="muted" style="margin-top: 16px;">${t("common.loading")}</div>`
+        : nothing}
+
+      ${!props.packagesLoading && props.packagesItems.length === 0
+        ? html`<div class="muted" style="margin-top: 16px;">${t("packages.empty")}</div>`
+        : nothing}
+
+      ${props.packagesItems.length > 0
+        ? html`
+          <div style="margin-top: 8px; font-size: 12px; opacity: 0.5;">
+            ${t("packages.count").replace("{shown}", String(props.packagesItems.length)).replace("{total}", String(props.packagesTotal))}
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 12px;">
+            ${props.packagesItems.map((item) => renderPackageCard(item, props))}
+          </div>
+        `
+        : nothing}
+
+      ${props.packagesTotal > props.packagesItems.length && props.packagesItems.length > 0
+        ? html`
+          <div style="display: flex; justify-content: center; margin-top: 16px;">
+            <button
+              class="btn"
+              ?disabled=${props.packagesLoading}
+              @click=${() => props.onPackagesLoadMore()}
+            >
+              ${props.packagesLoading ? t("common.loading") : t("packages.loadMore")}
+            </button>
+          </div>
+        `
+        : nothing}
+    </div>
+  `;
+}
+
+function kindBadgeColor(kind: string): string {
+  switch (kind) {
+  case "skill": return "#3b82f6";
+  case "plugin": return "#8b5cf6";
+  case "bundle": return "#f59e0b";
+  default: return "#6b7280";
+  }
+}
+
+function renderPackageCard(item: PackageCatalogItem, props: PluginsProps) {
+  const isBusy = props.packagesBusyId === item.id;
+  return html`
+    <div class="card" style="
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+    ">
+      <div class="row" style="justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 18px;">${item.icon || "📦"}</span>
+          <span style="font-weight: 600; font-size: 14px;">${item.name}</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span class="chip" style="font-size: 10px; background: ${kindBadgeColor(item.kind)}; color: #fff;">
+            ${item.kind}
+          </span>
+          ${item.isInstalled
+      ? html`<span class="chip chip-ok" style="font-size: 10px;">${t("packages.badge.installed")}</span>`
+      : nothing}
+        </div>
+      </div>
+      <div style="font-size: 12px; opacity: 0.6; line-height: 1.4;">${item.description}</div>
+      <div class="row" style="justify-content: space-between; align-items: center;">
+        <div style="font-size: 11px; opacity: 0.4;">
+          ${item.version ? `v${item.version}` : ""}
+          ${item.author ? ` · ${item.author}` : ""}
+        </div>
+        ${item.isInstalled
+      ? html`
+            <button
+              class="btn btn-sm"
+              style="font-size: 11px;"
+              ?disabled=${isBusy}
+              @click=${() => props.onPackagesRemove(item.id)}
+            >
+              ${isBusy ? t("packages.btn.removing") : t("packages.btn.remove")}
+            </button>
+          `
+      : html`
+            <button
+              class="btn btn-primary btn-sm"
+              style="font-size: 11px;"
+              ?disabled=${isBusy}
+              @click=${() => props.onPackagesInstall(item.id, item.kind)}
+            >
+              ${isBusy ? t("packages.btn.installing") : t("packages.btn.install")}
+            </button>
+          `}
+      </div>
     </div>
   `;
 }

@@ -7,12 +7,16 @@ package gateway
 import (
 	"context"
 	"log/slog"
+	"slices"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/Acosmi/ClawAcosmi/internal/media"
 	"github.com/Acosmi/ClawAcosmi/pkg/types"
 )
+
+var knownMediaSources = []string{"weibo", "baidu", "zhihu"}
 
 // MediaHandlers 返回媒体子系统 RPC 方法处理器。
 func MediaHandlers() map[string]GatewayMethodHandler {
@@ -55,6 +59,162 @@ func appendSharedMediaTools(tools []map[string]interface{}, cfg *types.OpenAcosm
 		"scope":       "shared",
 	})
 	return tools
+}
+
+func mediaAgentSettings(cfg *types.OpenAcosmiConfig) *types.MediaAgentSettings {
+	if cfg == nil || cfg.SubAgents == nil {
+		return nil
+	}
+	return cfg.SubAgents.MediaAgent
+}
+
+func mediaChannels(cfg *types.OpenAcosmiConfig) *types.ChannelsConfig {
+	if cfg == nil {
+		return nil
+	}
+	return cfg.Channels
+}
+
+func unionMediaSourceNames(runtimeNames []string, explicitNames []string) []string {
+	names := make([]string, 0, len(knownMediaSources)+len(runtimeNames)+len(explicitNames))
+	for _, name := range knownMediaSources {
+		if !slices.Contains(names, name) {
+			names = append(names, name)
+		}
+	}
+	for _, name := range runtimeNames {
+		if strings.TrimSpace(name) == "" || slices.Contains(names, name) {
+			continue
+		}
+		names = append(names, name)
+	}
+	for _, name := range explicitNames {
+		if strings.TrimSpace(name) == "" || slices.Contains(names, name) {
+			continue
+		}
+		names = append(names, name)
+	}
+	return names
+}
+
+func resolveMediaSourceState(cfg *types.OpenAcosmiConfig, runtimeNames []string) ([]map[string]interface{}, []string, bool) {
+	ma := mediaAgentSettings(cfg)
+	allNames := unionMediaSourceNames(runtimeNames, nil)
+	enabledSourcesConfigured := ma != nil && ma.EnabledSources != nil
+	enabledSet := map[string]bool{}
+
+	if enabledSourcesConfigured {
+		allNames = unionMediaSourceNames(runtimeNames, ma.EnabledSources)
+		for _, name := range ma.EnabledSources {
+			if strings.TrimSpace(name) == "" {
+				continue
+			}
+			enabledSet[name] = true
+		}
+	} else {
+		for _, name := range allNames {
+			enabledSet[name] = true
+		}
+	}
+
+	sort.Strings(allNames)
+
+	enabledSources := make([]string, 0, len(allNames))
+	sources := make([]map[string]interface{}, 0, len(allNames))
+	for _, name := range allNames {
+		enabled := enabledSet[name]
+		status := "disabled"
+		if enabledSourcesConfigured && enabled {
+			status = "configured"
+		} else if !enabledSourcesConfigured && enabled {
+			status = "default_enabled"
+		}
+		if enabled {
+			enabledSources = append(enabledSources, name)
+		}
+		sources = append(sources, map[string]interface{}{
+			"name":       name,
+			"enabled":    enabled,
+			"configured": enabledSourcesConfigured,
+			"status":     status,
+		})
+	}
+
+	return sources, enabledSources, enabledSourcesConfigured
+}
+
+func isWeChatPublisherConfigured(cfg *types.OpenAcosmiConfig) bool {
+	ch := mediaChannels(cfg)
+	if ch == nil || ch.WeChatMP == nil {
+		return false
+	}
+	return ch.WeChatMP.Enabled &&
+		strings.TrimSpace(ch.WeChatMP.AppID) != "" &&
+		strings.TrimSpace(ch.WeChatMP.AppSecret) != ""
+}
+
+func isXiaohongshuConfigured(cfg *types.OpenAcosmiConfig) bool {
+	ch := mediaChannels(cfg)
+	if ch == nil || ch.Xiaohongshu == nil {
+		return false
+	}
+	return ch.Xiaohongshu.Enabled &&
+		strings.TrimSpace(ch.Xiaohongshu.CookiePath) != ""
+}
+
+func isWebsitePublisherConfigured(cfg *types.OpenAcosmiConfig) bool {
+	ch := mediaChannels(cfg)
+	if ch == nil || ch.Website == nil {
+		return false
+	}
+	return ch.Website.Enabled &&
+		strings.TrimSpace(ch.Website.APIURL) != "" &&
+		strings.TrimSpace(ch.Website.AuthType) != "" &&
+		strings.TrimSpace(ch.Website.AuthToken) != ""
+}
+
+func configuredPublishers(cfg *types.OpenAcosmiConfig) []string {
+	publishers := make([]string, 0, 3)
+	if isWeChatPublisherConfigured(cfg) {
+		publishers = append(publishers, string(media.PlatformWeChat))
+	}
+	if isXiaohongshuConfigured(cfg) {
+		publishers = append(publishers, string(media.PlatformXiaohongshu))
+	}
+	if isWebsitePublisherConfigured(cfg) {
+		publishers = append(publishers, string(media.PlatformWebsite))
+	}
+	return publishers
+}
+
+func mediaToolState(name string, enabled bool, cfg *types.OpenAcosmiConfig) (string, bool) {
+	switch name {
+	case media.ToolTrendingTopics, media.ToolContentCompose:
+		return "builtin", false
+	case media.ToolMediaPublish:
+		if !enabled {
+			return "disabled", false
+		}
+		configured := len(configuredPublishers(cfg)) > 0
+		if configured {
+			return "configured", true
+		}
+		return "needs_configuration", false
+	case media.ToolSocialInteract:
+		if !enabled {
+			return "disabled", false
+		}
+		configured := isXiaohongshuConfigured(cfg)
+		if configured {
+			return "configured", true
+		}
+		return "needs_configuration", false
+	default:
+		if enabled {
+			return "enabled", false
+		}
+		return "disabled", false
+	}
 }
 
 // ---------- media.trending.fetch ----------
@@ -413,14 +573,7 @@ func handleMediaConfigGet(ctx *MethodHandlerContext) {
 	}
 
 	// 热点来源
-	sourceNames := sub.Aggregator.SourceNames()
-	sources := make([]map[string]interface{}, 0, len(sourceNames))
-	for _, name := range sourceNames {
-		sources = append(sources, map[string]interface{}{
-			"name":   name,
-			"status": "registered",
-		})
-	}
+	sources, enabledSources, enabledSourcesConfigured := resolveMediaSourceState(liveCfg, sub.Aggregator.SourceNames())
 
 	// 工具列表 — 使用 DefaultMediaToolDefs 获取 enabled/scope 完整信息
 	toolsCfg := media.MediaToolsConfig{
@@ -432,21 +585,21 @@ func handleMediaConfigGet(ctx *MethodHandlerContext) {
 	toolDefs := media.DefaultMediaToolDefs(toolsCfg)
 	tools := make([]map[string]interface{}, 0, len(toolDefs)+2)
 	for _, d := range toolDefs {
+		status, configured := mediaToolState(d.Name, d.Enabled, liveCfg)
 		tools = append(tools, map[string]interface{}{
 			"name":        d.Name,
 			"description": d.Description,
 			"enabled":     d.Enabled,
+			"configured":  configured,
 			"scope":       "media",
+			"status":      status,
 		})
 	}
 	// 共享 runner 工具
 	tools = appendSharedMediaTools(tools, liveCfg)
 
 	// 发布器
-	publishers := make([]string, 0)
-	for platform := range sub.Publishers {
-		publishers = append(publishers, string(platform))
-	}
+	publishers := configuredPublishers(liveCfg)
 	publishConfigured := len(publishers) > 0
 
 	// LLM 配置（从 live config 读取）
@@ -490,7 +643,6 @@ func handleMediaConfigGet(ctx *MethodHandlerContext) {
 		"autoDraftEnabled":   false,
 	}
 	// 来源配置状态（区分 nil 未配置 vs [] 显式全禁用）
-	enabledSourcesConfigured := false
 	if liveCfg != nil && liveCfg.SubAgents != nil && liveCfg.SubAgents.MediaAgent != nil {
 		ma := liveCfg.SubAgents.MediaAgent
 		enabledSourcesConfigured = ma.EnabledSources != nil
@@ -520,6 +672,7 @@ func handleMediaConfigGet(ctx *MethodHandlerContext) {
 		"publish_configured":         publishConfigured,
 		"llm":                        llmConfig,
 		"trending_strategy":          trendingStrategy,
+		"enabled_sources":            enabledSources,
 		"enabled_sources_configured": enabledSourcesConfigured,
 	}, nil)
 }

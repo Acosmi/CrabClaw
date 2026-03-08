@@ -1,4 +1,4 @@
-/// System diagnostics commands for Claw Acosmi CLI.
+/// System diagnostics commands for Crab Claw CLI.
 ///
 /// The `doctor` command inspects and repairs the configuration, auth profiles,
 /// gateway service, sandbox images, shell completion, state integrity, and
@@ -126,7 +126,7 @@ fn random_token() -> String {
 pub async fn execute(options: DoctorOptions) -> Result<()> {
     let mut prompter_state = prompter::create_doctor_prompter(&options);
 
-    note("OpenAcosmi doctor", Some("Doctor"));
+    note("Crab Claw doctor", Some("Doctor"));
 
     // ── 1. Pre-doctor update offer ──
     let update_result = update::maybe_offer_update_before_doctor(&options).await;
@@ -144,23 +144,29 @@ pub async fn execute(options: DoctorOptions) -> Result<()> {
     platform_notes::note_deprecated_legacy_env_vars(None);
 
     // ── 5. Config loading + migrations ──
-    let config_result = config_flow::load_and_maybe_migrate_doctor_config(&options, &mut prompter_state).await;
+    let config_result =
+        config_flow::load_and_maybe_migrate_doctor_config(&options, &mut prompter_state).await;
     let mut cfg = config_result.cfg;
     let config_path = config_result
         .path
         .unwrap_or_else(|| resolve_config_path().display().to_string());
 
     // ── 6. Gateway mode check ──
-    if cfg.gateway.as_ref().and_then(|gw| gw.mode.as_ref()).is_none() {
+    if cfg
+        .gateway
+        .as_ref()
+        .and_then(|gw| gw.mode.as_ref())
+        .is_none()
+    {
         let lines = vec![
             "gateway.mode is unset; gateway start will be blocked.".to_string(),
             format!(
                 "Fix: run {} and set Gateway mode (local/remote).",
-                format_cli_command("openacosmi configure")
+                format_cli_command("crabclaw configure")
             ),
             format!(
                 "Or set directly: {}",
-                format_cli_command("openacosmi config set gateway.mode local")
+                format_cli_command("crabclaw config set gateway.mode local")
             ),
         ];
         if !std::path::Path::new(&config_path).exists() {
@@ -168,7 +174,7 @@ pub async fn execute(options: DoctorOptions) -> Result<()> {
                 &format!(
                     "{}\nMissing config: run {} first.",
                     lines.join("\n"),
-                    format_cli_command("openacosmi setup")
+                    format_cli_command("crabclaw setup")
                 ),
                 Some("Gateway"),
             );
@@ -189,13 +195,12 @@ pub async fn execute(options: DoctorOptions) -> Result<()> {
         let has_token = auth_config
             .and_then(|a| a.token.as_ref())
             .is_some_and(|t| !t.trim().is_empty());
-        let needs_token = !matches!(
-            auth_mode,
-            Some(oa_types::gateway::GatewayAuthMode::Password)
-        ) && !(matches!(
-            auth_mode,
-            Some(oa_types::gateway::GatewayAuthMode::Token)
-        ) && has_token);
+        let needs_token =
+            !matches!(
+                auth_mode,
+                Some(oa_types::gateway::GatewayAuthMode::Password)
+            ) && !(matches!(auth_mode, Some(oa_types::gateway::GatewayAuthMode::Token))
+                && has_token);
 
         if needs_token {
             note(
@@ -229,7 +234,10 @@ pub async fn execute(options: DoctorOptions) -> Result<()> {
     // ── 9. Legacy state migrations ──
     let legacy_state = state_migrations::detect_legacy_state_migrations(&cfg).await;
     if !legacy_state.preview.is_empty() {
-        note(&legacy_state.preview.join("\n"), Some("Legacy state detected"));
+        note(
+            &legacy_state.preview.join("\n"),
+            Some("Legacy state detected"),
+        );
         let migrate = if options.non_interactive == Some(true) {
             true
         } else {
@@ -304,17 +312,14 @@ pub async fn execute(options: DoctorOptions) -> Result<()> {
             note("Config updated.", Some("Doctor"));
             let backup_path = format!("{config_path}.bak");
             if std::path::Path::new(&backup_path).exists() {
-                note(
-                    &format!("Backup: {backup_path}"),
-                    Some("Doctor"),
-                );
+                note(&format!("Backup: {backup_path}"), Some("Doctor"));
             }
         }
     } else {
         note(
             &format!(
                 "Run \"{}\" to apply changes.",
-                format_cli_command("openacosmi doctor --fix")
+                format_cli_command("crabclaw doctor --fix")
             ),
             Some("Doctor"),
         );

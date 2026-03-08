@@ -929,7 +929,7 @@ func sendEphemeralBlocks(ctx context.Context, monCtx *SlackMonitorContext, chann
 // TS 对照: pairing/pairing-messages.ts buildPairingReply
 func buildSlackPairingReply(userID, code string) string {
 	lines := []string{
-		"👋 Hi! This Slack account is paired with Open Acosmi.",
+		"👋 Hi! This Slack account is paired with Crab Claw（蟹爪）.",
 		"",
 		fmt.Sprintf("Your Slack user id: %s", userID),
 		fmt.Sprintf("Your pairing code: %s", code),

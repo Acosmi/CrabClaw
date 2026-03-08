@@ -2,7 +2,6 @@
 /// and wizard detection.
 ///
 /// Source: `src/commands/channels/shared.ts`
-
 use anyhow::Result;
 
 use oa_channels::registry::{ChatChannelId, get_chat_channel_meta};
@@ -33,7 +32,7 @@ pub async fn require_valid_config() -> Result<Option<OpenAcosmiConfig>> {
         eprintln!("Config invalid:\n{issues}");
         eprintln!(
             "Fix the config or run {}.",
-            format_cli_command("openacosmi doctor")
+            format_cli_command("crabclaw doctor")
         );
         std::process::exit(1);
     }
@@ -134,13 +133,8 @@ mod tests {
 
     #[test]
     fn format_channel_account_label_no_style() {
-        let label = format_channel_account_label(
-            ChatChannelId::Discord,
-            "default",
-            None,
-            None,
-            None,
-        );
+        let label =
+            format_channel_account_label(ChatChannelId::Discord, "default", None, None, None);
         assert_eq!(label, "Discord default");
     }
 

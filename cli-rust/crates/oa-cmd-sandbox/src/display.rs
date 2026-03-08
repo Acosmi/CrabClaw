@@ -93,7 +93,7 @@ pub fn display_summary(containers: &[SandboxContainerInfo], browsers: &[SandboxB
         println!("\n  {mismatch_count} container(s) with image mismatch detected.");
         println!(
             "   Run '{}' to update all containers.",
-            format_cli_command("openacosmi sandbox recreate --all")
+            format_cli_command("crabclaw sandbox recreate --all")
         );
     }
 }

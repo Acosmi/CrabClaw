@@ -1,7 +1,6 @@
 /// Update availability resolution and formatting.
 ///
 /// Source: `src/commands/status.update.ts`
-
 use serde::{Deserialize, Serialize};
 
 use oa_cli_shared::command_format::format_cli_command;
@@ -138,8 +137,7 @@ pub fn resolve_update_availability(
         .as_ref()
         .and_then(|r| r.latest_version.as_deref());
 
-    let registry_cmp = latest_version
-        .and_then(|lv| compare_semver(current_version, lv));
+    let registry_cmp = latest_version.and_then(|lv| compare_semver(current_version, lv));
     let has_registry_update = registry_cmp.is_some_and(|c| c < 0);
 
     let git_behind = if update.install_kind == "git" {
@@ -193,7 +191,7 @@ pub fn format_update_available_hint(
     };
     Some(format!(
         "Update available{suffix}. Run: {}",
-        format_cli_command("openacosmi update")
+        format_cli_command("crabclaw update")
     ))
 }
 
@@ -201,10 +199,7 @@ pub fn format_update_available_hint(
 ///
 /// Source: `src/commands/status.update.ts` - `formatUpdateOneLiner`
 #[must_use]
-pub fn format_update_one_liner(
-    update: &UpdateCheckResult,
-    current_version: &str,
-) -> String {
+pub fn format_update_one_liner(update: &UpdateCheckResult, current_version: &str) -> String {
     let mut parts: Vec<String> = Vec::new();
 
     if update.install_kind == "git" {

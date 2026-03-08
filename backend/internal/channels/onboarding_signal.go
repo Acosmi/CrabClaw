@@ -204,9 +204,9 @@ func ConfigureSignal(params ConfigureSignalParams) (*ConfigureSignalResult, erro
 
 	// Next steps note
 	prompter.Note(strings.Join([]string{
-		`Link device with: signal-cli link -n "OpenAcosmi"`,
+		`Link device with: signal-cli link -n "Crab Claw"`,
 		"Scan QR in Signal → Linked Devices",
-		"Then run: openacosmi gateway call channels.status --params '{\"probe\":true}'",
+		"Then run: crabclaw gateway call channels.status --params '{\"probe\":true}'",
 		"Docs: https://docs.openacosmi.dev/signal",
 	}, "\n"), "Signal next steps")
 

@@ -4,14 +4,13 @@
 /// for connecting to a remote gateway during onboarding.
 ///
 /// Source: `src/commands/onboard-remote.ts`
-
 use anyhow::Result;
 use tracing::info;
 
 use oa_types::config::OpenAcosmiConfig;
 use oa_types::gateway::{GatewayConfig, GatewayMode, GatewayRemoteConfig};
 
-use crate::helpers::{detect_binary, DEFAULT_GATEWAY_URL};
+use crate::helpers::{DEFAULT_GATEWAY_URL, detect_binary};
 
 /// A discovered gateway beacon from Bonjour/mDNS.
 ///
@@ -111,13 +110,11 @@ pub enum ConnectionMethod {
 ///
 /// Source: `src/commands/onboard-remote.ts` - SSH tunnel note
 pub fn build_ssh_tunnel_instructions(host: &str, ssh_port: Option<u16>) -> String {
-    let port_arg = ssh_port
-        .map(|p| format!(" -p {p}"))
-        .unwrap_or_default();
+    let port_arg = ssh_port.map(|p| format!(" -p {p}")).unwrap_or_default();
     [
         "Start a tunnel before using the CLI:",
         &format!("ssh -N -L 19001:127.0.0.1:19001 <user>@{host}{port_arg}"),
-        "Docs: https://github.com/Acosmi/Claw-Acosmi/tree/main/docs/skills/gateway/remote",
+        "Docs: https://github.com/Acosmi/CrabClaw/tree/main/docs/gateway/remote.md",
     ]
     .join("\n")
 }
@@ -154,9 +151,7 @@ pub fn apply_remote_gateway_config(
 /// connection method selection, and auth configuration.
 ///
 /// Source: `src/commands/onboard-remote.ts` - `promptRemoteGatewayConfig`
-pub async fn prompt_remote_gateway_config(
-    cfg: OpenAcosmiConfig,
-) -> Result<OpenAcosmiConfig> {
+pub async fn prompt_remote_gateway_config(cfg: OpenAcosmiConfig) -> Result<OpenAcosmiConfig> {
     info!("Remote gateway configuration available via interactive mode.");
 
     let suggested_url = cfg
@@ -321,10 +316,7 @@ mod tests {
         let cfg = OpenAcosmiConfig::default();
         let result = apply_remote_gateway_config(cfg, "ws://host:19001", None);
 
-        let remote = result
-            .gateway
-            .and_then(|g| g.remote)
-            .expect("remote");
+        let remote = result.gateway.and_then(|g| g.remote).expect("remote");
         assert!(remote.token.is_none());
     }
 }
