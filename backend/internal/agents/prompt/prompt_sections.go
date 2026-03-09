@@ -4,60 +4,16 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/Acosmi/ClawAcosmi/internal/agents/capabilities"
 )
 
 // ---------- 系统提示词段落构建器 ----------
 // TS 参考: system-prompt.ts 各 build*Section 函数
 
-// coreToolSummaries 核心工具描述映射。
-// NOTE: 主链路工具的权威描述来自 capabilities.Registry。
-// 此处保留非主链路工具（canvas/nodes/cron/gateway/sessions 等）的描述，
-// 主链路工具描述通过 BuildParams.ToolSummaries 从 registry 传入。
-var coreToolSummaries = map[string]string{
-	// --- 主链路工具（名称与 capabilities.Registry 对齐）---
-	"bash":              "Execute bash commands in the workspace",
-	"read_file":         "Read file contents",
-	"write_file":        "Create or overwrite files",
-	"list_dir":          "List directory contents",
-	"web_search":        "Search the web for real-time information",
-	"browser":           "Control web browser via CDP (navigate, click, type, screenshot, ARIA refs)",
-	"send_media":        "Send file/media to channel (feishu/discord/telegram/whatsapp)",
-	"spawn_coder_agent": "Delegate coding tasks to Open Coder sub-agent (delegation contract)",
-	"spawn_argus_agent": "Delegate desktop/visual tasks to Argus sub-agent (screen + visual perception)",
-	"spawn_media_agent": "Delegate media operations to media sub-agent",
-	"search_skills":     "Search skills index by keyword",
-	"lookup_skill":      "Look up full content of a skill by name",
-	"memory_search":     "Search UHMS memory by keyword",
-	"memory_get":        "Get specific memory entry by ID",
-	"report_progress":   "Report intermediate progress to user",
-	"request_help":      "Request help from parent agent (sub-agent only)",
-	// --- 非主链路工具（保留原始描述）---
-	"canvas":           "Present/eval/snapshot the Canvas",
-	"nodes":            "List/describe/notify/camera/screen on paired nodes",
-	"cron":             "Manage cron jobs and wake events",
-	"message":          "Send messages and channel actions",
-	"gateway":          "Restart, apply config, or run updates",
-	"agents_list":      "List agent ids allowed for sessions_spawn",
-	"sessions_list":    "List other sessions with filters/last",
-	"sessions_history": "Fetch history for another session/sub-agent",
-	"sessions_send":    "Send a message to another session/sub-agent",
-	"sessions_spawn":   "Spawn a sub-agent session",
-	"session_status":   "Show status card (usage + time + Reasoning/Verbose/Elevated)",
-	"image":            "Analyze an image with the configured image model",
-	"web_fetch":        "Fetch and extract readable content from a URL",
-}
-
-// toolOrder 工具输出排序（名称与 capabilities.Registry 对齐）。
-var toolOrder = []string{
-	"bash", "read_file", "write_file", "list_dir",
-	"web_search", "web_fetch", "browser", "canvas",
-	"nodes", "cron", "message", "gateway",
-	"spawn_coder_agent", "spawn_argus_agent", "spawn_media_agent", "send_media",
-	"agents_list", "sessions_list", "sessions_history", "sessions_send",
-	"sessions_spawn", "session_status", "image",
-	"search_skills", "lookup_skill", "memory_search", "memory_get",
-	"report_progress", "request_help",
-}
+// P1-1/P1-2/P1-3: coreToolSummaries and toolOrder deleted.
+// Tool summaries and sort order now derived from the capability tree (D1 derivation).
+// See: capabilities.TreeToolSummaries(), capabilities.TreeToolOrder()
 
 func buildToolingSection(toolNames []string, toolSummaries map[string]string) string {
 	available := make(map[string]bool)
@@ -65,31 +21,43 @@ func buildToolingSection(toolNames []string, toolSummaries map[string]string) st
 		available[strings.ToLower(strings.TrimSpace(t))] = true
 	}
 
+	// D1: merge tree summaries (authoritative) with caller-provided summaries (overrides)
+	treeSummaries := capabilities.TreeToolSummaries()
+	merged := make(map[string]string, len(treeSummaries))
+	for k, v := range treeSummaries {
+		merged[k] = v
+	}
+	for k, v := range toolSummaries {
+		if v != "" {
+			merged[k] = v
+		}
+	}
+
 	var lines []string
 	lines = append(lines, "## Tooling")
 	lines = append(lines, "Tool availability (filtered by policy):")
 	lines = append(lines, "Tool names are case-sensitive. Call tools exactly as listed.")
 
-	// 按固定顺序输出已知工具
-	for _, t := range toolOrder {
+	// D1: use tree-derived sort order instead of hand-written toolOrder
+	treeOrder := capabilities.TreeToolOrder()
+	orderSet := make(map[string]bool, len(treeOrder))
+	for _, t := range treeOrder {
+		orderSet[t] = true
+	}
+
+	// Output known tools in tree sort order
+	for _, t := range treeOrder {
 		if !available[t] {
 			continue
 		}
-		summary := coreToolSummaries[t]
-		if s, ok := toolSummaries[t]; ok && s != "" {
-			summary = s
-		}
-		if summary != "" {
+		if summary := merged[t]; summary != "" {
 			lines = append(lines, fmt.Sprintf("- %s: %s", t, summary))
 		} else {
 			lines = append(lines, fmt.Sprintf("- %s", t))
 		}
 	}
-	// 附加未知工具
-	orderSet := make(map[string]bool)
-	for _, t := range toolOrder {
-		orderSet[t] = true
-	}
+
+	// Append unknown tools (dynamic tools, runtime extras not in tree order)
 	var extra []string
 	for _, t := range toolNames {
 		norm := strings.ToLower(strings.TrimSpace(t))
@@ -99,15 +67,10 @@ func buildToolingSection(toolNames []string, toolSummaries map[string]string) st
 	}
 	sort.Strings(extra)
 	for _, t := range extra {
-		summary := ""
-		if s, ok := toolSummaries[t]; ok {
-			summary = s
-		}
-		if s, ok := coreToolSummaries[t]; ok && summary == "" {
-			summary = s
-		}
-		if summary != "" {
+		if summary := merged[t]; summary != "" {
 			lines = append(lines, fmt.Sprintf("- %s: %s", t, summary))
+		} else if s, ok := toolSummaries[t]; ok && s != "" {
+			lines = append(lines, fmt.Sprintf("- %s: %s", t, s))
 		} else {
 			lines = append(lines, fmt.Sprintf("- %s", t))
 		}
@@ -115,7 +78,7 @@ func buildToolingSection(toolNames []string, toolSummaries map[string]string) st
 
 	lines = append(lines,
 		"TOOLS.md does not control tool availability; it is user guidance for how to use external tools.",
-		"Sub-agent delegation: coding → spawn_coder_agent (Open Coder); desktop/GUI → spawn_argus_agent (灵瞳); web automation → browser (CSS selectors, no sub-agent needed).",
+		"Sub-agent delegation: coding → spawn_coder_agent (Open Coder); existing local file send/forward → send_media; desktop/GUI discovery or native app interaction → spawn_argus_agent (灵瞳); web automation → browser (CSS selectors, no sub-agent needed).",
 	)
 	return strings.Join(lines, "\n")
 }
@@ -205,17 +168,30 @@ func buildModelAliasesSection(lines []string, isMinimal bool) string {
 }
 
 // buildDelegationGuidanceSection 构建主 Agent 委托引导段。
-// Phase 6+: 当 spawn_coder_agent/spawn_argus_agent 可用时注入，
-// 引导主 Agent 处理工具选择和 needs_auth 协商循环。
+// P1-4: D2 derivation — tool selection list from tree's subagent nodes.
+// Negotiation protocol and result handling remain static (not tool metadata).
 func buildDelegationGuidanceSection() string {
-	return `## Sub-Agent Delegation
+	// D2: derive tool selection from tree subagent entries
+	entries := capabilities.TreeSubagentDelegationEntries()
+	var selectionLines []string
+	for _, e := range entries {
+		line := fmt.Sprintf("- %s", e.Name)
+		if e.Delegation != "" {
+			line += ": " + e.Delegation
+		} else if e.Summary != "" {
+			line += ": " + e.Summary
+		}
+		selectionLines = append(selectionLines, line)
+	}
+	selectionLines = append(selectionLines,
+		"- browser: web page automation (CSS selectors, faster than Argus for web)",
+		"- Simple single-file edits: use write_file/bash directly",
+	)
+
+	return fmt.Sprintf(`## Sub-Agent Delegation
 
 ### Tool Selection
-- spawn_coder_agent (Open Coder): multi-file code edits, refactoring, test writing
-- spawn_argus_agent (灵瞳 Argus): desktop app interaction, OCR, visual workflows
-- spawn_media_agent: media processing, image/audio/video operations
-- browser: web page automation (CSS selectors, faster than Argus for web)
-- Simple single-file edits: use write_file/bash directly
+%s
 
 ### spawn_coder_agent Negotiation
 When spawn_coder_agent returns needs_auth:
@@ -239,22 +215,34 @@ When spawn_argus_agent returns needs_auth:
 ### Result Handling
 When any sub-agent returns completed:
 1. Review the result and artifacts
-2. Summarize for the user concisely`
+2. Summarize for the user concisely`, strings.Join(selectionLines, "\n"))
 }
 
 // buildPlanGenerationSection 返回三级指挥体系的任务执行行为准则段落。
-// 注入到主智能体系统提示词中，引导 LLM 理解三级指挥流程。
+// P1-5: D2 derivation — tool selection list from tree's subagent UsageGuide.
+// Execution flow and rules remain static (behavioral guidance, not tool metadata).
 func buildPlanGenerationSection() string {
-	return `## 任务执行体系（三级指挥）
+	// D2: derive tool selection guidance from tree subagent entries
+	entries := capabilities.TreeSubagentDelegationEntries()
+	var toolLines []string
+	for _, e := range entries {
+		if e.UsageGuide != "" {
+			toolLines = append(toolLines, fmt.Sprintf("- %s → %s", e.UsageGuide, e.Name))
+		} else if e.Summary != "" {
+			toolLines = append(toolLines, fmt.Sprintf("- %s → %s", e.Summary, e.Name))
+		}
+	}
+	toolLines = append(toolLines,
+		"- 网页自动化（表单、点击、截图）→ browser（CSS 选择器，无需子智能体）",
+		"- 简单操作 → 直接使用 bash/write_file",
+	)
 
-你是站长（主智能体），管理 Open Coder（编程）、灵瞳（视觉）和媒体运营三个子智能体，并可直接使用 browser 工具进行网页自动化。
+	return fmt.Sprintf(`## 任务执行体系（三级指挥）
+
+你是站长（主智能体），管理多个子智能体，并可直接使用 browser 工具进行网页自动化。
 
 工具选择：
-- 编码任务（多文件编辑、重构、测试）→ spawn_coder_agent
-- 桌面/GUI 操作（原生应用、OCR）→ spawn_argus_agent
-- 媒体运营（内容创作、发布、趋势分析）→ spawn_media_agent
-- 网页自动化（表单、点击、截图）→ browser（CSS 选择器，无需子智能体）
-- 简单操作 → 直接使用 bash/write_file
+%s
 
 执行流程：
 1. 接收用户任务 → 分析意图 → 方案由系统自动提交用户确认
@@ -266,7 +254,7 @@ func buildPlanGenerationSection() string {
 - 简单任务（问答、轻量读取）直接处理，不走门控
 - 复杂任务（编码、删除、视觉操作）由系统自动走完整三级流程
 - 子智能体求助时优先自行解答，无法解答才上报用户
-- 质量审核聚焦：完成度、正确性、范围合规、安全性`
+- 质量审核聚焦：完成度、正确性、范围合规、安全性`, strings.Join(toolLines, "\n"))
 }
 
 // BuildQualityReviewPrompt 构建 LLM 语义质量审核的系统提示词。

@@ -15,6 +15,7 @@ import (
 	"math"
 	"strings"
 
+	"github.com/Acosmi/ClawAcosmi/internal/agents/capabilities"
 	"github.com/Acosmi/ClawAcosmi/pkg/log"
 	"github.com/Acosmi/ClawAcosmi/pkg/utils"
 )
@@ -418,6 +419,14 @@ func ResolveToolDisplay(toolName string, args map[string]any, meta ...string) To
 	key := strings.ToLower(name)
 	spec, hasSpec := toolRegistry[key]
 
+	// P1-12: D7 derivation — fall back to tree Display for tools not in hand-written registry
+	if !hasSpec {
+		if treeSpec := lookupTreeDisplay(key); treeSpec != nil {
+			spec = *treeSpec
+			hasSpec = true
+		}
+	}
+
 	emoji := "🧩"
 	title := formatToolTitle(name)
 	label := title
@@ -529,4 +538,24 @@ func FormatToolSummary(toolName string, args map[string]any) string {
 		return fmt.Sprintf("%s %s: %s", d.Emoji, d.Label, detail)
 	}
 	return fmt.Sprintf("%s %s", d.Emoji, d.Label)
+}
+
+// lookupTreeDisplay derives a ToolDisplaySpec from the capability tree.
+// P1-12: D7 derivation fallback for tools not in the hand-written toolRegistry.
+func lookupTreeDisplay(toolName string) *ToolDisplaySpec {
+	tree := capabilities.DefaultTree()
+	displays := tree.DisplaySpecs()
+	nd, ok := displays[toolName]
+	if !ok {
+		return nil
+	}
+	spec := &ToolDisplaySpec{
+		Emoji: nd.Icon,
+		Title: nd.Title,
+		Label: nd.Label,
+	}
+	if nd.DetailKeys != "" {
+		spec.DetailKeys = strings.Split(nd.DetailKeys, ",")
+	}
+	return spec
 }

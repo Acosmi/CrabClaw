@@ -22,6 +22,7 @@ import (
 type resultApprovalEntry struct {
 	ch        chan ResultApprovalDecision
 	expiresAt time.Time
+	req       ResultApprovalRequest
 }
 
 // ---------- 请求 / 决策类型 ----------
@@ -36,6 +37,7 @@ type ResultApprovalRequest struct {
 	ReviewSummary string            `json:"reviewSummary,omitempty"`
 	CreatedAtMs   int64             `json:"createdAtMs"`
 	ExpiresAtMs   int64             `json:"expiresAtMs"`
+	Workflow      ApprovalWorkflow  `json:"workflow,omitempty"`
 }
 
 // ResultApprovalDecision 用户对结果的签收决策。
@@ -57,25 +59,30 @@ type ResultApprovalManager struct {
 	mu      sync.Mutex
 	pending map[string]*resultApprovalEntry // id → pending entry (含过期时间)
 
-	broadcast   CoderConfirmBroadcastFunc // 复用广播类型（解耦 runner ↔ gateway）
-	timeout     time.Duration             // 默认 3min（签收比方案确认更快）
-	closeOnce   sync.Once                 // 防止 Close() 重复调用 panic
-	cleanupDone chan struct{}             // 关闭时停止 TTL 清理 goroutine
+	broadcast    CoderConfirmBroadcastFunc // 复用广播类型（解耦 runner ↔ gateway）
+	remoteNotify ResultApprovalRemoteNotifyFunc
+	timeout      time.Duration // 默认 3min（签收比方案确认更快）
+	closeOnce    sync.Once     // 防止 Close() 重复调用 panic
+	cleanupDone  chan struct{} // 关闭时停止 TTL 清理 goroutine
 }
+
+type ResultApprovalRemoteNotifyFunc func(req ResultApprovalRequest, sessionKey string)
 
 // NewResultApprovalManager 创建结果签收管理器。
 func NewResultApprovalManager(
 	broadcastFn CoderConfirmBroadcastFunc,
+	remoteNotifyFn ResultApprovalRemoteNotifyFunc,
 	timeout time.Duration,
 ) *ResultApprovalManager {
 	if timeout <= 0 {
 		timeout = 3 * time.Minute
 	}
 	m := &ResultApprovalManager{
-		pending:     make(map[string]*resultApprovalEntry),
-		broadcast:   broadcastFn,
-		timeout:     timeout,
-		cleanupDone: make(chan struct{}),
+		pending:      make(map[string]*resultApprovalEntry),
+		broadcast:    broadcastFn,
+		remoteNotify: remoteNotifyFn,
+		timeout:      timeout,
+		cleanupDone:  make(chan struct{}),
 	}
 	go m.ttlCleanupLoop()
 	return m
@@ -84,6 +91,10 @@ func NewResultApprovalManager(
 // RequestResultApproval 请求用户签收子智能体执行结果。
 // 阻塞直到用户决策、超时或 ctx 取消。
 func (m *ResultApprovalManager) RequestResultApproval(ctx context.Context, req ResultApprovalRequest) (ResultApprovalDecision, error) {
+	return m.RequestResultApprovalWithSessionKey(ctx, req, "")
+}
+
+func (m *ResultApprovalManager) RequestResultApprovalWithSessionKey(ctx context.Context, req ResultApprovalRequest, sessionKey string) (ResultApprovalDecision, error) {
 	// 填充默认字段
 	if req.ID == "" {
 		req.ID = uuid.New().String()
@@ -102,12 +113,18 @@ func (m *ResultApprovalManager) RequestResultApproval(ctx context.Context, req R
 	m.pending[req.ID] = &resultApprovalEntry{
 		ch:        ch,
 		expiresAt: time.UnixMilli(req.ExpiresAtMs),
+		req:       req,
 	}
 	m.mu.Unlock()
 
 	// 广播结果签收请求到前端
 	if m.broadcast != nil {
 		m.broadcast("result.approve.requested", req)
+	}
+	broadcastApprovalWorkflow(m.broadcast, req.Workflow, "result.approve.requested", req.ID)
+
+	if m.remoteNotify != nil {
+		m.remoteNotify(req, sessionKey)
 	}
 
 	slog.Debug("result approval requested",
@@ -143,14 +160,21 @@ func (m *ResultApprovalManager) RequestResultApproval(ctx context.Context, req R
 	delete(m.pending, req.ID)
 	m.mu.Unlock()
 
+	resolvedWorkflow := req.Workflow
+	if resolvedWorkflow.ID != "" {
+		resolvedWorkflow = resolvedWorkflow.MarkStageResolved(ApprovalTypeResultReview, req.ID, decision.Action)
+	}
+
 	// 广播决策结果
 	if m.broadcast != nil {
 		m.broadcast("result.approve.resolved", map[string]interface{}{
 			"id":       req.ID,
 			"decision": decision,
 			"ts":       time.Now().UnixMilli(),
+			"workflow": resolvedWorkflow,
 		})
 	}
+	broadcastApprovalWorkflow(m.broadcast, resolvedWorkflow, "result.approve.resolved", req.ID)
 
 	return decision, nil
 }
@@ -182,6 +206,16 @@ func (m *ResultApprovalManager) ResolveResultApproval(id string, decision Result
 	}
 
 	return nil
+}
+
+func (m *ResultApprovalManager) PendingRequest(id string) (ResultApprovalRequest, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	entry, ok := m.pending[id]
+	if !ok || entry == nil {
+		return ResultApprovalRequest{}, false
+	}
+	return entry.req, true
 }
 
 // Close 关闭管理器，停止 TTL 清理 goroutine。安全支持重复调用。

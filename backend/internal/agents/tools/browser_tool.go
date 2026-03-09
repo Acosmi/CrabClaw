@@ -61,7 +61,7 @@ func CreateBrowserTool(controller BrowserController) *AgentTool {
 						"start_gif_recording", "stop_gif_recording",
 						"list_tabs", "create_tab", "close_tab", "switch_tab",
 					},
-					"description": "Browser action. Recommended: observe → click_ref/fill_ref → screenshot. annotate_som: visual screenshot with numbered interactive elements. start/stop_gif_recording: record multi-step actions as animated GIF. Use ai_browse for multi-step intent-level tasks. Tab management: list_tabs/create_tab/close_tab/switch_tab.",
+					"description": "Browser action. Recommended: observe → click_ref/fill_ref → screenshot. annotate_som: visual screenshot with numbered interactive elements. start/stop_gif_recording: record multi-step actions as animated GIF. Use ai_browse for multi-step intent-level tasks. Tab management: list_tabs/create_tab/close_tab/switch_tab. IMPORTANT: Do NOT close tabs or browser when a task completes — keep the browser open for subsequent tasks. Only use close_tab when the user explicitly asks to close a specific tab.",
 				},
 				"url":       map[string]any{"type": "string", "description": "URL to navigate to (for navigate action)"},
 				"selector":  map[string]any{"type": "string", "description": "CSS selector (for click/type/wait_for actions)"},

@@ -23,14 +23,15 @@ import (
 //
 // 管线: RunTurn → RunWithModelFallback → RunEmbeddedPiAgent
 type ModelFallbackExecutor struct {
-	RunnerDeps         runner.EmbeddedRunDeps
-	Config             *types.OpenAcosmiConfig
-	AgentDir           string
-	OnPermissionDenied func(tool, detail string)              // 权限拒绝→WebSocket广播
-	WaitForApproval    func(ctx context.Context) bool         // 等待提权审批
-	SecurityLevelFunc  func() string                          // 动态安全级别
-	MountRequestsFunc  func() []runner.MountRequestForSandbox // 动态临时挂载请求（Phase 3.4）
-	OnToolEvent        func(event runner.ToolEvent)           // 结构化工具事件→频道广播
+	RunnerDeps                    runner.EmbeddedRunDeps
+	Config                        *types.OpenAcosmiConfig
+	AgentDir                      string
+	OnPermissionDenied            func(tool, detail string) // 权限拒绝→WebSocket广播
+	OnPermissionDeniedWithContext func(notice runner.PermissionDeniedNotice)
+	WaitForApproval               func(ctx context.Context) bool         // 等待提权审批
+	SecurityLevelFunc             func() string                          // 动态安全级别
+	MountRequestsFunc             func() []runner.MountRequestForSandbox // 动态临时挂载请求（Phase 3.4）
+	OnToolEvent                   func(event runner.ToolEvent)           // 结构化工具事件→频道广播
 }
 
 // RunTurn 执行一次 agent 回合（含模型失败切换）。
@@ -93,31 +94,32 @@ func (e *ModelFallbackExecutor) RunTurn(ctx context.Context, params AgentTurnPar
 			}
 
 			return runner.RunEmbeddedPiAgent(ctx, runner.RunEmbeddedPiAgentParams{
-				SessionID:           run.SessionID,
-				SessionKey:          run.SessionKey,
-				AgentID:             run.AgentID,
-				SessionFile:         run.SessionFile,
-				WorkspaceDir:        run.WorkspaceDir,
-				AgentDir:            e.AgentDir,
-				Config:              e.Config,
-				Prompt:              params.CommandBody,
-				ExtraSystemPrompt:   params.ExtraSystemPrompt,
-				Provider:            fbProvider,
-				Model:               fbModel,
-				AuthProfileID:       resolveAuthProfileID(run, fbProvider),
-				AuthProfileIDSource: resolveAuthProfileIDSource(run, fbProvider),
-				ThinkLevel:          string(run.ThinkLevel),
-				TimeoutMs:           int64(run.TimeoutMs),
-				RunID:               run.RunID, // Bug#11: 从 FollowupRunParams 传递，确保全链路可追踪
-				SuppressTranscript:  true,      // Bug#11: fallback 场景跳过 transcript 持久化，避免失败 attempt 污染历史
-				FallbackModels:      fallbacksOverride,
-				OnPermissionDenied:  e.OnPermissionDenied,
-				WaitForApproval:     e.WaitForApproval,
-				SecurityLevelFunc:   e.SecurityLevelFunc,
-				MountRequestsFunc:   e.MountRequestsFunc,
-				OnToolEvent:         e.OnToolEvent,
-				OnProgress:          params.OnProgress,
-				Attachments:         params.FollowupRun.Attachments,
+				SessionID:                     run.SessionID,
+				SessionKey:                    run.SessionKey,
+				AgentID:                       run.AgentID,
+				SessionFile:                   run.SessionFile,
+				WorkspaceDir:                  run.WorkspaceDir,
+				AgentDir:                      e.AgentDir,
+				Config:                        e.Config,
+				Prompt:                        params.CommandBody,
+				ExtraSystemPrompt:             params.ExtraSystemPrompt,
+				Provider:                      fbProvider,
+				Model:                         fbModel,
+				AuthProfileID:                 resolveAuthProfileID(run, fbProvider),
+				AuthProfileIDSource:           resolveAuthProfileIDSource(run, fbProvider),
+				ThinkLevel:                    string(run.ThinkLevel),
+				TimeoutMs:                     int64(run.TimeoutMs),
+				RunID:                         run.RunID, // Bug#11: 从 FollowupRunParams 传递，确保全链路可追踪
+				SuppressTranscript:            true,      // Bug#11: fallback 场景跳过 transcript 持久化，避免失败 attempt 污染历史
+				FallbackModels:                fallbacksOverride,
+				OnPermissionDenied:            e.OnPermissionDenied,
+				OnPermissionDeniedWithContext: e.OnPermissionDeniedWithContext,
+				WaitForApproval:               e.WaitForApproval,
+				SecurityLevelFunc:             e.SecurityLevelFunc,
+				MountRequestsFunc:             e.MountRequestsFunc,
+				OnToolEvent:                   e.OnToolEvent,
+				OnProgress:                    params.OnProgress,
+				Attachments:                   params.FollowupRun.Attachments,
 			}, e.RunnerDeps)
 		},
 		func(fbProvider, fbModel string, fbErr error, attempt, total int) {

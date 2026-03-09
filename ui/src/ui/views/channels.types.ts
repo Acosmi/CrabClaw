@@ -1,3 +1,4 @@
+import type { EmailTestResult } from "./channels.email.ts";
 import type {
   ChannelAccountSnapshot,
   ChannelsStatusSnapshot,
@@ -48,6 +49,10 @@ export type ChannelsProps = {
   onNostrProfileImport: () => void;
   onNostrProfileToggleAdvanced: () => void;
   onConfigureChannel?: (channelId: string) => void;
+  // Email channel
+  onEmailTest?: (accountId: string) => void;
+  emailTestLoading?: boolean;
+  emailTestResult?: EmailTestResult | null;
   /** Trigger host re-render (needed for config modal) */
   requestUpdate?: () => void;
 };

@@ -730,7 +730,7 @@ function renderDetailCard(props: MemoryProps) {
   )}
           </div>
           <div class="code-block" style="margin-top: 1rem; background: #fafafa; border: 1px solid #eaeaea; border-radius: 6px; padding: 16px; max-height: 400px; overflow-y: auto;">
-            <pre style="margin: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.9rem; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word;">${d.vfsContent || t("memory.noContent")}</pre>
+            <pre style="margin: 0; font-family: var(--mono); font-size: 0.9rem; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word;">${d.vfsContent || t("memory.noContent")}</pre>
           </div>
         </div>
       </div>

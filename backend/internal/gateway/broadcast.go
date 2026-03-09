@@ -47,14 +47,15 @@ const (
 )
 
 var eventScopeGuards = map[string][]string{
-	"exec.approval.requested": {scopeApprovals},
-	"exec.approval.resolved":  {scopeApprovals},
-	"coder.confirm.requested": {scopeApprovals},
-	"coder.confirm.resolved":  {scopeApprovals},
-	"device.pair.requested":   {scopePairing},
-	"device.pair.resolved":    {scopePairing},
-	"node.pair.requested":     {scopePairing},
-	"node.pair.resolved":      {scopePairing},
+	"exec.approval.requested":   {scopeApprovals},
+	"exec.approval.resolved":    {scopeApprovals},
+	"coder.confirm.requested":   {scopeApprovals},
+	"coder.confirm.resolved":    {scopeApprovals},
+	"approval.workflow.updated": {scopeApprovals},
+	"device.pair.requested":     {scopePairing},
+	"device.pair.resolved":      {scopePairing},
+	"node.pair.requested":       {scopePairing},
+	"node.pair.resolved":        {scopePairing},
 }
 
 func hasEventScope(client *WsClient, event string) bool {

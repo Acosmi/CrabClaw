@@ -2,9 +2,9 @@ version: '3'
 
 info:
   companyName: "Acosmi"
-  productName: "ClawAcosmi"
-  productIdentifier: "com.acosmi.clawacosmi.desktop"
-  description: "ClawAcosmi desktop shell"
+  productName: "Crab Claw"
+  productIdentifier: "com.acosmi.crabclaw.desktop"
+  description: "Crab Claw by Acosmi.ai desktop shell"
   copyright: "(c) 2026, Acosmi"
   comments: "Local desktop shell package"
   version: "0.0.0-dev"

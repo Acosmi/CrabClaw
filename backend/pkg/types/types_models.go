@@ -98,6 +98,7 @@ type ModelSource string
 
 const (
 	ModelSourceManaged ModelSource = "managed"
+	ModelSourceBuiltin ModelSource = "builtin"
 	ModelSourceCustom  ModelSource = "custom"
 )
 

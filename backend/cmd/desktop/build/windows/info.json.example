@@ -1,9 +1,9 @@
 {
   "CompanyName": "Acosmi",
-  "FileDescription": "ClawAcosmi desktop shell",
-  "InternalName": "ClawAcosmiDesktop",
+  "FileDescription": "Crab Claw by Acosmi.ai desktop shell",
+  "InternalName": "CrabClawDesktop",
   "LegalCopyright": "Copyright (c) Acosmi",
-  "OriginalFilename": "ClawAcosmi-desktop.exe",
-  "ProductName": "ClawAcosmi",
+  "OriginalFilename": "CrabClaw.exe",
+  "ProductName": "Crab Claw",
   "ProductVersion": "0.0.0-dev"
 }

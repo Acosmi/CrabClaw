@@ -1,8 +1,12 @@
 package gateway
 
 import (
+	"context"
 	"os"
 	"testing"
+	"time"
+
+	"github.com/Acosmi/ClawAcosmi/internal/agents/runner"
 )
 
 func TestHandleFeishuEscalationAction_RejectsMismatchedCardID(t *testing.T) {
@@ -61,10 +65,107 @@ func TestHandleFeishuEscalationAction_ApproveWithMatchingCardID(t *testing.T) {
 	}
 
 	status := mgr.GetStatus()
-	if !status.HasActive || status.Active == nil {
-		t.Fatalf("expected active grant after approve")
+	if status.ActiveLevel != "full" {
+		t.Fatalf("expected effective full level after approve, got %q", status.ActiveLevel)
 	}
-	if status.Active.Level != "full" {
-		t.Fatalf("expected full active level, got %q", status.Active.Level)
+	if status.BaseLevel != "full" {
+		t.Fatalf("expected permanent base full level, got %q", status.BaseLevel)
+	}
+	if status.HasActive {
+		t.Fatalf("full approval should not create a temporary active grant, got %+v", status.Active)
+	}
+}
+
+func TestHandleFeishuTypedApprovalAction_MountAccessApprove(t *testing.T) {
+	tmpHome := t.TempDir()
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpHome)
+	defer os.Setenv("HOME", origHome)
+
+	mgr := NewEscalationManager(nil, nil, nil)
+	mgr.SetMaxAllowedLevel("full")
+	defer mgr.Close()
+
+	if err := mgr.RequestEscalation("esc_mount", "allowlist", "need mount", "", "", "", "", 30, MountRequest{
+		HostPath:  "/Users/test/Desktop",
+		MountMode: "ro",
+	}); err != nil {
+		t.Fatalf("request escalation failed: %v", err)
+	}
+
+	state := &GatewayState{escalationMgr: mgr}
+	resp, err := handleFeishuTypedApprovalAction(state, "esc_mount", ApprovalTypeMountAccess, "approve", map[string]interface{}{"ttl": float64(30)})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp == nil || resp.Toast == nil || resp.Toast.Type != "success" {
+		t.Fatalf("expected success toast, got %+v", resp)
+	}
+
+	status := mgr.GetStatus()
+	if !status.HasActive || status.Active == nil {
+		t.Fatalf("expected active grant after typed mount approval")
+	}
+	if len(status.Active.MountRequests) != 1 || status.Active.MountRequests[0].HostPath != "/Users/test/Desktop" {
+		t.Fatalf("expected approved mount request to survive, got %+v", status.Active)
+	}
+}
+
+func TestHandleFeishuTypedApprovalAction_DataExportDeny(t *testing.T) {
+	idCh := make(chan string, 1)
+	confirmMgr := runner.NewCoderConfirmationManager(func(event string, payload interface{}) {
+		if event != "coder.confirm.requested" {
+			return
+		}
+		req, ok := payload.(runner.CoderConfirmationRequest)
+		if !ok || req.ID == "" {
+			return
+		}
+		select {
+		case idCh <- req.ID:
+		default:
+		}
+	}, nil, time.Second)
+
+	done := make(chan bool, 1)
+	go func() {
+		approved, err := confirmMgr.RequestConfirmation(
+			context.Background(),
+			"send_media",
+			[]byte(`{"target":"feishu:oc_target123","file_path":"/tmp/report.pdf"}`),
+			"feishu:oc_origin",
+		)
+		if err != nil {
+			t.Errorf("RequestConfirmation error: %v", err)
+		}
+		done <- approved
+	}()
+
+	var confirmID string
+	select {
+	case confirmID = <-idCh:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timed out waiting for coder confirmation request")
+	}
+
+	state := &GatewayState{coderConfirmMgr: confirmMgr}
+	resp, err := handleFeishuTypedApprovalAction(state, confirmID, ApprovalTypeDataExport, "deny", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp == nil || resp.Toast == nil || resp.Toast.Type != "info" {
+		t.Fatalf("expected info toast, got %+v", resp)
+	}
+	if resp.Toast.Content != "❌ 数据导出已拒绝" {
+		t.Fatalf("unexpected toast content: %+v", resp.Toast)
+	}
+
+	select {
+	case approved := <-done:
+		if approved {
+			t.Fatal("expected send_media confirmation to be denied")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for coder confirmation resolution")
 	}
 }

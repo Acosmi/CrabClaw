@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -68,6 +70,7 @@ type ExtensionRelayConfig struct {
 	Logger          *slog.Logger
 	AllowedOrigins  []string // custom allowed origins (optional)
 	ValidateOrigins bool     // if true, enforce origin checking
+	TokenFile       string   // path to persist the relay auth token (survives restarts)
 }
 
 // NewExtensionRelay creates and starts a new extension relay server.
@@ -76,9 +79,10 @@ func NewExtensionRelay(cfg ExtensionRelayConfig) (*ExtensionRelay, error) {
 		cfg.Logger = slog.Default()
 	}
 
-	token, err := generateSecureToken()
+	// Persist token across restarts: load from file if available, else generate and save.
+	token, err := loadOrGenerateToken(cfg.TokenFile, cfg.Logger)
 	if err != nil {
-		return nil, fmt.Errorf("generate auth token: %w", err)
+		return nil, fmt.Errorf("relay auth token: %w", err)
 	}
 
 	allowedOrigins := cfg.AllowedOrigins
@@ -116,7 +120,7 @@ func NewExtensionRelay(cfg ExtensionRelayConfig) (*ExtensionRelay, error) {
 
 	relay.listener = listener
 	relay.port = listener.Addr().(*net.TCPAddr).Port
-	relay.server = &http.Server{Handler: mux}
+	relay.server = &http.Server{Handler: relay.withCORS(mux, allowedOrigins, cfg.ValidateOrigins)}
 
 	go func() {
 		if err := relay.server.Serve(listener); err != nil && err != http.ErrServerClosed {
@@ -174,6 +178,13 @@ func (r *ExtensionRelay) AuthToken() string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.authToken
+}
+
+// ExtensionConnected reports whether a browser extension is currently connected.
+func (r *ExtensionRelay) ExtensionConnected() bool {
+	r.extMu.Lock()
+	defer r.extMu.Unlock()
+	return r.extConn != nil
 }
 
 func (r *ExtensionRelay) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -333,6 +344,47 @@ func (r *ExtensionRelay) handleJSONVersion(w http.ResponseWriter, _ *http.Reques
 func (r *ExtensionRelay) handleJSONProtocol(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"version":{"major":"1","minor":"3"}}`)) //nolint:errcheck
+}
+
+func (r *ExtensionRelay) withCORS(next http.Handler, allowed []string, validate bool) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if origin, ok := r.allowedCORSOrigin(req, allowed, validate); ok {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			w.Header().Set("Vary", "Origin")
+		}
+
+		if req.Method == http.MethodOptions {
+			if validate {
+				origin := strings.TrimSpace(req.Header.Get("Origin"))
+				if origin != "" {
+					if _, ok := r.allowedCORSOrigin(req, allowed, validate); !ok {
+						http.Error(w, "forbidden", http.StatusForbidden)
+						return
+					}
+				}
+			}
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, req)
+	})
+}
+
+func (r *ExtensionRelay) allowedCORSOrigin(req *http.Request, allowed []string, validate bool) (string, bool) {
+	origin := strings.TrimSpace(req.Header.Get("Origin"))
+	if origin == "" {
+		return "", false
+	}
+	if !validate {
+		return origin, true
+	}
+	if r.isAllowedOrigin(req, allowed) {
+		return origin, true
+	}
+	return "", false
 }
 
 // --- Origin validation (BR-H16) ---
@@ -580,6 +632,18 @@ func (r *ExtensionRelay) handleExtensionMessage(msg []byte) {
 	case "tab_created":
 		r.logger.Info("extension tab created", "tabId", envelope.TabID)
 
+	case "ping":
+		// Heartbeat from extension — respond with pong to keep connection alive.
+		r.extMu.Lock()
+		conn := r.extConn
+		r.extMu.Unlock()
+		if conn != nil {
+			pong, _ := json.Marshal(map[string]string{"type": "pong"})
+			if err := conn.WriteMessage(websocket.TextMessage, pong); err != nil {
+				r.logger.Debug("pong write failed", "err", err)
+			}
+		}
+
 	default:
 		r.logger.Debug("extension unknown message type", "type", envelope.Type)
 	}
@@ -685,4 +749,41 @@ func generateSecureToken() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(buf), nil
+}
+
+// loadOrGenerateToken loads the relay token from a file, or generates a new one
+// and saves it. This ensures the token survives gateway restarts so the
+// extension doesn't lose its connection on every restart.
+func loadOrGenerateToken(tokenFile string, logger *slog.Logger) (string, error) {
+	if tokenFile != "" {
+		data, err := os.ReadFile(tokenFile)
+		if err == nil {
+			token := strings.TrimSpace(string(data))
+			if len(token) == 64 { // valid hex-encoded 32-byte token
+				logger.Info("relay token loaded from file", "path", tokenFile)
+				return token, nil
+			}
+			logger.Warn("relay token file has invalid content, regenerating", "path", tokenFile)
+		}
+	}
+
+	// Generate new token.
+	token, err := generateSecureToken()
+	if err != nil {
+		return "", err
+	}
+
+	// Persist if path configured.
+	if tokenFile != "" {
+		dir := filepath.Dir(tokenFile)
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			logger.Warn("cannot create relay token dir", "path", dir, "err", err)
+		} else if err := os.WriteFile(tokenFile, []byte(token+"\n"), 0o600); err != nil {
+			logger.Warn("cannot save relay token", "path", tokenFile, "err", err)
+		} else {
+			logger.Info("relay token generated and saved", "path", tokenFile)
+		}
+	}
+
+	return token, nil
 }

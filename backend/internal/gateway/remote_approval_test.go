@@ -1,12 +1,185 @@
 package gateway
 
 import (
+	"context"
 	"os"
+	"sync"
 	"testing"
 	"time"
 )
 
 // ---------- RemoteApprovalNotifier ----------
+
+type fakeTypedApprovalProvider struct {
+	name         string
+	mu           sync.Mutex
+	typedCalls   []TypedApprovalRequest
+	typedResults []TypedApprovalResultNotification
+	legacyCalls  []ApprovalCardRequest
+}
+
+func (p *fakeTypedApprovalProvider) Name() string          { return p.name }
+func (p *fakeTypedApprovalProvider) ValidateConfig() error { return nil }
+func (p *fakeTypedApprovalProvider) SendApprovalRequest(_ context.Context, req ApprovalCardRequest) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.legacyCalls = append(p.legacyCalls, req)
+	return nil
+}
+func (p *fakeTypedApprovalProvider) SendTypedApprovalRequest(_ context.Context, req TypedApprovalRequest) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.typedCalls = append(p.typedCalls, req)
+	return nil
+}
+func (p *fakeTypedApprovalProvider) SendTypedApprovalResult(_ context.Context, result TypedApprovalResultNotification) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.typedResults = append(p.typedResults, result)
+	return nil
+}
+
+type fakeCoderConfirmProvider struct {
+	name         string
+	mu           sync.Mutex
+	coderCalls   []CoderConfirmCardRequest
+	typedCalls   []TypedApprovalRequest
+	typedResults []TypedApprovalResultNotification
+	resultCalls  []bool
+}
+
+func (p *fakeCoderConfirmProvider) Name() string          { return p.name }
+func (p *fakeCoderConfirmProvider) ValidateConfig() error { return nil }
+func (p *fakeCoderConfirmProvider) SendApprovalRequest(_ context.Context, _ ApprovalCardRequest) error {
+	return nil
+}
+func (p *fakeCoderConfirmProvider) SendCoderConfirmRequest(_ context.Context, req CoderConfirmCardRequest) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.coderCalls = append(p.coderCalls, req)
+	return nil
+}
+func (p *fakeCoderConfirmProvider) SendCoderConfirmResult(_ context.Context, _ string, approved bool) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.resultCalls = append(p.resultCalls, approved)
+	return nil
+}
+func (p *fakeCoderConfirmProvider) SendTypedApprovalRequest(_ context.Context, req TypedApprovalRequest) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.typedCalls = append(p.typedCalls, req)
+	return nil
+}
+func (p *fakeCoderConfirmProvider) SendTypedApprovalResult(_ context.Context, result TypedApprovalResultNotification) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.typedResults = append(p.typedResults, result)
+	return nil
+}
+
+type fakeLegacyCoderConfirmProvider struct {
+	name        string
+	mu          sync.Mutex
+	coderCalls  []CoderConfirmCardRequest
+	resultCalls []bool
+}
+
+func (p *fakeLegacyCoderConfirmProvider) Name() string          { return p.name }
+func (p *fakeLegacyCoderConfirmProvider) ValidateConfig() error { return nil }
+func (p *fakeLegacyCoderConfirmProvider) SendApprovalRequest(_ context.Context, _ ApprovalCardRequest) error {
+	return nil
+}
+func (p *fakeLegacyCoderConfirmProvider) SendCoderConfirmRequest(_ context.Context, req CoderConfirmCardRequest) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.coderCalls = append(p.coderCalls, req)
+	return nil
+}
+func (p *fakeLegacyCoderConfirmProvider) SendCoderConfirmResult(_ context.Context, _ string, approved bool) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.resultCalls = append(p.resultCalls, approved)
+	return nil
+}
+
+type fakeResultProvider struct {
+	name        string
+	mu          sync.Mutex
+	resultCalls []ApprovalResultNotification
+}
+
+func (p *fakeResultProvider) Name() string          { return p.name }
+func (p *fakeResultProvider) ValidateConfig() error { return nil }
+func (p *fakeResultProvider) SendApprovalRequest(_ context.Context, _ ApprovalCardRequest) error {
+	return nil
+}
+func (p *fakeResultProvider) SendResultNotification(_ context.Context, result ApprovalResultNotification) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.resultCalls = append(p.resultCalls, result)
+	return nil
+}
+
+type fakePlanConfirmProvider struct {
+	name        string
+	mu          sync.Mutex
+	planCalls   []PlanConfirmCardRequest
+	resultCalls []string
+	typedCalls  []TypedApprovalRequest
+	typedResult []TypedApprovalResultNotification
+}
+
+func (p *fakePlanConfirmProvider) Name() string          { return p.name }
+func (p *fakePlanConfirmProvider) ValidateConfig() error { return nil }
+func (p *fakePlanConfirmProvider) SendApprovalRequest(_ context.Context, _ ApprovalCardRequest) error {
+	return nil
+}
+func (p *fakePlanConfirmProvider) SendPlanConfirmRequest(_ context.Context, req PlanConfirmCardRequest) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.planCalls = append(p.planCalls, req)
+	return nil
+}
+func (p *fakePlanConfirmProvider) SendPlanConfirmResult(_ context.Context, _ string, decision string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.resultCalls = append(p.resultCalls, decision)
+	return nil
+}
+func (p *fakePlanConfirmProvider) SendTypedApprovalRequest(_ context.Context, req TypedApprovalRequest) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.typedCalls = append(p.typedCalls, req)
+	return nil
+}
+func (p *fakePlanConfirmProvider) SendTypedApprovalResult(_ context.Context, result TypedApprovalResultNotification) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.typedResult = append(p.typedResult, result)
+	return nil
+}
+
+type fakeLegacyPlanConfirmProvider struct {
+	name      string
+	mu        sync.Mutex
+	planCalls []PlanConfirmCardRequest
+}
+
+func (p *fakeLegacyPlanConfirmProvider) Name() string          { return p.name }
+func (p *fakeLegacyPlanConfirmProvider) ValidateConfig() error { return nil }
+func (p *fakeLegacyPlanConfirmProvider) SendApprovalRequest(_ context.Context, _ ApprovalCardRequest) error {
+	return nil
+}
+func (p *fakeLegacyPlanConfirmProvider) SendPlanConfirmRequest(_ context.Context, req PlanConfirmCardRequest) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.planCalls = append(p.planCalls, req)
+	return nil
+}
+func (p *fakeLegacyPlanConfirmProvider) SendPlanConfirmResult(_ context.Context, _ string, _ string) error {
+	return nil
+}
 
 func TestRemoteApprovalNotifier_DefaultConfig(t *testing.T) {
 	tmpHome := t.TempDir()
@@ -107,6 +280,236 @@ func TestRemoteApprovalNotifier_NotifyAllNoProviders(t *testing.T) {
 		TTLMinutes:     30,
 		RequestedAt:    time.Now(),
 	})
+}
+
+func TestRemoteApprovalNotifier_NotifyEscalation_PrefersTypedForTypedProviders(t *testing.T) {
+	t.Parallel()
+
+	typedProvider := &fakeTypedApprovalProvider{name: "feishu"}
+	legacyProvider := &fakeRemoteApprovalProvider{name: "dingtalk"}
+	notifier := &RemoteApprovalNotifier{
+		config: RemoteApprovalConfig{
+			Enabled:     true,
+			CallbackURL: "https://example.com/callback",
+		},
+		providers: []RemoteApprovalProvider{typedProvider, legacyProvider},
+	}
+
+	notifier.NotifyEscalation(
+		ApprovalCardRequest{
+			EscalationID:   "esc_mount_001",
+			RequestedLevel: "allowlist",
+			Reason:         "need mount",
+			TTLMinutes:     30,
+			RequestedAt:    time.Now(),
+		},
+		&TypedApprovalRequest{
+			Type:       ApprovalTypeMountAccess,
+			ID:         "esc_mount_001",
+			Reason:     "need mount",
+			TTLMinutes: 30,
+			MountPath:  "/Users/test/Desktop",
+			MountMode:  "ro",
+		},
+	)
+
+	time.Sleep(50 * time.Millisecond)
+
+	typedProvider.mu.Lock()
+	defer typedProvider.mu.Unlock()
+	if len(typedProvider.typedCalls) != 1 {
+		t.Fatalf("expected typed provider to receive 1 typed call, got %d", len(typedProvider.typedCalls))
+	}
+	if len(typedProvider.legacyCalls) != 0 {
+		t.Fatalf("typed provider should not receive legacy fallback when typed is available, got %d", len(typedProvider.legacyCalls))
+	}
+}
+
+func TestRemoteApprovalNotifier_NotifyTypedOrCoderConfirm_FallsBackPerProvider(t *testing.T) {
+	t.Parallel()
+
+	typedProvider := &fakeCoderConfirmProvider{name: "feishu"}
+	legacyProvider := &fakeLegacyCoderConfirmProvider{name: "wecom"}
+	notifier := &RemoteApprovalNotifier{
+		config: RemoteApprovalConfig{
+			Enabled:     true,
+			CallbackURL: "https://example.com/callback",
+		},
+		providers: []RemoteApprovalProvider{typedProvider, legacyProvider},
+	}
+
+	notifier.NotifyTypedOrCoderConfirm(
+		&TypedApprovalRequest{
+			Type:          ApprovalTypeDataExport,
+			ID:            "confirm_send_001",
+			Reason:        "send_media export",
+			TTLMinutes:    5,
+			TargetChannel: "feishu:oc_target",
+			ExportFiles:   []string{"report.pdf"},
+		},
+		CoderConfirmCardRequest{
+			ConfirmID:  "confirm_send_001",
+			ToolName:   "send_media",
+			Preview:    "send report.pdf to feishu:oc_target",
+			TTLMinutes: 5,
+		},
+	)
+
+	time.Sleep(50 * time.Millisecond)
+
+	typedProvider.mu.Lock()
+	if len(typedProvider.typedCalls) != 1 {
+		typedProvider.mu.Unlock()
+		t.Fatalf("typed provider should receive typed data_export call, got %d", len(typedProvider.typedCalls))
+	}
+	if len(typedProvider.coderCalls) != 0 {
+		typedProvider.mu.Unlock()
+		t.Fatalf("typed provider should not receive coder fallback when typed is available, got %d", len(typedProvider.coderCalls))
+	}
+	typedProvider.mu.Unlock()
+
+	legacyProvider.mu.Lock()
+	defer legacyProvider.mu.Unlock()
+	if len(legacyProvider.coderCalls) != 1 {
+		t.Fatalf("legacy provider should receive coder confirm fallback, got %d", len(legacyProvider.coderCalls))
+	}
+}
+
+func TestRemoteApprovalNotifier_NotifyTypedOrApprovalResult_FallsBackPerProvider(t *testing.T) {
+	t.Parallel()
+
+	typedProvider := &fakeTypedApprovalProvider{name: "feishu"}
+	legacyProvider := &fakeResultProvider{name: "wecom"}
+	notifier := &RemoteApprovalNotifier{
+		config:    RemoteApprovalConfig{Enabled: true},
+		providers: []RemoteApprovalProvider{typedProvider, legacyProvider},
+	}
+
+	notifier.NotifyTypedOrApprovalResult(
+		&TypedApprovalResultNotification{
+			Type:       ApprovalTypeMountAccess,
+			ID:         "esc_mount_001",
+			Approved:   true,
+			TTLMinutes: 30,
+			MountPath:  "/Users/test/Desktop",
+			MountMode:  "ro",
+		},
+		ApprovalResultNotification{
+			EscalationID:   "esc_mount_001",
+			Approved:       true,
+			RequestedLevel: "allowlist",
+			TTLMinutes:     30,
+		},
+	)
+
+	time.Sleep(50 * time.Millisecond)
+
+	typedProvider.mu.Lock()
+	if len(typedProvider.typedResults) != 1 {
+		typedProvider.mu.Unlock()
+		t.Fatalf("typed provider should receive typed result, got %d", len(typedProvider.typedResults))
+	}
+	if len(typedProvider.legacyCalls) != 0 {
+		typedProvider.mu.Unlock()
+		t.Fatalf("typed provider should not receive legacy request fallback during result notification, got %d", len(typedProvider.legacyCalls))
+	}
+	typedProvider.mu.Unlock()
+
+	legacyProvider.mu.Lock()
+	defer legacyProvider.mu.Unlock()
+	if len(legacyProvider.resultCalls) != 1 {
+		t.Fatalf("legacy provider should receive legacy result fallback, got %d", len(legacyProvider.resultCalls))
+	}
+}
+
+func TestRemoteApprovalNotifier_NotifyTypedOrCoderConfirmResult_FallsBackPerProvider(t *testing.T) {
+	t.Parallel()
+
+	typedProvider := &fakeCoderConfirmProvider{name: "feishu"}
+	legacyProvider := &fakeLegacyCoderConfirmProvider{name: "wecom"}
+	notifier := &RemoteApprovalNotifier{
+		config:    RemoteApprovalConfig{Enabled: true},
+		providers: []RemoteApprovalProvider{typedProvider, legacyProvider},
+	}
+
+	notifier.NotifyTypedOrCoderConfirmResult(
+		&TypedApprovalResultNotification{
+			Type:     ApprovalTypeDataExport,
+			ID:       "confirm_send_001",
+			Approved: false,
+			Reason:   "denied",
+		},
+		"confirm_send_001",
+		false,
+	)
+
+	time.Sleep(50 * time.Millisecond)
+
+	typedProvider.mu.Lock()
+	if len(typedProvider.typedResults) != 1 {
+		typedProvider.mu.Unlock()
+		t.Fatalf("typed provider should receive typed coder result, got %d", len(typedProvider.typedResults))
+	}
+	if len(typedProvider.resultCalls) != 0 {
+		typedProvider.mu.Unlock()
+		t.Fatalf("typed provider should not receive legacy coder result fallback, got %d", len(typedProvider.resultCalls))
+	}
+	typedProvider.mu.Unlock()
+
+	legacyProvider.mu.Lock()
+	defer legacyProvider.mu.Unlock()
+	if len(legacyProvider.resultCalls) != 1 {
+		t.Fatalf("legacy provider should receive legacy coder result fallback, got %d", len(legacyProvider.resultCalls))
+	}
+}
+
+func TestRemoteApprovalNotifier_NotifyTypedOrPlanConfirm_FallsBackPerProvider(t *testing.T) {
+	t.Parallel()
+
+	typedProvider := &fakePlanConfirmProvider{name: "feishu"}
+	legacyProvider := &fakeLegacyPlanConfirmProvider{name: "wecom"}
+	notifier := &RemoteApprovalNotifier{
+		config: RemoteApprovalConfig{
+			Enabled:     true,
+			CallbackURL: "https://example.com/callback",
+		},
+		providers: []RemoteApprovalProvider{typedProvider, legacyProvider},
+	}
+
+	notifier.NotifyTypedOrPlanConfirm(
+		&TypedApprovalRequest{
+			Type:       ApprovalTypePlanConfirm,
+			ID:         "plan_001",
+			TaskBrief:  "发送 report.pdf 到飞书",
+			PlanSteps:  []string{"确认文件", "申请导出审批", "发送文件"},
+			IntentTier: "task_light",
+		},
+		PlanConfirmCardRequest{
+			ConfirmID:  "plan_001",
+			TaskBrief:  "发送 report.pdf 到飞书",
+			PlanSteps:  []string{"确认文件", "申请导出审批", "发送文件"},
+			IntentTier: "task_light",
+		},
+	)
+
+	time.Sleep(50 * time.Millisecond)
+
+	typedProvider.mu.Lock()
+	if len(typedProvider.typedCalls) != 1 {
+		typedProvider.mu.Unlock()
+		t.Fatalf("typed provider should receive typed plan_confirm call, got %d", len(typedProvider.typedCalls))
+	}
+	if len(typedProvider.planCalls) != 0 {
+		typedProvider.mu.Unlock()
+		t.Fatalf("typed provider should not receive legacy plan_confirm fallback, got %d", len(typedProvider.planCalls))
+	}
+	typedProvider.mu.Unlock()
+
+	legacyProvider.mu.Lock()
+	defer legacyProvider.mu.Unlock()
+	if len(legacyProvider.planCalls) != 1 {
+		t.Fatalf("legacy provider should receive legacy plan_confirm fallback, got %d", len(legacyProvider.planCalls))
+	}
 }
 
 func TestRemoteApprovalNotifier_UpdateLastKnownFeishuTarget(t *testing.T) {

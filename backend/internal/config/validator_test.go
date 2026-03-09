@@ -243,7 +243,7 @@ func TestDeepConstraints_ValidConfig(t *testing.T) {
 	cfg := &types.OpenAcosmiConfig{
 		Logging: &types.LoggingConfig{Level: "info"},
 		Gateway: &types.GatewayConfig{Port: &goodPort, Mode: "local", Bind: "auto"},
-		Update:  &types.OpenAcosmiUpdateConfig{Channel: "stable"},
+		Update:  &types.OpenAcosmiUpdateConfig{Channel: "stable", SourceURL: "https://updates.example.com", InstallPolicy: "manual"},
 		Session: &types.SessionConfig{Scope: "per-sender", DmScope: "main"},
 	}
 	errs := ValidateOpenAcosmiConfig(cfg)
@@ -270,6 +270,72 @@ func TestDeepConstraints_InvalidSTTProvider(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected enum error for invalid stt.provider")
+	}
+}
+
+func TestDeepConstraints_InvalidUpdateInstallPolicy(t *testing.T) {
+	cfg := &types.OpenAcosmiConfig{
+		Update: &types.OpenAcosmiUpdateConfig{InstallPolicy: "later"},
+	}
+	errs := ValidateOpenAcosmiConfig(cfg)
+	found := false
+	for _, e := range errs {
+		if e.Field == "update.installPolicy" && e.Tag == "enum" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected enum error for invalid update.installPolicy")
+	}
+}
+
+func TestDeepConstraints_ValidUpdateInstallPolicies(t *testing.T) {
+	for _, policy := range []string{"manual", "on-quit", "idle"} {
+		cfg := &types.OpenAcosmiConfig{
+			Update: &types.OpenAcosmiUpdateConfig{InstallPolicy: policy},
+		}
+		errs := ValidateOpenAcosmiConfig(cfg)
+		for _, e := range errs {
+			if e.Field == "update.installPolicy" && e.Tag == "enum" {
+				t.Fatalf("unexpected enum error for update.installPolicy=%q: %v", policy, e)
+			}
+		}
+	}
+}
+
+func TestDeepConstraints_InvalidUpdateSourceURL(t *testing.T) {
+	cfg := &types.OpenAcosmiConfig{
+		Update: &types.OpenAcosmiUpdateConfig{SourceURL: "updates.example.com/feed"},
+	}
+	errs := ValidateOpenAcosmiConfig(cfg)
+	found := false
+	for _, e := range errs {
+		if e.Field == "update.sourceURL" && e.Tag == "url" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected url error for invalid update.sourceURL")
+	}
+}
+
+func TestDeepConstraints_ValidUpdateSourceURL(t *testing.T) {
+	for _, sourceURL := range []string{
+		"https://updates.example.com",
+		"https://updates.example.com/stable/update.json",
+		"http://127.0.0.1:8080/dev/update.json",
+	} {
+		cfg := &types.OpenAcosmiConfig{
+			Update: &types.OpenAcosmiUpdateConfig{SourceURL: sourceURL},
+		}
+		errs := ValidateOpenAcosmiConfig(cfg)
+		for _, e := range errs {
+			if e.Field == "update.sourceURL" {
+				t.Fatalf("unexpected error for update.sourceURL=%q: %v", sourceURL, e)
+			}
+		}
 	}
 }
 

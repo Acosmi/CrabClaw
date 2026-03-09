@@ -13,7 +13,12 @@ import {
   renderProcessingCard,
 } from "../chat/grouped-render.ts";
 import { renderCodexReadonlySurface } from "../chat/codex-readonly-surface.ts";
-import { isReadonlyRunVisible } from "../chat/readonly-run-state.ts";
+import {
+  isReadonlyRunTerminal,
+  isReadonlyRunVisible,
+  normalizeReadonlyRunAnchorText,
+} from "../chat/readonly-run-state.ts";
+import { extractText } from "../chat/message-extract.ts";
 import { normalizeMessage, normalizeRoleForGrouping } from "../chat/message-normalizer.ts";
 import { initCodeBlockCopyListeners } from "../chat/code-block-actions.ts";
 import { icons } from "../icons.ts";
@@ -40,6 +45,7 @@ export type ChatProps = {
   toolMessages: unknown[];
   uxMode?: ChatUxMode;
   readonlyRun?: ChatReadonlyRunState | null;
+  readonlyRunHistory?: ChatReadonlyRunState[];
   stream: string | null;
   streamStartedAt: number | null;
   assistantAvatarUrl?: string | null;
@@ -95,10 +101,15 @@ export type ChatProps = {
   models?: Array<{ id: string; name: string; provider: string; source: string }>;
   currentModel?: string | null;
   onModelChange?: (model: string) => void;
+  onOpenModelConfig?: () => void;
 };
 
 const _codeBlockInitialized = new WeakSet<HTMLElement>();
 const COMPACTION_TOAST_DURATION_MS = 5000;
+const BUILTIN_PROMO_DURATION_MS = 5000;
+const BUILTIN_PROMO_USED_KEY = "openacosmi.chat.builtinPromo.used";
+const BUILTIN_PROMO_COLLAPSED_KEY = "openacosmi.chat.builtinPromo.collapsed";
+let _builtinPromoTimer: number | null = null;
 
 // Browser extension error detection pattern (matches P1-T1 improved error message)
 const _BROWSER_EXT_ERROR_RE = /Browser tool is not (available|configured)/i;
@@ -119,17 +130,46 @@ function hasBrowserExtError(messages: unknown[]): boolean {
   return false;
 }
 
-// Close "+" menu on click outside
+// Close model menu on click outside
 let _menuCloseInstalled = false;
+function setModelMenuOpen(selectbox: HTMLElement | null, open: boolean) {
+  if (!selectbox) return;
+  if (open) {
+    selectbox.setAttribute("data-open", "true");
+  } else {
+    selectbox.removeAttribute("data-open");
+  }
+  const trigger = selectbox.querySelector(".chat-compose__model-select") as HTMLButtonElement | null;
+  trigger?.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function closeModelMenus(except: HTMLElement | null = null) {
+  const openMenus = document.querySelectorAll(".chat-compose__model-selectbox[data-open='true']");
+  for (const node of openMenus) {
+    if (except && node === except) {
+      continue;
+    }
+    setModelMenuOpen(node as HTMLElement, false);
+  }
+}
+
 function installMenuCloseListener() {
   if (_menuCloseInstalled) return;
   _menuCloseInstalled = true;
   document.addEventListener("click", (e) => {
-    const openMenu = document.querySelector(".chat-compose__menu--open");
-    if (!openMenu) return;
-    const target = e.target as HTMLElement;
-    if (target.closest(".chat-compose__menu") || target.closest(".chat-compose__plus")) return;
-    openMenu.classList.remove("chat-compose__menu--open");
+    const target = e.target;
+    if (!(target instanceof HTMLElement)) {
+      closeModelMenus();
+      return;
+    }
+    if (!target.closest(".chat-compose__model-shell")) {
+      closeModelMenus();
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      closeModelMenus();
+    }
   });
 }
 
@@ -351,6 +391,239 @@ function renderAttachmentPreview(props: ChatProps) {
   `;
 }
 
+function readBuiltinPromoFlag(key: string): boolean {
+  try {
+    return window.localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeBuiltinPromoFlag(key: string, value: boolean) {
+  try {
+    if (value) {
+      window.localStorage.setItem(key, "1");
+    } else {
+      window.localStorage.removeItem(key);
+    }
+  } catch {
+    // Ignore localStorage failures in test/private contexts.
+  }
+}
+
+function resolveBuiltinPromoState(props: ChatProps, activeSource: "builtin" | "custom") {
+  if (activeSource === "builtin") {
+    writeBuiltinPromoFlag(BUILTIN_PROMO_USED_KEY, true);
+    writeBuiltinPromoFlag(BUILTIN_PROMO_COLLAPSED_KEY, false);
+    if (_builtinPromoTimer !== null) {
+      window.clearTimeout(_builtinPromoTimer);
+      _builtinPromoTimer = null;
+    }
+    return { visible: false, dot: false };
+  }
+
+  if (readBuiltinPromoFlag(BUILTIN_PROMO_USED_KEY)) {
+    return { visible: false, dot: false };
+  }
+
+  if (!readBuiltinPromoFlag(BUILTIN_PROMO_COLLAPSED_KEY)) {
+    if (_builtinPromoTimer === null) {
+      _builtinPromoTimer = window.setTimeout(() => {
+        writeBuiltinPromoFlag(BUILTIN_PROMO_COLLAPSED_KEY, true);
+        _builtinPromoTimer = null;
+        props.requestUpdate?.();
+      }, BUILTIN_PROMO_DURATION_MS);
+    }
+    return { visible: true, dot: false };
+  }
+
+  return { visible: false, dot: true };
+}
+
+const MODEL_PROVIDER_LABELS: Record<string, string> = {
+  anthropic: "Anthropic",
+  deepseek: "DeepSeek",
+  github: "GitHub",
+  "github-copilot": "GitHub Copilot",
+  google: "Google",
+  huggingface: "Hugging Face",
+  litellm: "LiteLLM",
+  minimax: "MiniMax",
+  mistral: "Mistral",
+  moonshot: "Moonshot",
+  ollama: "Ollama",
+  openai: "OpenAI",
+  openrouter: "OpenRouter",
+  qianfan: "Qianfan",
+  qwen: "Qwen",
+  together: "Together",
+  volcengine: "Volcengine",
+  xai: "xAI",
+  zai: "Z.AI",
+};
+
+function formatProviderLabel(provider: string): string {
+  const trimmed = provider.trim();
+  if (!trimmed) {
+    return t("chat.modelCustomGroup");
+  }
+  return MODEL_PROVIDER_LABELS[trimmed] ?? trimmed;
+}
+
+function formatModelValueLabel(model: { name: string; id: string; provider: string }): string {
+  const base = model.name || model.id;
+  const provider = formatProviderLabel(model.provider);
+  return model.provider ? `${provider} · ${base}` : base;
+}
+
+function renderModelSelector(props: ChatProps) {
+  const baseModels = props.models ?? [];
+  const currentKey = props.currentModel?.trim() ?? "";
+  const models = [...baseModels];
+  if (currentKey && !models.some((model) => {
+    const key = model.provider ? `${model.provider}/${model.id}` : model.id;
+    return key === currentKey || model.id === currentKey;
+  })) {
+    const slash = currentKey.indexOf("/");
+    models.push({
+      id: slash >= 0 ? currentKey.slice(slash + 1) : currentKey,
+      name: slash >= 0 ? currentKey.slice(slash + 1) : currentKey,
+      provider: slash >= 0 ? currentKey.slice(0, slash) : "",
+      source: "custom",
+    });
+  }
+  const current = models.find((model) => {
+    const value = model.provider ? `${model.provider}/${model.id}` : model.id;
+    return props.currentModel === value || props.currentModel === model.id;
+  });
+  const builtinModels = models.filter((model) => model.source === "builtin");
+  const customModels = models.filter((model) => model.source === "custom");
+  const activeSource = current?.source === "builtin"
+    ? "builtin"
+    : customModels.length > 0
+      ? "custom"
+      : builtinModels.length > 0
+        ? "builtin"
+        : "custom";
+  const builtinPromo = resolveBuiltinPromoState(props, activeSource);
+  const visibleModels = activeSource === "builtin" ? builtinModels : customModels;
+  const providerGroups = new Map<string, typeof visibleModels>();
+  for (const model of visibleModels) {
+    const key = model.provider || "__default__";
+    const existing = providerGroups.get(key);
+    if (existing) {
+      existing.push(model);
+      continue;
+    }
+    providerGroups.set(key, [model]);
+  }
+  const displayModel = current ?? visibleModels[0] ?? null;
+  const currentLabel = displayModel ? formatModelValueLabel(displayModel) : activeSource === "builtin"
+    ? t("chat.modelBuiltinPlaceholder")
+    : t("chat.modelCustomEmpty");
+  const renderOptions = (items: typeof visibleModels) => items.map((m) => {
+    const value = m.provider ? `${m.provider}/${m.id}` : m.id;
+    const selected = props.currentModel === value || props.currentModel === m.id;
+    const label = m.name || m.id;
+    return html`
+      <button
+        class="chat-compose__model-option ${selected ? "chat-compose__model-option--active" : ""}"
+        type="button"
+        role="option"
+        aria-selected=${selected ? "true" : "false"}
+        @click=${() => {
+      props.onModelChange?.(value);
+      closeModelMenus();
+    }}
+      >
+        <span class="chat-compose__model-option-label">${label}</span>
+        ${selected ? html`<span class="chat-compose__model-option-check">${icons.check}</span>` : nothing}
+      </button>
+    `;
+  });
+
+  return html`
+    <div class="chat-compose__model-shell">
+      <div class="chat-compose__model-groups" aria-hidden="true">
+        <span class="chat-compose__model-chip-wrap">
+          <span class="chat-compose__model-chip ${activeSource === "builtin" ? "chat-compose__model-chip--active" : ""} ${builtinModels.length === 0 ? "chat-compose__model-chip--placeholder" : ""}">
+            ${t("chat.modelBuiltin")}
+          </span>
+          ${builtinPromo.visible
+    ? html`<span class="chat-compose__model-popover">${t("chat.modelBuiltinPromo")}</span>`
+    : nothing}
+          ${builtinPromo.dot
+    ? html`<span class="chat-compose__model-dot" aria-label="${t("chat.modelBuiltinPromoDot")}"></span>`
+    : nothing}
+        </span>
+        <span class="chat-compose__model-chip ${activeSource === "custom" ? "chat-compose__model-chip--active" : ""}">
+          ${t("chat.modelCustom")}
+        </span>
+      </div>
+      <div class="chat-compose__model-selectbox">
+        <button
+          class="chat-compose__model-select"
+          type="button"
+          title="${t("chat.selectModel")}"
+          aria-label="${t("chat.selectModel")}"
+          aria-haspopup="listbox"
+          aria-expanded="false"
+          @click=${(event: Event) => {
+      const selectbox = (event.currentTarget as HTMLElement | null)?.closest(".chat-compose__model-selectbox") as HTMLElement | null;
+      const nextOpen = selectbox?.getAttribute("data-open") !== "true";
+      closeModelMenus(selectbox);
+      setModelMenuOpen(selectbox, nextOpen);
+    }}
+        >
+          <span class="chat-compose__model-select-value">${currentLabel}</span>
+          <span class="chat-compose__model-select-caret" aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </span>
+        </button>
+        <div class="chat-compose__model-menu" role="listbox" aria-label="${t("chat.selectModel")}">
+          ${visibleModels.length > 0
+    ? Array.from(providerGroups.entries()).map(([provider, items]) => html`
+                <div class="chat-compose__model-group">
+                  <div class="chat-compose__model-group-label">${formatProviderLabel(provider)}</div>
+                  <div class="chat-compose__model-group-options">
+                    ${renderOptions(items)}
+                  </div>
+                </div>
+              `)
+    : html`
+                <div class="chat-compose__model-empty" aria-live="polite">
+                  ${props.connected
+        ? activeSource === "builtin"
+          ? t("chat.modelBuiltinPlaceholder")
+          : t("chat.modelCustomEmpty")
+        : t("chat.modelUnavailable")}
+                </div>
+              `}
+          ${props.onOpenModelConfig
+    ? html`
+              <div class="chat-compose__model-footer">
+                <button
+                  class="chat-compose__model-add"
+                  type="button"
+                  ?disabled=${!props.connected}
+                  @click=${() => {
+      props.onOpenModelConfig?.();
+      closeModelMenus();
+    }}
+                >
+                  ${t("chat.modelAddCustom")}
+                </button>
+              </div>
+            `
+    : nothing}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 export function renderChat(props: ChatProps) {
   installMenuCloseListener();
   const canCompose = props.connected;
@@ -370,10 +643,18 @@ export function renderChat(props: ChatProps) {
       ? t("chat.placeholderImages")
       : t("chat.placeholderDefault")
     : t("chat.placeholderDisconnected");
+  const canSubmit = props.connected && (props.draft.trim().length > 0 || hasAttachments);
+  const primaryActionIsAbort = isBusy && canAbort;
+  const primaryActionDisabled = primaryActionIsAbort ? false : !canSubmit;
+  const primaryActionLabel = primaryActionIsAbort ? t("chat.stop") : t("chat.send");
 
   const splitRatio = props.splitRatio ?? 0.6;
   const sidebarOpen = Boolean(props.sidebarOpen && props.onCloseSidebar);
   const thread = html`
+    ${(() => {
+    const chatItems = buildChatItems(props);
+    const { groupedRuns, looseRuns } = resolveReadonlyRunBindings(chatItems, props);
+    return html`
     <div
       class="chat-thread"
       role="log"
@@ -393,7 +674,7 @@ export function renderChat(props: ChatProps) {
       : nothing
     }
       ${repeat(
-      buildChatItems(props),
+      chatItems,
       (item) => item.key,
       (item) => {
         if (item.kind === "divider") {
@@ -430,21 +711,27 @@ export function renderChat(props: ChatProps) {
             showReasoning,
             assistantName: props.assistantName,
             assistantAvatar: assistantIdentity.avatar,
+            workflowRun: groupedRuns.get(item.key) ?? null,
           });
+        }
+
+        if (item.kind === "readonly-run") {
+          return renderCodexReadonlySurface(item.run);
         }
 
         return nothing;
       },
     )}
-      ${shouldRenderReadonlyRunSurface(props)
-      ? renderCodexReadonlySurface(props.readonlyRun!)
-      : nothing}
+      ${looseRuns.map((run) => renderCodexReadonlySurface(run))}
     </div>
+    `;
+  })()}
   `;
 
   return html`
     <section class="card chat">
       ${props.disabledReason ? html`<div class="callout">${props.disabledReason}</div>` : nothing}
+      ${props.error && props.error !== props.disabledReason ? html`<div class="callout danger">${props.error}</div>` : nothing}
 
       ${!props.browserExtBannerDismissed && hasBrowserExtError(props.messages)
       ? html`
@@ -604,7 +891,7 @@ export function renderChat(props: ChatProps) {
           <div class="chat-compose__bottom-row">
             <div class="chat-compose__left">
               <button
-                class="chat-compose__action-btn"
+                class="chat-compose__action-btn chat-compose__attach-btn"
                 type="button"
                 title="${t("chat.attach")}"
                 aria-label="${t("chat.attach")}"
@@ -618,45 +905,12 @@ export function renderChat(props: ChatProps) {
       input.click();
     }}
               >
-                ${icons.paperclip}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 5v14" />
+                  <path d="M5 12h14" />
+                </svg>
               </button>
-              <button
-                class="chat-compose__action-btn"
-                type="button"
-                title="${t("chat.attachImage")}"
-                aria-label="${t("chat.attachImage")}"
-                ?disabled=${!props.connected}
-                @click=${() => {
-      const input = document.createElement("input");
-      input.type = "file";
-      input.multiple = true;
-      input.accept = "image/*";
-      input.addEventListener("change", (ev) => handleFileSelect(ev, props));
-      input.click();
-    }}
-              >
-                ${icons.image}
-              </button>
-              ${(props.models?.length ?? 0) > 0
-      ? html`<select
-                    class="chat-compose__model-select"
-                    title="${t("chat.selectModel")}"
-                    aria-label="${t("chat.selectModel")}"
-                    ?disabled=${!props.connected}
-                    @change=${(e: Event) => {
-        const val = (e.target as HTMLSelectElement).value;
-        if (val && props.onModelChange) props.onModelChange(val);
-      }}
-                  >
-                    ${props.models!.map((m) => {
-        const value = m.provider ? `${m.provider}/${m.id}` : m.id;
-        const selected = props.currentModel === value || props.currentModel === m.id;
-        const label = m.name || m.id;
-        const badge = m.source === "managed" ? " ★" : "";
-        return html`<option value=${value} ?selected=${selected}>${label}${badge}</option>`;
-      })}
-                  </select>`
-      : nothing}
+              ${renderModelSelector(props)}
             </div>
 
             <div class="chat-compose__right">
@@ -675,20 +929,6 @@ export function renderChat(props: ChatProps) {
                     @click=${() => props.onVoiceStart?.()}
                   >
                     ${icons.mic}
-                  </button>`
-      : nothing}
-              ${props.draft.trim()
-      ? html`<button
-                    class="chat-compose__send"
-                    type="button"
-                    title="${isBusy ? t("chat.queue") : t("chat.send")}"
-                    aria-label="${isBusy ? t("chat.queue") : t("chat.send")}"
-                    ?disabled=${!props.connected}
-                    @click=${props.onSend}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M8 13.5V2.5M8 2.5L3 7.5M8 2.5L13 7.5"/>
-                    </svg>
                   </button>`
       : nothing}
               <button
@@ -726,27 +966,33 @@ export function renderChat(props: ChatProps) {
       }, 3000);
     }}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 5v14" />
-                  <path d="M5 12h14" />
-                </svg>
+                ${icons.penLine}
+              </button>
+              <button
+                class="chat-compose__send ${primaryActionIsAbort ? "chat-compose__send--abort" : canSubmit ? "chat-compose__send--ready" : ""}"
+                type="button"
+                title="${primaryActionLabel}"
+                aria-label="${primaryActionLabel}"
+                ?disabled=${primaryActionDisabled}
+                @click=${() => {
+      if (primaryActionIsAbort) {
+        props.onAbort?.();
+        return;
+      }
+      props.onSend();
+    }}
+              >
+                ${primaryActionIsAbort
+      ? icons.stop
+      : html`
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M8 13.5V2.5M8 2.5L3 7.5M8 2.5L13 7.5"/>
+                    </svg>
+                  `}
               </button>
             </div>
           </div>
         </div>
-
-        ${isBusy
-      ? html`<div class="chat-compose__below">
-              <button
-                class="btn chat-compose__stop-btn"
-                type="button"
-                ?disabled=${!canAbort}
-                @click=${canAbort ? props.onAbort : props.onNewSession}
-              >
-                ${canAbort ? t("chat.stop") : t("chat.newSession")}
-              </button>
-            </div>`
-      : nothing}
         <p class="chat-compose__safety-hint">${t("chat.safetyHint")}</p>
       </div>
       ${props.permissionPopupCallbacks && props.requestUpdate
@@ -812,6 +1058,10 @@ export function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup>
   const items: ChatItem[] = [];
   const history = Array.isArray(props.messages) ? props.messages : [];
   const tools = Array.isArray(props.toolMessages) ? props.toolMessages : [];
+  const readonlyRun =
+    shouldRenderReadonlyRunSurface(props) && !isReadonlyRunTerminal(props.readonlyRun ?? null)
+      ? props.readonlyRun ?? null
+      : null;
   const historyStart = Math.max(0, history.length - CHAT_HISTORY_RENDER_LIMIT);
   if (historyStart > 0) {
     items.push({
@@ -876,7 +1126,129 @@ export function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup>
     }
   }
 
+  if (readonlyRun) {
+    items.push(buildReadonlyRunItem(readonlyRun));
+  }
+
   return groupMessages(items);
+}
+
+function buildReadonlyRunItem(run: ChatProps["readonlyRun"]): Extract<ChatItem, { kind: "readonly-run" }> {
+  const startedAt = run?.startedAt ?? "na";
+  const marker = run?.completedAt ?? run?.updatedAt ?? startedAt;
+  return {
+    kind: "readonly-run",
+    key: `readonly:${run?.sessionKey ?? "session"}:${startedAt}:${marker}:${run?.phase ?? "idle"}`,
+    run: run!,
+  };
+}
+
+function readonlyRunRenderIdentity(run: ChatReadonlyRunState): string {
+  if (run.finalMessageId?.trim()) {
+    return `msg:${run.finalMessageId.trim()}`;
+  }
+  if (typeof run.finalMessageTimestamp === "number") {
+    return `ts:${run.finalMessageTimestamp}`;
+  }
+  if (run.finalMessageText) {
+    return `text:${run.finalMessageText}`;
+  }
+  return `fallback:${run.sessionKey}:${run.startedAt ?? "na"}:${run.completedAt ?? run.updatedAt ?? "na"}:${run.phase}`;
+}
+
+function dedupeReadonlyRuns(runs: ChatReadonlyRunState[], sessionKey: string): ChatReadonlyRunState[] {
+  const byId = new Map<string, ChatReadonlyRunState>();
+  for (const run of runs) {
+    if (!isReadonlyRunVisible(run, sessionKey) || !isReadonlyRunTerminal(run)) {
+      continue;
+    }
+    byId.set(readonlyRunRenderIdentity(run), run);
+  }
+  return [...byId.values()];
+}
+
+function resolveTerminalReadonlyRuns(props: ChatProps): ChatReadonlyRunState[] {
+  if ((props.uxMode ?? "classic") !== "codex-readonly") {
+    return [];
+  }
+  const current = props.readonlyRun;
+  return dedupeReadonlyRuns([
+    ...(Array.isArray(props.readonlyRunHistory) ? props.readonlyRunHistory : []),
+    current && isReadonlyRunVisible(current, props.sessionKey) && isReadonlyRunTerminal(current)
+      ? current
+      : null,
+  ].filter((run): run is ChatReadonlyRunState => Boolean(run)), props.sessionKey);
+}
+
+function compareReadonlyRunRecency(left: ChatReadonlyRunState, right: ChatReadonlyRunState): number {
+  const leftTs = left.finalMessageTimestamp ?? left.completedAt ?? left.updatedAt ?? left.startedAt ?? 0;
+  const rightTs = right.finalMessageTimestamp ?? right.completedAt ?? right.updatedAt ?? right.startedAt ?? 0;
+  return leftTs - rightTs;
+}
+
+function resolveReadonlyRunBindings(
+  items: Array<ChatItem | MessageGroup>,
+  props: ChatProps,
+): { groupedRuns: Map<string, ChatReadonlyRunState>; looseRuns: ChatReadonlyRunState[] } {
+  const groupedRuns = new Map<string, ChatReadonlyRunState>();
+  const looseRuns: ChatReadonlyRunState[] = [];
+
+  for (const run of resolveTerminalReadonlyRuns(props)) {
+    const groupKey = resolveReadonlyRunTargetGroupKey(items, run);
+    if (!groupKey) {
+      looseRuns.push(run);
+      continue;
+    }
+    const existing = groupedRuns.get(groupKey);
+    if (!existing || compareReadonlyRunRecency(existing, run) <= 0) {
+      groupedRuns.set(groupKey, run);
+      continue;
+    }
+    looseRuns.push(run);
+  }
+
+  return { groupedRuns, looseRuns };
+}
+
+function resolveReadonlyRunTargetGroupKey(
+  items: Array<ChatItem | MessageGroup>,
+  run: ChatProps["readonlyRun"] | null,
+): string | null {
+  if (!run || !isReadonlyRunTerminal(run)) {
+    return null;
+  }
+
+  const exactId = run.finalMessageId?.trim() || "";
+  const exactTimestamp = run.finalMessageTimestamp ?? null;
+  const exactText = normalizeReadonlyRunAnchorText(run.finalMessageText);
+
+  for (const item of items) {
+    if (item.kind !== "group") {
+      continue;
+    }
+    if (normalizeRoleForGrouping(item.role) !== "assistant") {
+      continue;
+    }
+    for (const entry of item.messages) {
+      const msg = entry.message as Record<string, unknown>;
+      const id = typeof msg.id === "string"
+        ? msg.id
+        : typeof msg.messageId === "string"
+          ? msg.messageId
+          : "";
+      const timestamp = typeof msg.timestamp === "number" ? msg.timestamp : null;
+      const text = normalizeReadonlyRunAnchorText(extractText(entry.message));
+      if (
+        (exactId && id === exactId) ||
+        (exactTimestamp !== null && timestamp === exactTimestamp) ||
+        (exactText !== null && text === exactText)
+      ) {
+        return item.key;
+      }
+    }
+  }
+
+  return null;
 }
 
 function messageKey(message: unknown, index: number): string {

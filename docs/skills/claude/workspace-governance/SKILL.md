@@ -7,7 +7,7 @@ metadata:
   category: claude
   requires: []
 user-invocable: false
-disable-model-invocation: false
+disable-model-invocation: true
 ---
 
 # 技能 1: 严格边界控制

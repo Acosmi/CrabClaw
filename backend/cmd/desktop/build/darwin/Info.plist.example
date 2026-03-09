@@ -3,13 +3,13 @@
 <plist version="1.0">
   <dict>
     <key>CFBundleDisplayName</key>
-    <string>ClawAcosmi</string>
+    <string>Crab Claw</string>
     <key>CFBundleExecutable</key>
-    <string>ClawAcosmi-desktop</string>
+    <string>CrabClaw</string>
     <key>CFBundleIdentifier</key>
-    <string>com.acosmi.clawacosmi.desktop</string>
+    <string>com.acosmi.crabclaw.desktop</string>
     <key>CFBundleName</key>
-    <string>ClawAcosmi</string>
+    <string>Crab Claw</string>
     <key>CFBundleVersion</key>
     <string>0.0.0-dev</string>
   </dict>

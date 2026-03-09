@@ -3,6 +3,8 @@ import { repeat } from "lit/directives/repeat.js";
 import type { AppViewState } from "./app-view-state.ts";
 import {
   createChatReadonlyRunState,
+  loadPersistedChatReadonlyRun,
+  loadPersistedChatReadonlyRunHistory,
   startChatReadonlyRun,
   type ChatUxMode,
 } from "./chat/readonly-run-state.ts";
@@ -14,7 +16,7 @@ import { refreshChat } from "./app-chat.ts";
 import { syncUrlWithSessionKey } from "./app-settings.ts";
 import { OpenAcosmiApp } from "./app.ts";
 import { ChatState, loadChatHistory } from "./controllers/chat.ts";
-import { icons } from "./icons.ts";
+import { icons, isAccentIcon } from "./icons.ts";
 import { iconForTab, pathForTab, titleForTab, type Tab } from "./navigation.ts";
 import {
   type Locale,
@@ -34,6 +36,7 @@ type PendingChannelMessage = {
 export type ChatSessionSwitchHost = {
   sessionKey: string;
   chatReadonlyRun: AppViewState["chatReadonlyRun"];
+  chatReadonlyRunHistory: AppViewState["chatReadonlyRunHistory"];
   chatMessage: string;
   chatMessages: unknown[];
   chatStream: string | null;
@@ -71,7 +74,8 @@ export function applyChatSessionSwitchState(
   }
 
   host.sessionKey = sessionKey;
-  host.chatReadonlyRun = createChatReadonlyRunState(sessionKey);
+  host.chatReadonlyRun = loadPersistedChatReadonlyRun(sessionKey) ?? createChatReadonlyRunState(sessionKey);
+  host.chatReadonlyRunHistory = loadPersistedChatReadonlyRunHistory(sessionKey);
   host.chatMessage = "";
   host.chatStream = null;
   host.chatStreamStartedAt = null;
@@ -107,6 +111,8 @@ export function applyChatSessionSwitchState(
 
 export function renderTab(state: AppViewState, tab: Tab, badge?: number) {
   const href = pathForTab(tab, state.basePath);
+  const iconName = iconForTab(tab);
+  const iconClass = isAccentIcon(iconName) ? "nav-item__icon nav-item__icon--accent" : "nav-item__icon";
   return html`
     <a
       href=${href}
@@ -124,10 +130,10 @@ export function renderTab(state: AppViewState, tab: Tab, badge?: number) {
       }
       event.preventDefault();
       state.setTab(tab);
-    }}
+      }}
       title=${titleForTab(tab)}
     >
-      <span class="nav-item__icon" aria-hidden="true">${icons[iconForTab(tab)]}</span>
+      <span class=${iconClass} aria-hidden="true">${icons[iconName]}</span>
       <span class="nav-item__text">${titleForTab(tab)}</span>
       ${badge && badge > 0 ? html`
         <span class="nav-item__badge">${badge > 99 ? '99+' : badge}</span>
@@ -348,11 +354,16 @@ export function renderChatControls(state: AppViewState) {
       }
       
       .split-capsule.is-thinking {
-        /* Apple Intelligence / macOS inspired glass-glow - Deep Tech Blue */
         position: relative;
         overflow: hidden;
-        border-color: rgba(56, 189, 248, 0.4);
-        background: var(--surface-2, rgba(30, 41, 59, 0.4));
+        border-color: rgba(96, 165, 250, 0.42);
+        background:
+          linear-gradient(135deg, rgba(239, 246, 255, 0.95) 0%, rgba(224, 242, 254, 0.94) 42%, rgba(219, 234, 254, 0.92) 100%);
+        box-shadow:
+          0 10px 28px rgba(59, 130, 246, 0.18),
+          inset 0 1px 0 rgba(255, 255, 255, 0.88);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
         animation: capsule-breathe 2.5s ease-in-out infinite alternate;
       }
       
@@ -361,15 +372,42 @@ export function renderChatControls(state: AppViewState) {
         position: absolute;
         top: 0; bottom: 0; width: 50%;
         left: -100%;
-        background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.2), transparent);
+        background: linear-gradient(
+          90deg,
+          transparent 0%,
+          rgba(255, 255, 255, 0.18) 18%,
+          rgba(147, 197, 253, 0.42) 52%,
+          rgba(219, 234, 254, 0.12) 78%,
+          transparent 100%
+        );
         transform: skewX(-20deg);
         animation: glass-sweep 3s infinite linear;
         pointer-events: none;
       }
+
+      .split-capsule.is-thinking::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(circle at 12% 20%, rgba(191, 219, 254, 0.45), transparent 42%),
+          radial-gradient(circle at 88% 82%, rgba(125, 211, 252, 0.22), transparent 38%);
+        pointer-events: none;
+      }
       
       @keyframes capsule-breathe {
-        0% { box-shadow: 0 0 8px rgba(14, 165, 233, 0.15), inset 0 0 4px rgba(14, 165, 233, 0.1); }
-        100% { box-shadow: 0 0 16px rgba(14, 165, 233, 0.5), inset 0 0 10px rgba(14, 165, 233, 0.25); }
+        0% {
+          box-shadow:
+            0 8px 22px rgba(96, 165, 250, 0.14),
+            0 0 0 1px rgba(191, 219, 254, 0.3),
+            inset 0 1px 0 rgba(255, 255, 255, 0.82);
+        }
+        100% {
+          box-shadow:
+            0 14px 34px rgba(59, 130, 246, 0.22),
+            0 0 0 1px rgba(147, 197, 253, 0.42),
+            inset 0 1px 0 rgba(255, 255, 255, 0.96);
+        }
       }
       
       @keyframes glass-sweep {
@@ -394,7 +432,10 @@ export function renderChatControls(state: AppViewState) {
       }
       .split-capsule-btn:hover { background: rgba(128,128,128,0.08); }
       .split-capsule-btn:active { background: rgba(128,128,128,0.15); }
+      .split-capsule.is-thinking .split-capsule-btn:hover { background: rgba(147, 197, 253, 0.16); }
+      .split-capsule.is-thinking .split-capsule-btn:active { background: rgba(96, 165, 250, 0.2); }
       .chat-ux-toggle {
+        position: relative;
         display: inline-flex;
         align-items: center;
         padding: 3px;
@@ -403,8 +444,37 @@ export function renderChatControls(state: AppViewState) {
         background: color-mix(in srgb, var(--surface-1) 82%, transparent);
         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         flex-shrink: 0;
+        overflow: hidden;
+        isolation: isolate;
+      }
+      .chat-ux-toggle__thumb {
+        position: absolute;
+        top: 3px;
+        bottom: 3px;
+        left: 3px;
+        width: calc(50% - 3px);
+        border-radius: 999px;
+        background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(59, 130, 246, 0.22));
+        box-shadow:
+          inset 0 0 0 1px rgba(56, 189, 248, 0.18),
+          0 6px 14px rgba(14, 165, 233, 0.14);
+        transition:
+          transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+          background 0.24s ease,
+          box-shadow 0.24s ease;
+        pointer-events: none;
+        z-index: 0;
+      }
+      .chat-ux-toggle[data-mode="codex-readonly"] .chat-ux-toggle__thumb {
+        transform: translateX(100%);
+        background: linear-gradient(135deg, rgba(14, 165, 233, 0.24), rgba(59, 130, 246, 0.34));
+        box-shadow:
+          inset 0 0 0 1px rgba(14, 165, 233, 0.26),
+          0 8px 18px rgba(37, 99, 235, 0.18);
       }
       .chat-ux-toggle__button {
+        position: relative;
+        z-index: 1;
         border: none;
         background: transparent;
         color: var(--text-dim);
@@ -413,20 +483,17 @@ export function renderChatControls(state: AppViewState) {
         padding: 7px 10px;
         border-radius: 999px;
         cursor: pointer;
-        transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+        transition: color 0.2s ease, transform 0.18s ease;
         white-space: nowrap;
       }
       .chat-ux-toggle__button:hover {
         color: var(--text-strong);
       }
-      .chat-ux-toggle__button.active {
-        background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(59, 130, 246, 0.26));
-        color: var(--text-strong);
-        box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.22);
+      .chat-ux-toggle__button:active {
+        transform: translateY(1px) scale(0.98);
       }
-      .chat-ux-toggle__button[data-mode="codex-readonly"].active {
-        background: linear-gradient(135deg, rgba(14, 165, 233, 0.24), rgba(59, 130, 246, 0.34));
-        box-shadow: inset 0 0 0 1px rgba(14, 165, 233, 0.32);
+      .chat-ux-toggle__button.active {
+        color: var(--text-strong);
       }
       @media (max-width: 960px) {
         .chat-ux-toggle__button {
@@ -467,6 +534,9 @@ export function renderChatControls(state: AppViewState) {
         position: relative;
         overflow: hidden;
         min-width: 96px;
+      }
+      .split-capsule.is-thinking .capsule-left {
+        border-right-color: rgba(96, 165, 250, 0.22);
       }
       .capsule-right {
         border-radius: 0 8px 8px 0;
@@ -637,7 +707,13 @@ export function renderChatControls(state: AppViewState) {
         </div>
       </div>
 
-      <div class="chat-ux-toggle" role="group" aria-label="${t("helpers.chatUx")}">
+      <div
+        class="chat-ux-toggle"
+        data-mode=${chatUxMode}
+        role="group"
+        aria-label="${t("helpers.chatUx")}"
+      >
+        <span class="chat-ux-toggle__thumb" aria-hidden="true"></span>
         <button
           class="chat-ux-toggle__button ${chatUxMode === "classic" ? "active" : ""}"
           data-mode="classic"

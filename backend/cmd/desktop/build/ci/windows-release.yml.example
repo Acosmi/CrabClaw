@@ -25,4 +25,15 @@ jobs:
 
       - name: Package desktop app
         working-directory: backend/cmd/desktop
-        run: wails3 task windows:package
+        run: wails3 task windows:package ARCH=amd64 VERSION=${{ github.ref_name }}
+
+      - name: Generate updater manifest
+        working-directory: backend/cmd/desktop
+        env:
+          BASE_URL: https://downloads.example.com/releases/${{ github.ref_name }}
+        run: >
+          wails3 task release:manifest
+          VERSION=${{ github.ref_name }}
+          BASE_URL=${{ env.BASE_URL }}
+          ARTIFACTS_DIR=./bin
+          OUTPUT_DIR=./release

@@ -1,9 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applyChatSessionSwitchState,
   type ChatSessionSwitchHost,
 } from "./app-render.helpers.ts";
-import { createChatReadonlyRunState } from "./chat/readonly-run-state.ts";
+import { createChatReadonlyRunState, persistChatReadonlyRun } from "./chat/readonly-run-state.ts";
 import type { UiSettings } from "./storage.ts";
 
 function createSettings(): UiSettings {
@@ -28,6 +28,7 @@ function createHost(): ChatSessionSwitchHost {
   const host: ChatSessionSwitchHost = {
     sessionKey: "main",
     chatReadonlyRun: createChatReadonlyRunState("main"),
+    chatReadonlyRunHistory: [],
     chatMessage: "draft",
     chatMessages: [],
     chatStream: "working",
@@ -47,6 +48,32 @@ function createHost(): ChatSessionSwitchHost {
 }
 
 describe("applyChatSessionSwitchState", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("restores a persisted completed workflow when switching sessions", () => {
+    const host = createHost();
+    persistChatReadonlyRun({
+      ...createChatReadonlyRunState("feishu:chat-a"),
+      phase: "complete",
+      startedAt: 100,
+      updatedAt: 150,
+      completedAt: 180,
+      latestProgress: "done",
+      toolSteps: [],
+      activity: [],
+      finalMessageId: "msg-1",
+      finalMessageTimestamp: 200,
+    }, "feishu:chat-a");
+
+    applyChatSessionSwitchState(host, "feishu:chat-a", 1_234);
+
+    expect(host.chatReadonlyRun.phase).toBe("complete");
+    expect(host.chatReadonlyRun.finalMessageId).toBe("msg-1");
+    expect(host.chatReadonlyRunHistory).toHaveLength(1);
+  });
+
   it("clears stale run bindings before switching to a new session", () => {
     const host = createHost();
 

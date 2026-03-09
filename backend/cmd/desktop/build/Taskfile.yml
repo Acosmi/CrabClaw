@@ -8,7 +8,7 @@ tasks:
     desc: Stage Control UI assets into the desktop embed directory
     dir: '{{.USER_WORKING_DIR}}'
     cmds:
-      - ../../../scripts/desktop/stage_control_ui.sh
+      - bash ../../../scripts/desktop/stage_control_ui.sh
 
   prepare:appicon:
     desc: Copy the canonical desktop icon source into the build workspace

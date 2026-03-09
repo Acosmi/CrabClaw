@@ -876,7 +876,7 @@ func ensureUserTranscriptOnError(sessionId, storePath, text string, attachments 
 	}
 	content := []session.ContentBlock{}
 	if strings.TrimSpace(text) != "" {
-		content = append(content, session.ContentBlock{Type: "text", Text: text})
+		content = append(content, session.TextBlock(text))
 	}
 	if len(attachments) > 0 {
 		content = append(content, attachments...)
@@ -897,6 +897,112 @@ func truncateStr(s string, maxLen int) string {
 		return s
 	}
 	return string(runes[:maxLen]) + "..."
+}
+
+const maxInlineTextDocumentChars = 12000
+
+func isInlineTextDocument(fileName, mimeType string) bool {
+	switch media.FormatCategory(fileName) {
+	case "text", "code", "web":
+		return true
+	}
+	mime := strings.ToLower(strings.TrimSpace(mimeType))
+	switch mime {
+	case "application/json", "application/xml", "application/yaml", "application/x-yaml":
+		return true
+	}
+	return strings.HasPrefix(mime, "text/")
+}
+
+func inlineTextDocumentLanguage(fileName, mimeType string) string {
+	switch strings.ToLower(filepath.Ext(fileName)) {
+	case ".md":
+		return "markdown"
+	case ".json":
+		return "json"
+	case ".xml":
+		return "xml"
+	case ".yaml", ".yml":
+		return "yaml"
+	case ".csv":
+		return "csv"
+	case ".txt":
+		return "text"
+	case ".py":
+		return "python"
+	case ".go":
+		return "go"
+	case ".rs":
+		return "rust"
+	case ".js":
+		return "javascript"
+	case ".ts":
+		return "typescript"
+	case ".java":
+		return "java"
+	case ".c":
+		return "c"
+	case ".cpp":
+		return "cpp"
+	case ".h":
+		return "c"
+	case ".hpp":
+		return "cpp"
+	case ".rb":
+		return "ruby"
+	case ".php":
+		return "php"
+	case ".swift":
+		return "swift"
+	case ".kt":
+		return "kotlin"
+	case ".sh":
+		return "bash"
+	case ".sql":
+		return "sql"
+	case ".css":
+		return "css"
+	case ".html", ".htm":
+		return "html"
+	}
+	mime := strings.ToLower(strings.TrimSpace(mimeType))
+	switch mime {
+	case "application/json":
+		return "json"
+	case "application/xml":
+		return "xml"
+	case "application/yaml", "application/x-yaml":
+		return "yaml"
+	}
+	if strings.HasPrefix(mime, "text/") {
+		return "text"
+	}
+	return ""
+}
+
+func buildInlineTextDocumentPrompt(fileName, mimeType string, data []byte) string {
+	content := strings.TrimSpace(strings.ToValidUTF8(string(data), "?"))
+	if content == "" {
+		return fmt.Sprintf("[文件: %s, 内容为空]", fileName)
+	}
+
+	truncated := false
+	if len([]rune(content)) > maxInlineTextDocumentChars {
+		content = truncateStr(content, maxInlineTextDocumentChars)
+		truncated = true
+	}
+
+	lang := inlineTextDocumentLanguage(fileName, mimeType)
+	if lang == "" {
+		lang = "text"
+	}
+
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("[文件: %s]\n````%s\n%s\n````", fileName, lang, content))
+	if truncated {
+		b.WriteString("\n[文件内容已截断]")
+	}
+	return b.String()
 }
 
 type chatAttachmentProviderSnapshot struct {
@@ -1024,18 +1130,26 @@ func processAttachmentsForChatWithCache(
 	},
 	providerCache *chatAttachmentProviderCache,
 ) (string, []session.ContentBlock) {
-	if len(attachments) == 0 || cfgLoader == nil {
+	if len(attachments) == 0 {
 		return text, nil
 	}
 	if providerCache == nil {
 		providerCache = defaultChatAttachmentProviderCache
 	}
 
-	cfg, err := cfgLoader.LoadConfig()
-	if err != nil || cfg == nil {
-		return text, nil
+	var cfg *types.OpenAcosmiConfig
+	if cfgLoader != nil {
+		loadedCfg, err := cfgLoader.LoadConfig()
+		if err != nil {
+			slog.Warn("chat.send: attachment config unavailable", "error", err)
+		} else {
+			cfg = loadedCfg
+		}
 	}
-	providerSnapshot := providerCache.Resolve(cfg)
+	var providerSnapshot chatAttachmentProviderSnapshot
+	if cfg != nil {
+		providerSnapshot = providerCache.Resolve(cfg)
+	}
 
 	var parts []string
 	if text != "" {
@@ -1106,6 +1220,10 @@ func processAttachmentsForChatWithCache(
 				},
 			})
 			// STT text enhancement for LLM prompt
+			if cfg == nil {
+				parts = append(parts, "[语音附件: 配置不可用，未执行语音转录]")
+				continue
+			}
 			if cfg.STT == nil || cfg.STT.Provider == "" {
 				parts = append(parts, "[语音附件: 语音转文字(STT)未配置，请前往 设置→Speech to Text 配置语音识别服务]")
 				continue
@@ -1133,6 +1251,8 @@ func processAttachmentsForChatWithCache(
 			if sttErr != nil {
 				slog.Error("chat.send: STT failed", "error", sttErr)
 				parts = append(parts, "[语音转录失败]")
+			} else if strings.TrimSpace(transcript) == "" {
+				parts = append(parts, "[语音附件: 转录结果为空]")
 			} else {
 				parts = append(parts, fmt.Sprintf("[语音转录]: %s", transcript))
 			}
@@ -1148,17 +1268,6 @@ func processAttachmentsForChatWithCache(
 				FileSize: int64(fileSize),
 				MimeType: mimeType,
 			})
-			// DocConv text enhancement for LLM prompt
-			if cfg.DocConv == nil || cfg.DocConv.Provider == "" {
-				if fileName != "" {
-					parts = append(parts, fmt.Sprintf("[文件: %s]", fileName))
-				}
-				continue
-			}
-			if !media.IsSupportedFormat(fileName) {
-				parts = append(parts, fmt.Sprintf("[文件: %s, 格式不支持转换]", fileName))
-				continue
-			}
 			data, decErr := base64.StdEncoding.DecodeString(contentB64)
 			if decErr != nil {
 				parts = append(parts, fmt.Sprintf("[文件: %s, 解码失败]", fileName))
@@ -1166,6 +1275,23 @@ func processAttachmentsForChatWithCache(
 			}
 			if len(data) > maxAttachmentBytes {
 				parts = append(parts, fmt.Sprintf("[文件: %s, 数据过大]", fileName))
+				continue
+			}
+			if isInlineTextDocument(fileName, mimeType) {
+				parts = append(parts, buildInlineTextDocumentPrompt(fileName, mimeType, data))
+				continue
+			}
+			// DocConv text enhancement for non-text documents
+			if cfg == nil {
+				parts = append(parts, fmt.Sprintf("[文件: %s]", fileName))
+				continue
+			}
+			if cfg.DocConv == nil || cfg.DocConv.Provider == "" {
+				parts = append(parts, fmt.Sprintf("[文件: %s]", fileName))
+				continue
+			}
+			if !media.IsSupportedFormat(fileName) {
+				parts = append(parts, fmt.Sprintf("[文件: %s, 格式不支持转换]", fileName))
 				continue
 			}
 			if providerSnapshot.docConverter == nil {
@@ -1189,7 +1315,7 @@ func processAttachmentsForChatWithCache(
 	}
 
 	enhancedText := text
-	if len(parts) > 1 {
+	if len(parts) > 0 {
 		enhancedText = strings.Join(parts, "\n")
 	}
 	return enhancedText, blocks

@@ -103,19 +103,26 @@ func (p *dingtalkProvider) buildActionCard(req ApprovalCardRequest) map[string]i
 		levelLabel = req.RequestedLevel
 	}
 
-	approveURL := fmt.Sprintf("%s?action=approve&id=%s&ttl=%d", req.CallbackURL, req.EscalationID, req.TTLMinutes)
+	approveURL := fmt.Sprintf("%s?action=approve&id=%s", req.CallbackURL, req.EscalationID)
+	if !isPermanentApprovalLevel(req.RequestedLevel) {
+		approveURL = fmt.Sprintf("%s&ttl=%d", approveURL, req.TTLMinutes)
+	}
 	denyURL := fmt.Sprintf("%s?action=deny&id=%s", req.CallbackURL, req.EscalationID)
 
+	durationLine := fmt.Sprintf("**授权时长**: %d 分钟", req.TTLMinutes)
+	if isPermanentApprovalLevel(req.RequestedLevel) {
+		durationLine = "**授权模式**: 永久授权"
+	}
 	markdown := fmt.Sprintf("## 🔐 权限提升审批\n\n"+
 		"**请求级别**: %s\n\n"+
 		"**原因**: %s\n\n"+
-		"**授权时长**: %d 分钟\n\n"+
+		"%s\n\n"+
 		"**请求时间**: %s\n\n"+
 		"---\n\n"+
 		"ID: `%s`",
 		levelLabel,
 		req.Reason,
-		req.TTLMinutes,
+		durationLine,
 		req.RequestedAt.Format("2006-01-02 15:04:05"),
 		req.EscalationID,
 	)
@@ -215,12 +222,21 @@ func (p *dingtalkProvider) buildResultCard(result ApprovalResultNotification) ma
 
 	if result.Approved {
 		title = "✅ 权限已生效"
-		markdown = fmt.Sprintf("## ✅ 权限已生效\n\n"+
-			"**授权级别**: %s\n\n"+
-			"**有效时长**: %d 分钟\n\n"+
-			"权限到期后将自动降级。\n\n"+
-			"---\n\nID: `%s`",
-			result.RequestedLevel, result.TTLMinutes, result.EscalationID)
+		if isPermanentApprovalLevel(result.RequestedLevel) {
+			markdown = fmt.Sprintf("## ✅ 权限已生效\n\n"+
+				"**授权级别**: %s\n\n"+
+				"**授权模式**: 永久授权\n\n"+
+				"该权限将持续生效，直到手动改回。\n\n"+
+				"---\n\nID: `%s`",
+				result.RequestedLevel, result.EscalationID)
+		} else {
+			markdown = fmt.Sprintf("## ✅ 权限已生效\n\n"+
+				"**授权级别**: %s\n\n"+
+				"**有效时长**: %d 分钟\n\n"+
+				"权限到期后将自动降级。\n\n"+
+				"---\n\nID: `%s`",
+				result.RequestedLevel, result.TTLMinutes, result.EscalationID)
+		}
 	} else {
 		title = "❌ 权限请求已拒绝"
 		reason := result.Reason

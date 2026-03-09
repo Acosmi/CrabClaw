@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Acosmi/ClawAcosmi/internal/agents/runner"
 	"github.com/Acosmi/ClawAcosmi/internal/channels"
 )
 
@@ -45,13 +46,14 @@ type ApprovalCardRequest struct {
 	Reason         string    `json:"reason"`
 	RunID          string    `json:"runId,omitempty"`
 	SessionID      string    `json:"sessionId,omitempty"`
-	TTLMinutes     int       `json:"ttlMinutes"`
+	TTLMinutes     int       `json:"ttlMinutes"` // full/L3 永久授权时为 0
 	CallbackURL    string    `json:"callbackUrl"`
 	RequestedAt    time.Time `json:"requestedAt"`
 	// OriginatorChatID 发起操作的群聊 ID（如飞书 chat_id），用于审批卡片群发。
 	OriginatorChatID string `json:"originatorChatId,omitempty"`
 	// OriginatorUserID 发起远程操作的用户 ID（如飞书 open_id），用于审批卡片私聊。
-	OriginatorUserID string `json:"originatorUserId,omitempty"`
+	OriginatorUserID string                  `json:"originatorUserId,omitempty"`
+	Workflow         runner.ApprovalWorkflow `json:"workflow,omitempty"`
 }
 
 // ApprovalCallbackPayload 外部平台回调载荷。
@@ -62,6 +64,93 @@ type ApprovalCallbackPayload struct {
 	Provider     string `json:"provider"`
 	ApproverID   string `json:"approverId,omitempty"`
 	ApproverName string `json:"approverName,omitempty"`
+}
+
+// ---------- Phase 6: 审批类型常量 + 卡片渲染接口 ----------
+
+// P6-1: 四种审批类型常量。
+// 每种类型对应独立的审批卡片模板和审批语义。
+const (
+	ApprovalTypePlanConfirm    = "plan_confirm"    // 方案确认（展示 PlanSteps）
+	ApprovalTypeExecEscalation = "exec_escalation" // 执行提权（展示命令 + 风险等级）
+	ApprovalTypeMountAccess    = "mount_access"    // 挂载访问（展示路径 + 读写权限 + TTL）
+	ApprovalTypeDataExport     = "data_export"     // 数据导出（展示目标频道 + 文件 + 脱敏）
+	ApprovalTypeResultReview   = "result_review"   // 最终结果签收
+)
+
+// TypedApprovalRequest 统一的类型化审批请求。
+// 根据 Type 字段选择对应的卡片渲染器，不同审批类型使用各自的专属字段。
+type TypedApprovalRequest struct {
+	// ── 通用字段 ──
+	Type             string                  `json:"type"` // ApprovalType* 常量
+	ID               string                  `json:"id"`
+	Reason           string                  `json:"reason"`
+	TTLMinutes       int                     `json:"ttlMinutes"`
+	RequestedAt      time.Time               `json:"requestedAt"`
+	SessionKey       string                  `json:"sessionKey,omitempty"`
+	OriginatorChatID string                  `json:"originatorChatId,omitempty"`
+	OriginatorUserID string                  `json:"originatorUserId,omitempty"`
+	CallbackURL      string                  `json:"callbackUrl,omitempty"`
+	Workflow         runner.ApprovalWorkflow `json:"workflow,omitempty"`
+
+	// ── plan_confirm 专属 ──
+	TaskBrief  string   `json:"taskBrief,omitempty"`
+	PlanSteps  []string `json:"planSteps,omitempty"`
+	IntentTier string   `json:"intentTier,omitempty"`
+
+	// ── exec_escalation 专属 ──
+	RequestedLevel string `json:"requestedLevel,omitempty"` // allowlist/sandboxed/full
+	Command        string `json:"command,omitempty"`
+	RiskLevel      string `json:"riskLevel,omitempty"` // low/medium/high/critical
+
+	// ── mount_access 专属 ──
+	MountPath string `json:"mountPath,omitempty"`
+	MountMode string `json:"mountMode,omitempty"` // ro/rw
+
+	// ── data_export 专属 ──
+	TargetChannel string   `json:"targetChannel,omitempty"`
+	ExportFiles   []string `json:"exportFiles,omitempty"`
+	Sanitized     bool     `json:"sanitized,omitempty"`
+
+	// ── result_review 专属 ──
+	ResultSummary string `json:"resultSummary,omitempty"`
+	ReviewSummary string `json:"reviewSummary,omitempty"`
+}
+
+// P6-2: ApprovalCardRenderer 审批卡片渲染接口。
+// 每种审批类型对应一个实现，构建平台特定的互动卡片内容。
+type ApprovalCardRenderer interface {
+	ApprovalType() string
+	RenderCard(req TypedApprovalRequest) map[string]interface{}
+}
+
+// TypedApprovalNotifier 可选接口——Provider 实现后可推送类型化审批卡片。
+type TypedApprovalNotifier interface {
+	SendTypedApprovalRequest(ctx context.Context, req TypedApprovalRequest) error
+}
+
+// TypedApprovalResultNotification 类型化审批结果通知。
+// 复用审批类型语义，避免请求走 typed 卡片、结果又退回 legacy 文案。
+type TypedApprovalResultNotification struct {
+	Type       string                  `json:"type"` // ApprovalType* 常量
+	ID         string                  `json:"id"`
+	Approved   bool                    `json:"approved"`
+	Reason     string                  `json:"reason,omitempty"`
+	TTLMinutes int                     `json:"ttlMinutes,omitempty"`
+	Workflow   runner.ApprovalWorkflow `json:"workflow,omitempty"`
+
+	RequestedLevel string   `json:"requestedLevel,omitempty"`
+	MountPath      string   `json:"mountPath,omitempty"`
+	MountMode      string   `json:"mountMode,omitempty"`
+	TargetChannel  string   `json:"targetChannel,omitempty"`
+	ExportFiles    []string `json:"exportFiles,omitempty"`
+	ResultSummary  string   `json:"resultSummary,omitempty"`
+	ReviewSummary  string   `json:"reviewSummary,omitempty"`
+}
+
+// TypedApprovalResultNotifier 可选接口——Provider 实现后可推送类型化审批结果卡片。
+type TypedApprovalResultNotifier interface {
+	SendTypedApprovalResult(ctx context.Context, result TypedApprovalResultNotification) error
 }
 
 // ---------- 远程审批配置 ----------
@@ -233,6 +322,13 @@ func (n *RemoteApprovalNotifier) UpdateLastKnownFeishuTarget(chatID, userID stri
 // NotifyAll 向所有已启用的 Provider 发送审批通知。
 // 不阻塞调用方——异步发送，收集错误日志。
 func (n *RemoteApprovalNotifier) NotifyAll(req ApprovalCardRequest) {
+	n.NotifyEscalation(req, nil)
+}
+
+// NotifyEscalation 发送权限审批通知。
+// typed 非空时，优先对支持 TypedApprovalNotifier 的 Provider 发送类型化审批卡片；
+// 不支持 typed 的 Provider 回退到 legacy ApprovalCardRequest，避免重复推送两张卡片。
+func (n *RemoteApprovalNotifier) NotifyEscalation(req ApprovalCardRequest, typed *TypedApprovalRequest) {
 	n.mu.RLock()
 	if !n.config.Enabled || len(n.providers) == 0 {
 		n.mu.RUnlock()
@@ -240,21 +336,66 @@ func (n *RemoteApprovalNotifier) NotifyAll(req ApprovalCardRequest) {
 	}
 	providers := make([]RemoteApprovalProvider, len(n.providers))
 	copy(providers, n.providers)
+	callbackURL := n.config.CallbackURL
+	logger := n.logger
 	n.mu.RUnlock()
+	if logger == nil {
+		logger = slog.Default().With("component", "remote-approval")
+	}
 
 	// 填充回调 URL
 	if req.CallbackURL == "" {
-		n.mu.RLock()
-		req.CallbackURL = n.config.CallbackURL
-		n.mu.RUnlock()
+		req.CallbackURL = callbackURL
+	}
+
+	var typedReq TypedApprovalRequest
+	hasTyped := typed != nil
+	if hasTyped {
+		typedReq = *typed
+		if typedReq.CallbackURL == "" {
+			typedReq.CallbackURL = callbackURL
+		}
 	}
 
 	for _, p := range providers {
-		go func(prov RemoteApprovalProvider) {
+		prov := p
+		if hasTyped {
+			if tn, ok := prov.(TypedApprovalNotifier); ok {
+				go func(notifier TypedApprovalNotifier, name string, req TypedApprovalRequest) {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					if err := notifier.SendTypedApprovalRequest(ctx, req); err != nil {
+						logger.Error("类型化审批通知发送失败",
+							"provider", name,
+							"type", req.Type,
+							"id", req.ID,
+							"error", err,
+						)
+						if n.broadcaster != nil {
+							n.broadcaster.Broadcast("remote.approval.sendFailed", map[string]interface{}{
+								"provider":     name,
+								"escalationId": req.ID,
+								"approvalType": req.Type,
+								"error":        err.Error(),
+							}, nil)
+						}
+					} else {
+						logger.Info("类型化审批通知已发送",
+							"provider", name,
+							"type", req.Type,
+							"id", req.ID,
+						)
+					}
+				}(tn, prov.Name(), typedReq)
+				continue
+			}
+		}
+
+		go func(prov RemoteApprovalProvider, req ApprovalCardRequest) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			if err := prov.SendApprovalRequest(ctx, req); err != nil {
-				n.logger.Error("远程审批通知发送失败",
+				logger.Error("远程审批通知发送失败",
 					"provider", prov.Name(),
 					"escalation_id", req.EscalationID,
 					"error", err,
@@ -268,12 +409,12 @@ func (n *RemoteApprovalNotifier) NotifyAll(req ApprovalCardRequest) {
 					}, nil)
 				}
 			} else {
-				n.logger.Info("远程审批通知已发送",
+				logger.Info("远程审批通知已发送",
 					"provider", prov.Name(),
 					"escalation_id", req.EscalationID,
 				)
 			}
-		}(p)
+		}(prov, req)
 	}
 }
 
@@ -284,8 +425,12 @@ type ApprovalResultNotification struct {
 	EscalationID   string `json:"escalationId"`
 	Approved       bool   `json:"approved"`
 	Reason         string `json:"reason"`         // 拒绝原因（超时/手动拒绝）
-	RequestedLevel string `json:"requestedLevel"` // 请求的级别
-	TTLMinutes     int    `json:"ttlMinutes"`     // 批准时的授权时长
+	RequestedLevel string `json:"requestedLevel"` // 实际生效的级别
+	TTLMinutes     int    `json:"ttlMinutes"`     // 临时授权时长；full/L3 永久授权时为 0
+}
+
+func isPermanentApprovalLevel(level string) bool {
+	return strings.EqualFold(strings.TrimSpace(level), "full")
 }
 
 // ResultNotifier 可选接口——Provider 实现后可推送审批结果卡片。
@@ -334,13 +479,14 @@ func (n *RemoteApprovalNotifier) NotifyResult(result ApprovalResultNotification)
 
 // CoderConfirmCardRequest 操作确认卡片请求参数。
 type CoderConfirmCardRequest struct {
-	ConfirmID        string `json:"confirmId"`
-	ToolName         string `json:"toolName"`
-	Preview          string `json:"preview"`                    // 命令/文件预览文本
-	SessionKey       string `json:"sessionKey"`                 // 来源会话标识
-	OriginatorChatID string `json:"originatorChatId,omitempty"` // 飞书 chat_id
-	OriginatorUserID string `json:"originatorUserId,omitempty"` // D5-F1: 飞书 open_id，用于私聊推送审批卡片
-	TTLMinutes       int    `json:"ttlMinutes"`                 // 超时分钟数
+	ConfirmID        string                  `json:"confirmId"`
+	ToolName         string                  `json:"toolName"`
+	Preview          string                  `json:"preview"`                    // 命令/文件预览文本
+	SessionKey       string                  `json:"sessionKey"`                 // 来源会话标识
+	OriginatorChatID string                  `json:"originatorChatId,omitempty"` // 飞书 chat_id
+	OriginatorUserID string                  `json:"originatorUserId,omitempty"` // D5-F1: 飞书 open_id，用于私聊推送审批卡片
+	TTLMinutes       int                     `json:"ttlMinutes"`                 // 超时分钟数
+	Workflow         runner.ApprovalWorkflow `json:"workflow,omitempty"`
 }
 
 // CoderConfirmNotifier 可选接口——Provider 实现后可推送操作确认卡片。
@@ -386,6 +532,82 @@ func (n *RemoteApprovalNotifier) NotifyCoderConfirm(req CoderConfirmCardRequest)
 	}
 }
 
+// NotifyTypedOrCoderConfirm 发送操作确认通知。
+// typed 非空时，支持 typed 的 Provider 使用类型化卡片；其余 Provider 回退到 coder confirm 卡片。
+func (n *RemoteApprovalNotifier) NotifyTypedOrCoderConfirm(typed *TypedApprovalRequest, fallback CoderConfirmCardRequest) {
+	n.mu.RLock()
+	if !n.config.Enabled || len(n.providers) == 0 {
+		n.mu.RUnlock()
+		return
+	}
+	providers := make([]RemoteApprovalProvider, len(n.providers))
+	copy(providers, n.providers)
+	callbackURL := n.config.CallbackURL
+	logger := n.logger
+	n.mu.RUnlock()
+	if logger == nil {
+		logger = slog.Default().With("component", "remote-approval")
+	}
+
+	var typedReq TypedApprovalRequest
+	hasTyped := typed != nil
+	if hasTyped {
+		typedReq = *typed
+		if typedReq.CallbackURL == "" {
+			typedReq.CallbackURL = callbackURL
+		}
+	}
+
+	for _, p := range providers {
+		prov := p
+		if hasTyped {
+			if tn, ok := prov.(TypedApprovalNotifier); ok {
+				go func(notifier TypedApprovalNotifier, name string, req TypedApprovalRequest) {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					if err := notifier.SendTypedApprovalRequest(ctx, req); err != nil {
+						logger.Error("类型化操作确认通知发送失败",
+							"provider", name,
+							"type", req.Type,
+							"id", req.ID,
+							"error", err,
+						)
+					} else {
+						logger.Info("类型化操作确认通知已发送",
+							"provider", name,
+							"type", req.Type,
+							"id", req.ID,
+						)
+					}
+				}(tn, prov.Name(), typedReq)
+				continue
+			}
+		}
+
+		cn, ok := prov.(CoderConfirmNotifier)
+		if !ok {
+			continue
+		}
+		go func(notifier CoderConfirmNotifier, name string, req CoderConfirmCardRequest) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := notifier.SendCoderConfirmRequest(ctx, req); err != nil {
+				logger.Error("操作确认通知发送失败",
+					"provider", name,
+					"confirmId", req.ConfirmID,
+					"error", err,
+				)
+			} else {
+				logger.Info("操作确认通知已发送",
+					"provider", name,
+					"confirmId", req.ConfirmID,
+					"tool", req.ToolName,
+				)
+			}
+		}(cn, prov.Name(), fallback)
+	}
+}
+
 // NotifyCoderConfirmResult 向所有已启用的 Provider 推送操作确认结果。
 func (n *RemoteApprovalNotifier) NotifyCoderConfirmResult(id string, approved bool) {
 	n.mu.RLock()
@@ -416,24 +638,219 @@ func (n *RemoteApprovalNotifier) NotifyCoderConfirmResult(id string, approved bo
 	}
 }
 
+// NotifyTypedOrApprovalResult 发送审批结果通知。
+// typed 非空时，支持 typed result 的 Provider 使用类型化结果卡片；
+// 其余 Provider 回退到 legacy ApprovalResultNotification。
+func (n *RemoteApprovalNotifier) NotifyTypedOrApprovalResult(typed *TypedApprovalResultNotification, fallback ApprovalResultNotification) {
+	n.mu.RLock()
+	if !n.config.Enabled || len(n.providers) == 0 {
+		n.mu.RUnlock()
+		return
+	}
+	providers := make([]RemoteApprovalProvider, len(n.providers))
+	copy(providers, n.providers)
+	logger := n.logger
+	n.mu.RUnlock()
+	if logger == nil {
+		logger = slog.Default().With("component", "remote-approval")
+	}
+
+	var typedResult TypedApprovalResultNotification
+	hasTyped := typed != nil
+	if hasTyped {
+		typedResult = *typed
+	}
+
+	for _, p := range providers {
+		prov := p
+		if hasTyped {
+			if tn, ok := prov.(TypedApprovalResultNotifier); ok {
+				go func(notifier TypedApprovalResultNotifier, name string, result TypedApprovalResultNotification) {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					if err := notifier.SendTypedApprovalResult(ctx, result); err != nil {
+						logger.Error("类型化审批结果通知发送失败",
+							"provider", name,
+							"type", result.Type,
+							"id", result.ID,
+							"error", err,
+						)
+					} else {
+						logger.Info("类型化审批结果通知已发送",
+							"provider", name,
+							"type", result.Type,
+							"id", result.ID,
+							"approved", result.Approved,
+						)
+					}
+				}(tn, prov.Name(), typedResult)
+				continue
+			}
+		}
+
+		rn, ok := prov.(ResultNotifier)
+		if !ok {
+			continue
+		}
+		go func(notifier ResultNotifier, name string, result ApprovalResultNotification) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := notifier.SendResultNotification(ctx, result); err != nil {
+				logger.Error("审批结果通知发送失败",
+					"provider", name,
+					"escalation_id", result.EscalationID,
+					"error", err,
+				)
+			}
+		}(rn, prov.Name(), fallback)
+	}
+}
+
+// NotifyTypedOrCoderConfirmResult 发送操作确认结果通知。
+// typed 非空时，支持 typed result 的 Provider 使用类型化结果卡片；
+// 其余 Provider 回退到 legacy coder confirm result。
+func (n *RemoteApprovalNotifier) NotifyTypedOrCoderConfirmResult(typed *TypedApprovalResultNotification, id string, approved bool) {
+	n.mu.RLock()
+	if !n.config.Enabled || len(n.providers) == 0 {
+		n.mu.RUnlock()
+		return
+	}
+	providers := make([]RemoteApprovalProvider, len(n.providers))
+	copy(providers, n.providers)
+	logger := n.logger
+	n.mu.RUnlock()
+	if logger == nil {
+		logger = slog.Default().With("component", "remote-approval")
+	}
+
+	var typedResult TypedApprovalResultNotification
+	hasTyped := typed != nil
+	if hasTyped {
+		typedResult = *typed
+	}
+
+	for _, p := range providers {
+		prov := p
+		if hasTyped {
+			if tn, ok := prov.(TypedApprovalResultNotifier); ok {
+				go func(notifier TypedApprovalResultNotifier, name string, result TypedApprovalResultNotification) {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					if err := notifier.SendTypedApprovalResult(ctx, result); err != nil {
+						logger.Error("类型化操作确认结果通知失败",
+							"provider", name,
+							"type", result.Type,
+							"id", result.ID,
+							"error", err,
+						)
+					}
+				}(tn, prov.Name(), typedResult)
+				continue
+			}
+		}
+
+		cn, ok := prov.(CoderConfirmNotifier)
+		if !ok {
+			continue
+		}
+		go func(notifier CoderConfirmNotifier, name, confirmID string, approved bool) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := notifier.SendCoderConfirmResult(ctx, confirmID, approved); err != nil {
+				logger.Error("操作确认结果通知失败",
+					"provider", name,
+					"confirmId", confirmID,
+					"error", err,
+				)
+			}
+		}(cn, prov.Name(), id, approved)
+	}
+}
+
 // ---------- PlanConfirmation 方案确认卡片 ----------
 
 // PlanConfirmCardRequest 方案确认卡片请求参数。
 type PlanConfirmCardRequest struct {
-	ConfirmID        string   `json:"confirmId"`
-	TaskBrief        string   `json:"taskBrief"`
-	PlanSteps        []string `json:"planSteps"`
-	IntentTier       string   `json:"intentTier"`
-	SessionKey       string   `json:"sessionKey"`                 // 来源会话标识
-	OriginatorChatID string   `json:"originatorChatId,omitempty"` // 飞书 chat_id
-	OriginatorUserID string   `json:"originatorUserId,omitempty"` // 飞书 open_id
-	TTLMinutes       int      `json:"ttlMinutes"`
+	ConfirmID        string                  `json:"confirmId"`
+	TaskBrief        string                  `json:"taskBrief"`
+	PlanSteps        []string                `json:"planSteps"`
+	ApprovalSummary  []string                `json:"approvalSummary,omitempty"`
+	IntentTier       string                  `json:"intentTier"`
+	SessionKey       string                  `json:"sessionKey"`                 // 来源会话标识
+	OriginatorChatID string                  `json:"originatorChatId,omitempty"` // 飞书 chat_id
+	OriginatorUserID string                  `json:"originatorUserId,omitempty"` // 飞书 open_id
+	TTLMinutes       int                     `json:"ttlMinutes"`
+	Workflow         runner.ApprovalWorkflow `json:"workflow,omitempty"`
 }
 
 // PlanConfirmNotifier 可选接口——Provider 实现后可推送方案确认卡片。
 type PlanConfirmNotifier interface {
 	SendPlanConfirmRequest(ctx context.Context, req PlanConfirmCardRequest) error
 	SendPlanConfirmResult(ctx context.Context, id string, decision string) error
+}
+
+// NotifyTypedOrPlanConfirm 发送方案确认通知。
+// typed 非空时，支持 typed 的 Provider 使用类型化卡片；其余 Provider 回退到 legacy plan confirm 卡片。
+func (n *RemoteApprovalNotifier) NotifyTypedOrPlanConfirm(typed *TypedApprovalRequest, fallback PlanConfirmCardRequest) {
+	n.mu.RLock()
+	if !n.config.Enabled || len(n.providers) == 0 {
+		n.mu.RUnlock()
+		return
+	}
+	providers := make([]RemoteApprovalProvider, len(n.providers))
+	copy(providers, n.providers)
+	callbackURL := n.config.CallbackURL
+	logger := n.logger
+	n.mu.RUnlock()
+	if logger == nil {
+		logger = slog.Default().With("component", "remote-approval")
+	}
+
+	var typedReq TypedApprovalRequest
+	hasTyped := typed != nil
+	if hasTyped {
+		typedReq = *typed
+		if typedReq.CallbackURL == "" {
+			typedReq.CallbackURL = callbackURL
+		}
+	}
+
+	for _, p := range providers {
+		prov := p
+		if hasTyped {
+			if tn, ok := prov.(TypedApprovalNotifier); ok {
+				go func(notifier TypedApprovalNotifier, name string, req TypedApprovalRequest) {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					if err := notifier.SendTypedApprovalRequest(ctx, req); err != nil {
+						logger.Error("类型化方案确认通知发送失败",
+							"provider", name,
+							"type", req.Type,
+							"id", req.ID,
+							"error", err,
+						)
+					}
+				}(tn, prov.Name(), typedReq)
+				continue
+			}
+		}
+
+		pn, ok := prov.(PlanConfirmNotifier)
+		if !ok {
+			continue
+		}
+		go func(notifier PlanConfirmNotifier, name string, req PlanConfirmCardRequest) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := notifier.SendPlanConfirmRequest(ctx, req); err != nil {
+				logger.Error("方案确认通知发送失败",
+					"provider", name,
+					"confirmId", req.ConfirmID,
+					"error", err,
+				)
+			}
+		}(pn, prov.Name(), fallback)
+	}
 }
 
 // NotifyPlanConfirm 向所有已启用的 Provider 发送方案确认通知。
@@ -472,6 +889,66 @@ func (n *RemoteApprovalNotifier) NotifyPlanConfirm(req PlanConfirmCardRequest) {
 	}
 }
 
+// NotifyTypedOrPlanConfirmResult 发送方案确认结果。
+// typed 非空时，支持 typed result 的 Provider 使用类型化结果卡片；其余 Provider 回退到 legacy plan result。
+func (n *RemoteApprovalNotifier) NotifyTypedOrPlanConfirmResult(typed *TypedApprovalResultNotification, id string, decision string) {
+	n.mu.RLock()
+	if !n.config.Enabled || len(n.providers) == 0 {
+		n.mu.RUnlock()
+		return
+	}
+	providers := make([]RemoteApprovalProvider, len(n.providers))
+	copy(providers, n.providers)
+	logger := n.logger
+	n.mu.RUnlock()
+	if logger == nil {
+		logger = slog.Default().With("component", "remote-approval")
+	}
+
+	var typedResult TypedApprovalResultNotification
+	hasTyped := typed != nil
+	if hasTyped {
+		typedResult = *typed
+	}
+
+	for _, p := range providers {
+		prov := p
+		if hasTyped {
+			if tn, ok := prov.(TypedApprovalResultNotifier); ok {
+				go func(notifier TypedApprovalResultNotifier, name string, result TypedApprovalResultNotification) {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					if err := notifier.SendTypedApprovalResult(ctx, result); err != nil {
+						logger.Error("类型化方案确认结果通知失败",
+							"provider", name,
+							"type", result.Type,
+							"id", result.ID,
+							"error", err,
+						)
+					}
+				}(tn, prov.Name(), typedResult)
+				continue
+			}
+		}
+
+		pn, ok := prov.(PlanConfirmNotifier)
+		if !ok {
+			continue
+		}
+		go func(notifier PlanConfirmNotifier, name, confirmID, decision string) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := notifier.SendPlanConfirmResult(ctx, confirmID, decision); err != nil {
+				logger.Error("方案确认结果通知失败",
+					"provider", name,
+					"confirmId", confirmID,
+					"error", err,
+				)
+			}
+		}(pn, prov.Name(), id, decision)
+	}
+}
+
 // NotifyPlanConfirmResult 向所有已启用的 Provider 推送方案确认结果。
 func (n *RemoteApprovalNotifier) NotifyPlanConfirmResult(id string, decision string) {
 	n.mu.RLock()
@@ -499,6 +976,53 @@ func (n *RemoteApprovalNotifier) NotifyPlanConfirmResult(id string, decision str
 				)
 			}
 		}(pn, p.Name())
+	}
+}
+
+// ---------- Phase 6: 类型化审批通知 ----------
+
+// NotifyTypedApproval 向所有已启用的 Provider 发送类型化审批通知。
+// 使用 type assertion 检测 Provider 是否支持 TypedApprovalNotifier 接口。
+func (n *RemoteApprovalNotifier) NotifyTypedApproval(req TypedApprovalRequest) {
+	n.mu.RLock()
+	if !n.config.Enabled || len(n.providers) == 0 {
+		n.mu.RUnlock()
+		return
+	}
+	providers := make([]RemoteApprovalProvider, len(n.providers))
+	copy(providers, n.providers)
+	n.mu.RUnlock()
+
+	// 填充回调 URL
+	if req.CallbackURL == "" {
+		n.mu.RLock()
+		req.CallbackURL = n.config.CallbackURL
+		n.mu.RUnlock()
+	}
+
+	for _, p := range providers {
+		tn, ok := p.(TypedApprovalNotifier)
+		if !ok {
+			continue
+		}
+		go func(notifier TypedApprovalNotifier, name string) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := notifier.SendTypedApprovalRequest(ctx, req); err != nil {
+				n.logger.Error("类型化审批通知发送失败",
+					"provider", name,
+					"type", req.Type,
+					"id", req.ID,
+					"error", err,
+				)
+			} else {
+				n.logger.Info("类型化审批通知已发送",
+					"provider", name,
+					"type", req.Type,
+					"id", req.ID,
+				)
+			}
+		}(tn, p.Name())
 	}
 }
 

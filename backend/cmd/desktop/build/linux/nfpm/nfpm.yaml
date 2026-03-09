@@ -1,23 +1,23 @@
-name: "clawacosmi-desktop"
+name: "crabclaw"
 arch: ${GOARCH}
 platform: "linux"
 version: "0.0.0-dev"
 section: "default"
 priority: "extra"
 maintainer: Acosmi <devnull@acosmi.local>
-description: "ClawAcosmi desktop shell"
+description: "Crab Claw by Acosmi.ai desktop shell"
 vendor: "Acosmi"
 homepage: "https://v3alpha.wails.io"
 license: "Proprietary"
 release: "1"
 
 contents:
-  - src: "./bin/ClawAcosmi-desktop"
-    dst: "/usr/local/bin/ClawAcosmi-desktop"
+  - src: "./bin/CrabClaw"
+    dst: "/usr/local/bin/CrabClaw"
   - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/128x128/apps/clawacosmi-desktop.png"
-  - src: "./build/linux/ClawAcosmi-desktop.desktop"
-    dst: "/usr/share/applications/ClawAcosmi-desktop.desktop"
+    dst: "/usr/share/icons/hicolor/128x128/apps/crabclaw.png"
+  - src: "./build/linux/CrabClaw.desktop"
+    dst: "/usr/share/applications/CrabClaw.desktop"
 
 depends:
   - libgtk-3-0

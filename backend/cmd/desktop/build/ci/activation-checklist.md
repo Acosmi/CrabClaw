@@ -1,46 +1,56 @@
-# Desktop CI Activation Checklist
+# 桌面 CI 激活检查清单
 
-This checklist defines the minimum gate before any desktop CI template becomes
-an active workflow.
+这份清单用于定义桌面 CI 模板从“文档方案”进入“真实可执行 workflow”前必须满足的门槛。
 
-## 1. Naming freeze
+当前状态：
 
-- Confirm the user-visible product name is `ClawAcosmi`
-- Confirm the desktop binary name to package
-- Confirm whether legacy `openacosmi` compatibility names remain during transition
+- `.github/workflows/desktop-release.yml` 已作为 Windows amd64 / Linux amd64 的手动发布 workflow 启用
+- macOS 自动发布仍暂缓
 
-## 2. Build inputs
+## 1. 命名冻结
 
-- Confirm `dist/control-ui` is the authoritative staged UI output
-- Confirm `scripts/desktop/stage_control_ui.sh` remains the staging script
-- Confirm `backend/cmd/desktop/frontend/dist` remains the desktop embed target
+- 确认用户可见产品名统一为 `Crab Claw`
+- 确认桌面宿主二进制名统一为 `CrabClaw`
+- 确认遗留兼容命名不会重新出现在安装器元数据和发布产物中
 
-## 3. Toolchain pinning
+## 2. 构建输入
 
-- Pin Go version
-- Pin Node version
-- Pin Wails CLI version
-- Confirm Linux runner package dependencies
+- 确认 `dist/control-ui` 仍是权威 UI staging 输出
+- 确认 `scripts/desktop/stage_control_ui.sh` 仍是 staging 脚本
+- 确认 `backend/cmd/desktop/frontend/dist` 仍是桌面嵌入目录
 
-## 4. Release outputs
+## 3. 工具链固定
 
-- Define expected Windows artifact names
-- Define expected Linux artifact names
-- Define artifact retention and upload policy
+- 固定 Go 版本
+- 固定 Node 版本
+- 固定 Wails CLI 版本
+- 确认 Linux runner 的打包依赖仍完整
 
-## 5. Secret handling
+## 4. 发布输出
 
-- Confirm whether signing is in scope
-- If yes, define secret names and runner requirements
-- If no, make unsigned artifact behavior explicit
+- 明确 Windows 产物标准文件名
+- 明确 Linux 产物标准文件名
+- 明确上传、保留期与发布策略
 
-## 6. Runtime safety review
+## 5. Secret 与签名
 
-- Confirm no active workflow invokes experimental desktop runtime paths without approval
-- Confirm workflow failure cannot affect the existing Gateway or macOS release path
+- 确认本轮是否要求签名
+- 若要求签名，明确 Secret 名称与 runner 前提
+- 若不要求签名，明确 unsigned 产物的状态标识
 
-## 7. Activation step
+## 6. 运行安全
 
-- Copy the chosen template into `.github/workflows/`
-- Replace placeholder `echo` steps with reviewed build/package commands
-- Run on a non-release branch first
+- 确认 workflow 不会在未经批准的情况下触发实验性桌面路径
+- 确认 workflow 失败不会影响现有 Gateway 与 macOS 发布主线
+
+## 7. 当前激活结论
+
+当前范围已完成：
+
+- `.github/workflows/desktop-release.yml` 已启用
+- Windows / Linux 的打包命令已接入
+
+未来扩容前仍需完成：
+
+- macOS 仅在宿主归属明确后接入
+- 扩 runner 矩阵前，先同步审查命名与签名策略

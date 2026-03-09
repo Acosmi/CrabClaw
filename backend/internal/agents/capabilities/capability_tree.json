@@ -1,0 +1,2149 @@
+{
+  "nodes": {
+    "ai": {
+      "id": "ai",
+      "name": "ai",
+      "kind": "group",
+      "parent": "",
+      "children": [
+        "ai/image"
+      ],
+      "prompt": {
+        "summary": "",
+        "sort_order": 0,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": "AI model tools"
+      },
+      "policy": {
+        "policy_groups": [
+          "group:ai"
+        ],
+        "profiles": null,
+        "wizard_group": ""
+      }
+    },
+    "ai/image": {
+      "id": "ai/image",
+      "name": "image",
+      "kind": "tool",
+      "parent": "ai",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "always",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Analyze images using configured image model",
+        "sort_order": 23,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_multimodal",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "none",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "policy": {
+        "policy_groups": [
+          "group:ai"
+        ],
+        "profiles": [
+          "coding",
+          "full"
+        ],
+        "wizard_group": "ai"
+      }
+    },
+    "dynamic": {
+      "id": "dynamic",
+      "name": "dynamic",
+      "kind": "group",
+      "parent": "",
+      "children": [
+        "dynamic/argus",
+        "dynamic/remote_mcp",
+        "dynamic/local_mcp"
+      ],
+      "prompt": {
+        "summary": "",
+        "sort_order": 0,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": "Dynamic tool groups discovered at runtime"
+      }
+    },
+    "dynamic/argus": {
+      "id": "dynamic/argus",
+      "name": "argus",
+      "kind": "group",
+      "parent": "dynamic",
+      "children": null,
+      "runtime": {
+        "owner": "argus_bridge",
+        "enabled_when": "ArgusBridge != nil",
+        "dynamic": true,
+        "name_prefix": "argus_",
+        "discovery_source": "ArgusBridge.AgentTools()",
+        "provider_id": "argus",
+        "list_method": "AgentTools"
+      },
+      "prompt": {
+        "summary": "",
+        "sort_order": 0,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": "Argus desktop automation tools (screen capture, click, type, etc.)"
+      },
+      "routing": {
+        "min_tier": "task_multimodal",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "full",
+        "file_access": "none",
+        "approval_type": "exec_escalation",
+        "scope_check": "none"
+      }
+    },
+    "dynamic/local_mcp": {
+      "id": "dynamic/local_mcp",
+      "name": "local_mcp",
+      "kind": "group",
+      "parent": "dynamic",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "LocalMCPBridge != nil",
+        "dynamic": true,
+        "name_prefix": "mcp_",
+        "discovery_source": "LocalMCPBridge.AgentTools()",
+        "provider_id": "local_mcp",
+        "list_method": "AgentTools"
+      },
+      "prompt": {
+        "summary": "",
+        "sort_order": 0,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": "Local MCP server tools"
+      },
+      "routing": {
+        "min_tier": "task_light",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      }
+    },
+    "dynamic/remote_mcp": {
+      "id": "dynamic/remote_mcp",
+      "name": "remote_mcp",
+      "kind": "group",
+      "parent": "dynamic",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "RemoteMCPBridge != nil",
+        "dynamic": true,
+        "name_prefix": "remote_",
+        "discovery_source": "RemoteMCPBridge.AgentRemoteTools()",
+        "provider_id": "remote_mcp",
+        "list_method": "AgentRemoteTools"
+      },
+      "prompt": {
+        "summary": "",
+        "sort_order": 0,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": "Remote MCP server tools"
+      },
+      "routing": {
+        "min_tier": "task_write",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      }
+    },
+    "fs": {
+      "id": "fs",
+      "name": "fs",
+      "kind": "group",
+      "parent": "",
+      "children": [
+        "fs/read_file",
+        "fs/write_file",
+        "fs/list_dir",
+        "fs/apply_patch"
+      ],
+      "prompt": {
+        "summary": "",
+        "sort_order": 0,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": "File system operations"
+      },
+      "policy": {
+        "policy_groups": [
+          "group:fs"
+        ],
+        "profiles": null,
+        "wizard_group": ""
+      }
+    },
+    "fs/apply_patch": {
+      "id": "fs/apply_patch",
+      "name": "apply_patch",
+      "kind": "tool",
+      "parent": "fs",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "tools.exec.applyPatch.enabled",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Apply multi-file patches with structured patch format",
+        "sort_order": 5,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_multimodal",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "sandboxed",
+        "file_access": "scoped_write",
+        "approval_type": "plan_confirm",
+        "scope_check": "workspace"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "policy": {
+        "policy_groups": [
+          "group:fs"
+        ],
+        "profiles": [
+          "coding",
+          "full"
+        ],
+        "wizard_group": "fs"
+      }
+    },
+    "fs/list_dir": {
+      "id": "fs/list_dir",
+      "name": "list_dir",
+      "kind": "tool",
+      "parent": "fs",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "always",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "List directory contents",
+        "sort_order": 4,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_light",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "global_read",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "display": {
+        "icon": "📂",
+        "title": "List Dir",
+        "label": "",
+        "verb": "List",
+        "detail_keys": "path"
+      },
+      "policy": {
+        "policy_groups": [
+          "group:fs"
+        ],
+        "profiles": [
+          "coding",
+          "full"
+        ],
+        "wizard_group": "fs"
+      }
+    },
+    "fs/read_file": {
+      "id": "fs/read_file",
+      "name": "read_file",
+      "kind": "tool",
+      "parent": "fs",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "always",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Read file contents",
+        "sort_order": 2,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_light",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "global_read",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "display": {
+        "icon": "📖",
+        "title": "Read File",
+        "label": "",
+        "verb": "Read",
+        "detail_keys": "path"
+      },
+      "policy": {
+        "policy_groups": [
+          "group:fs"
+        ],
+        "profiles": [
+          "coding",
+          "full"
+        ],
+        "wizard_group": "fs"
+      }
+    },
+    "fs/write_file": {
+      "id": "fs/write_file",
+      "name": "write_file",
+      "kind": "tool",
+      "parent": "fs",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "always",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Create or overwrite files",
+        "sort_order": 3,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_write",
+        "exclude_from": [
+          "task_delete"
+        ],
+        "intent_keywords": {
+          "zh": [
+            "写",
+            "编写",
+            "创建",
+            "修改",
+            "改一",
+            "改个",
+            "修",
+            "添加",
+            "新增"
+          ],
+          "en": [
+            "write",
+            "create",
+            "add",
+            "modify",
+            "fix"
+          ]
+        },
+        "intent_priority": 10
+      },
+      "perms": {
+        "min_security_level": "sandboxed",
+        "file_access": "scoped_write",
+        "approval_type": "plan_confirm",
+        "scope_check": "workspace"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "display": {
+        "icon": "✍️",
+        "title": "Write File",
+        "label": "",
+        "verb": "Write",
+        "detail_keys": "path"
+      },
+      "policy": {
+        "policy_groups": [
+          "group:fs"
+        ],
+        "profiles": [
+          "coding",
+          "full"
+        ],
+        "wizard_group": "fs"
+      }
+    },
+    "internal": {
+      "id": "internal",
+      "name": "internal",
+      "kind": "group",
+      "parent": "",
+      "children": [
+        "internal/report_progress",
+        "internal/request_help"
+      ],
+      "prompt": {
+        "summary": "",
+        "sort_order": 0,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": "Internal system tools"
+      }
+    },
+    "internal/report_progress": {
+      "id": "internal/report_progress",
+      "name": "report_progress",
+      "kind": "tool",
+      "parent": "internal",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "always",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Report intermediate progress to user",
+        "sort_order": 28,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_light",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "none",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": false,
+        "bound_skills": null,
+        "guidance": false
+      }
+    },
+    "internal/request_help": {
+      "id": "internal/request_help",
+      "name": "request_help",
+      "kind": "tool",
+      "parent": "internal",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "AgentChannel != nil",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Request help from parent agent (sub-agent only)",
+        "sort_order": 29,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_multimodal",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "none",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": false,
+        "bound_skills": null,
+        "guidance": false
+      }
+    },
+    "media": {
+      "id": "media",
+      "name": "media",
+      "kind": "group",
+      "parent": "",
+      "children": [
+        "media/send_media",
+        "media/send_email"
+      ],
+      "prompt": {
+        "summary": "",
+        "sort_order": 0,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": "Media sending and email tools"
+      }
+    },
+    "media/send_email": {
+      "id": "media/send_email",
+      "name": "send_email",
+      "kind": "tool",
+      "parent": "media",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "EmailSender != nil",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Send an email message with new/reply support",
+        "sort_order": 16,
+        "usage_guide": "Use when user asks to send email, compose email, or reply to email thread",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_write",
+        "exclude_from": [
+          "task_delete"
+        ],
+        "intent_keywords": {
+          "zh": [
+            "邮件",
+            "发邮件",
+            "写邮件",
+            "回复邮件"
+          ],
+          "en": [
+            "email",
+            "send email",
+            "compose email",
+            "reply email"
+          ]
+        },
+        "intent_priority": 10
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "none",
+        "approval_type": "plan_confirm",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "display": {
+        "icon": "📧",
+        "title": "Send Email",
+        "label": "",
+        "verb": "Send",
+        "detail_keys": "to,subject"
+      }
+    },
+    "media/send_media": {
+      "id": "media/send_media",
+      "name": "send_media",
+      "kind": "tool",
+      "parent": "media",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "MediaSender != nil",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Send file/media to channel (feishu/discord/telegram/whatsapp)",
+        "sort_order": 16,
+        "usage_guide": "Use when user asks to send/share/forward a file or media to a channel",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_light",
+        "exclude_from": [
+          "task_delete"
+        ],
+        "intent_keywords": {
+          "zh": [
+            "发送",
+            "发给我",
+            "传给我",
+            "分享",
+            "转发",
+            "文件",
+            "发给",
+            "发消息",
+            "通知"
+          ],
+          "en": [
+            "send",
+            "share",
+            "forward",
+            "file",
+            "media"
+          ]
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "scoped_read",
+        "approval_type": "data_export",
+        "scope_check": "mount_required",
+        "escalation_hints": {
+          "default_requested_level": "allowlist",
+          "default_ttl_minutes": 30,
+          "default_mount_mode": "ro",
+          "needs_originator": true
+        }
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "display": {
+        "icon": "📎",
+        "title": "Send Media",
+        "label": "",
+        "verb": "Send",
+        "detail_keys": "path,channel"
+      },
+      "policy": {
+        "policy_groups": null,
+        "profiles": [
+          "messaging",
+          "full"
+        ],
+        "wizard_group": ""
+      }
+    },
+    "memory": {
+      "id": "memory",
+      "name": "memory",
+      "kind": "group",
+      "parent": "",
+      "children": [
+        "memory/memory_search",
+        "memory/memory_get"
+      ],
+      "prompt": {
+        "summary": "",
+        "sort_order": 0,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": "UHMS memory search and retrieval"
+      },
+      "policy": {
+        "policy_groups": [
+          "group:memory"
+        ],
+        "profiles": null,
+        "wizard_group": ""
+      }
+    },
+    "memory/memory_get": {
+      "id": "memory/memory_get",
+      "name": "memory_get",
+      "kind": "tool",
+      "parent": "memory",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "UHMSBridge != nil",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Get specific memory entry by ID",
+        "sort_order": 27,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "question",
+        "exclude_from": [
+          "task_delete"
+        ],
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "none",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "display": {
+        "icon": "📓",
+        "title": "Memory Get",
+        "label": "",
+        "verb": "Get",
+        "detail_keys": "path,from,lines"
+      },
+      "policy": {
+        "policy_groups": [
+          "group:memory"
+        ],
+        "profiles": [
+          "coding",
+          "full"
+        ],
+        "wizard_group": "memory"
+      }
+    },
+    "memory/memory_search": {
+      "id": "memory/memory_search",
+      "name": "memory_search",
+      "kind": "tool",
+      "parent": "memory",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "UHMSBridge != nil",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Search UHMS memory by keyword",
+        "sort_order": 26,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "question",
+        "exclude_from": [
+          "task_delete"
+        ],
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "none",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "display": {
+        "icon": "🧠",
+        "title": "Memory Search",
+        "label": "",
+        "verb": "Search",
+        "detail_keys": "query"
+      },
+      "policy": {
+        "policy_groups": [
+          "group:memory"
+        ],
+        "profiles": [
+          "coding",
+          "full"
+        ],
+        "wizard_group": "memory"
+      }
+    },
+    "messaging": {
+      "id": "messaging",
+      "name": "messaging",
+      "kind": "group",
+      "parent": "",
+      "children": [
+        "messaging/message"
+      ],
+      "prompt": {
+        "summary": "",
+        "sort_order": 0,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": "Channel messaging tools"
+      },
+      "policy": {
+        "policy_groups": [
+          "group:messaging"
+        ],
+        "profiles": null,
+        "wizard_group": ""
+      }
+    },
+    "messaging/message": {
+      "id": "messaging/message",
+      "name": "message",
+      "kind": "tool",
+      "parent": "messaging",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "always",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Send messages and channel operations",
+        "sort_order": 13,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_multimodal",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "none",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "policy": {
+        "policy_groups": [
+          "group:messaging"
+        ],
+        "profiles": [
+          "messaging",
+          "full"
+        ],
+        "wizard_group": "messaging"
+      }
+    },
+    "meta": {
+      "id": "meta",
+      "name": "meta",
+      "kind": "group",
+      "parent": "",
+      "children": [
+        "meta/capability_manage"
+      ],
+      "prompt": {
+        "summary": "",
+        "sort_order": 0,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": "Self-inspection and governance meta-tools"
+      }
+    },
+    "meta/capability_manage": {
+      "id": "meta/capability_manage",
+      "name": "capability_manage",
+      "kind": "tool",
+      "parent": "meta",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "always",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Inspect and diagnose the capability tree (read-only)",
+        "sort_order": 30,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "question",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "none",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": false,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "display": {
+        "icon": "🌳",
+        "title": "Capability Manage",
+        "label": "",
+        "verb": "Inspect",
+        "detail_keys": ""
+      },
+      "policy": {
+        "policy_groups": [
+          "group:system"
+        ],
+        "profiles": [
+          "full"
+        ],
+        "wizard_group": ""
+      }
+    },
+    "runtime": {
+      "id": "runtime",
+      "name": "runtime",
+      "kind": "group",
+      "parent": "",
+      "children": [
+        "runtime/bash"
+      ],
+      "prompt": {
+        "summary": "",
+        "sort_order": 0,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": "Core runtime execution tools"
+      },
+      "policy": {
+        "policy_groups": [
+          "group:runtime"
+        ],
+        "profiles": null,
+        "wizard_group": ""
+      }
+    },
+    "runtime/bash": {
+      "id": "runtime/bash",
+      "name": "bash",
+      "kind": "tool",
+      "parent": "runtime",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "always",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Execute bash commands in the workspace",
+        "sort_order": 1,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_light",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": [
+            "删除",
+            "删掉",
+            "删了",
+            "删",
+            "移除",
+            "清理",
+            "清除",
+            "清掉"
+          ],
+          "en": [
+            "remove",
+            "delete",
+            "rm "
+          ]
+        },
+        "intent_priority": 30
+      },
+      "perms": {
+        "min_security_level": "sandboxed",
+        "file_access": "none",
+        "approval_type": "exec_escalation",
+        "scope_check": "workspace",
+        "escalation_hints": {
+          "default_requested_level": "sandboxed",
+          "default_ttl_minutes": 30,
+          "default_mount_mode": "",
+          "needs_originator": false,
+          "needs_run_session": true
+        }
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "display": {
+        "icon": "🛠️",
+        "title": "Bash",
+        "label": "",
+        "verb": "Execute",
+        "detail_keys": "command"
+      },
+      "policy": {
+        "policy_groups": [
+          "group:runtime"
+        ],
+        "profiles": [
+          "coding",
+          "full"
+        ],
+        "wizard_group": "runtime"
+      }
+    },
+    "sessions": {
+      "id": "sessions",
+      "name": "sessions",
+      "kind": "group",
+      "parent": "",
+      "children": [
+        "sessions/agents_list",
+        "sessions/sessions_list",
+        "sessions/sessions_history",
+        "sessions/sessions_send",
+        "sessions/sessions_spawn",
+        "sessions/session_status"
+      ],
+      "prompt": {
+        "summary": "",
+        "sort_order": 0,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": "Session and sub-agent management"
+      },
+      "policy": {
+        "policy_groups": [
+          "group:sessions"
+        ],
+        "profiles": null,
+        "wizard_group": ""
+      }
+    },
+    "sessions/agents_list": {
+      "id": "sessions/agents_list",
+      "name": "agents_list",
+      "kind": "tool",
+      "parent": "sessions",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "always",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "List available agent IDs for sessions_spawn",
+        "sort_order": 17,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_multimodal",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "none",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "policy": {
+        "policy_groups": [
+          "group:sessions"
+        ],
+        "profiles": [
+          "coding",
+          "full"
+        ],
+        "wizard_group": "sessions"
+      }
+    },
+    "sessions/session_status": {
+      "id": "sessions/session_status",
+      "name": "session_status",
+      "kind": "tool",
+      "parent": "sessions",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "always",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Show session status card (usage, time, mode)",
+        "sort_order": 22,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_multimodal",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "none",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "policy": {
+        "policy_groups": [
+          "group:sessions"
+        ],
+        "profiles": [
+          "minimal",
+          "coding",
+          "messaging",
+          "full"
+        ],
+        "wizard_group": "sessions"
+      }
+    },
+    "sessions/sessions_history": {
+      "id": "sessions/sessions_history",
+      "name": "sessions_history",
+      "kind": "tool",
+      "parent": "sessions",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "always",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Fetch history for another session or sub-agent",
+        "sort_order": 19,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_multimodal",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "none",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "policy": {
+        "policy_groups": [
+          "group:sessions"
+        ],
+        "profiles": [
+          "coding",
+          "messaging",
+          "full"
+        ],
+        "wizard_group": "sessions"
+      }
+    },
+    "sessions/sessions_list": {
+      "id": "sessions/sessions_list",
+      "name": "sessions_list",
+      "kind": "tool",
+      "parent": "sessions",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "always",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "List other sessions with filters and pagination",
+        "sort_order": 18,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_multimodal",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "none",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "policy": {
+        "policy_groups": [
+          "group:sessions"
+        ],
+        "profiles": [
+          "coding",
+          "messaging",
+          "full"
+        ],
+        "wizard_group": "sessions"
+      }
+    },
+    "sessions/sessions_send": {
+      "id": "sessions/sessions_send",
+      "name": "sessions_send",
+      "kind": "tool",
+      "parent": "sessions",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "always",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Send a message to another session or sub-agent",
+        "sort_order": 20,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_multimodal",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "none",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "policy": {
+        "policy_groups": [
+          "group:sessions"
+        ],
+        "profiles": [
+          "coding",
+          "messaging",
+          "full"
+        ],
+        "wizard_group": "sessions"
+      }
+    },
+    "sessions/sessions_spawn": {
+      "id": "sessions/sessions_spawn",
+      "name": "sessions_spawn",
+      "kind": "tool",
+      "parent": "sessions",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "always",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Spawn a sub-agent session",
+        "sort_order": 21,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_multimodal",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "sandboxed",
+        "file_access": "none",
+        "approval_type": "plan_confirm",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "policy": {
+        "policy_groups": [
+          "group:sessions"
+        ],
+        "profiles": [
+          "coding",
+          "full"
+        ],
+        "wizard_group": "sessions"
+      }
+    },
+    "skills": {
+      "id": "skills",
+      "name": "skills",
+      "kind": "group",
+      "parent": "",
+      "children": [
+        "skills/search_skills",
+        "skills/lookup_skill"
+      ],
+      "prompt": {
+        "summary": "",
+        "sort_order": 0,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": "Skill index search and lookup"
+      }
+    },
+    "skills/lookup_skill": {
+      "id": "skills/lookup_skill",
+      "name": "lookup_skill",
+      "kind": "tool",
+      "parent": "skills",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "skills available",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Look up full content of a skill by name",
+        "sort_order": 25,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "question",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "none",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": false,
+        "bound_skills": null,
+        "guidance": false
+      }
+    },
+    "skills/search_skills": {
+      "id": "skills/search_skills",
+      "name": "search_skills",
+      "kind": "tool",
+      "parent": "skills",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "UHMSBridge != nil \u0026\u0026 IsSkillsIndexed",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Search skills index by keyword",
+        "sort_order": 24,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "question",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "none",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": false,
+        "bound_skills": null,
+        "guidance": false
+      }
+    },
+    "subagents": {
+      "id": "subagents",
+      "name": "subagents",
+      "kind": "group",
+      "parent": "",
+      "children": [
+        "subagents/spawn_coder_agent",
+        "subagents/spawn_argus_agent",
+        "subagents/spawn_media_agent"
+      ],
+      "prompt": {
+        "summary": "",
+        "sort_order": 0,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": "Sub-agent delegation entries"
+      }
+    },
+    "subagents/spawn_argus_agent": {
+      "id": "subagents/spawn_argus_agent",
+      "name": "spawn_argus_agent",
+      "kind": "subagent",
+      "parent": "subagents",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "ArgusBridge != nil",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Delegate desktop/visual tasks to Argus sub-agent (screen + visual perception)",
+        "sort_order": 15,
+        "usage_guide": "",
+        "delegation": "Delegate desktop UI tasks, screen capture, visual reasoning to Argus",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_write",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": [
+            "截屏",
+            "截图",
+            "截个",
+            "截一",
+            "屏幕截",
+            "拍照",
+            "拍个照",
+            "拍一张",
+            "灵瞳"
+          ],
+          "en": [
+            "screenshot",
+            "capture screen",
+            "capture ",
+            "argus"
+          ]
+        },
+        "intent_priority": 20
+      },
+      "perms": {
+        "min_security_level": "full",
+        "file_access": "none",
+        "approval_type": "exec_escalation",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": false,
+        "bound_skills": null,
+        "guidance": false
+      }
+    },
+    "subagents/spawn_coder_agent": {
+      "id": "subagents/spawn_coder_agent",
+      "name": "spawn_coder_agent",
+      "kind": "subagent",
+      "parent": "subagents",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "always",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Delegate coding tasks to Open Coder sub-agent (delegation contract)",
+        "sort_order": 14,
+        "usage_guide": "",
+        "delegation": "Delegate file-heavy coding tasks; coder has sandboxed fs access",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_write",
+        "exclude_from": [
+          "task_delete"
+        ],
+        "intent_keywords": {
+          "zh": [
+            "开发",
+            "生成",
+            "实现",
+            "重构",
+            "优化"
+          ],
+          "en": [
+            "code",
+            "develop",
+            "build",
+            "implement",
+            "generate",
+            "refactor"
+          ]
+        },
+        "intent_priority": 10
+      },
+      "perms": {
+        "min_security_level": "sandboxed",
+        "file_access": "scoped_write",
+        "approval_type": "plan_confirm",
+        "scope_check": "workspace"
+      },
+      "skills": {
+        "bindable": false,
+        "bound_skills": null,
+        "guidance": false
+      }
+    },
+    "subagents/spawn_media_agent": {
+      "id": "subagents/spawn_media_agent",
+      "name": "spawn_media_agent",
+      "kind": "subagent",
+      "parent": "subagents",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "MediaSubsystem != nil",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Delegate media operations to media sub-agent",
+        "sort_order": 16,
+        "usage_guide": "",
+        "delegation": "Delegate media processing tasks to the media subsystem agent",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_write",
+        "exclude_from": [
+          "task_delete"
+        ],
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "none",
+        "approval_type": "plan_confirm",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": false,
+        "bound_skills": null,
+        "guidance": false
+      }
+    },
+    "system": {
+      "id": "system",
+      "name": "system",
+      "kind": "group",
+      "parent": "",
+      "children": [
+        "system/nodes",
+        "system/cron",
+        "system/gateway"
+      ],
+      "prompt": {
+        "summary": "",
+        "sort_order": 0,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": "System management tools"
+      },
+      "policy": {
+        "policy_groups": [
+          "group:system"
+        ],
+        "profiles": null,
+        "wizard_group": ""
+      }
+    },
+    "system/cron": {
+      "id": "system/cron",
+      "name": "cron",
+      "kind": "tool",
+      "parent": "system",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "always",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Manage scheduled tasks and wake events",
+        "sort_order": 11,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_multimodal",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "sandboxed",
+        "file_access": "none",
+        "approval_type": "plan_confirm",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "policy": {
+        "policy_groups": [
+          "group:system"
+        ],
+        "profiles": [
+          "full"
+        ],
+        "wizard_group": "system"
+      }
+    },
+    "system/gateway": {
+      "id": "system/gateway",
+      "name": "gateway",
+      "kind": "tool",
+      "parent": "system",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "always",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Restart, apply config or run updates",
+        "sort_order": 12,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_multimodal",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": [
+            "部署",
+            "配置",
+            "安装",
+            "升级"
+          ],
+          "en": [
+            "deploy",
+            "configure",
+            "install",
+            "upgrade"
+          ]
+        },
+        "intent_priority": 10
+      },
+      "perms": {
+        "min_security_level": "full",
+        "file_access": "none",
+        "approval_type": "exec_escalation",
+        "scope_check": "none",
+        "escalation_hints": {
+          "default_requested_level": "full",
+          "default_ttl_minutes": 0,
+          "default_mount_mode": "",
+          "needs_originator": false,
+          "needs_run_session": true
+        }
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "policy": {
+        "policy_groups": [
+          "group:system"
+        ],
+        "profiles": [
+          "full"
+        ],
+        "wizard_group": "system"
+      }
+    },
+    "system/nodes": {
+      "id": "system/nodes",
+      "name": "nodes",
+      "kind": "tool",
+      "parent": "system",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "always",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "List/describe/notify/control paired node devices",
+        "sort_order": 10,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_multimodal",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "none",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "policy": {
+        "policy_groups": [
+          "group:system"
+        ],
+        "profiles": [
+          "full"
+        ],
+        "wizard_group": "system"
+      }
+    },
+    "ui": {
+      "id": "ui",
+      "name": "ui",
+      "kind": "group",
+      "parent": "",
+      "children": [
+        "ui/browser",
+        "ui/canvas"
+      ],
+      "prompt": {
+        "summary": "",
+        "sort_order": 0,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": "Browser and canvas UI tools"
+      },
+      "policy": {
+        "policy_groups": [
+          "group:ui"
+        ],
+        "profiles": null,
+        "wizard_group": ""
+      }
+    },
+    "ui/browser": {
+      "id": "ui/browser",
+      "name": "browser",
+      "kind": "tool",
+      "parent": "ui",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "BrowserController != nil",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Control web browser via CDP (navigate, click, type, screenshot, ARIA refs)",
+        "sort_order": 8,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_light",
+        "exclude_from": [
+          "task_delete"
+        ],
+        "intent_keywords": {
+          "zh": [
+            "浏览器",
+            "网页"
+          ],
+          "en": [
+            "browser"
+          ]
+        },
+        "intent_priority": 20
+      },
+      "perms": {
+        "min_security_level": "sandboxed",
+        "file_access": "none",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "display": {
+        "icon": "🌐",
+        "title": "Browser",
+        "label": "",
+        "verb": "Browse",
+        "detail_keys": ""
+      },
+      "policy": {
+        "policy_groups": [
+          "group:ui"
+        ],
+        "profiles": [
+          "full"
+        ],
+        "wizard_group": "web"
+      }
+    },
+    "ui/canvas": {
+      "id": "ui/canvas",
+      "name": "canvas",
+      "kind": "tool",
+      "parent": "ui",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "always",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Display, evaluate and snapshot Canvas artifacts",
+        "sort_order": 9,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_multimodal",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "none",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "policy": {
+        "policy_groups": [
+          "group:ui"
+        ],
+        "profiles": [
+          "full"
+        ],
+        "wizard_group": "ui"
+      }
+    },
+    "web": {
+      "id": "web",
+      "name": "web",
+      "kind": "group",
+      "parent": "",
+      "children": [
+        "web/web_search",
+        "web/web_fetch"
+      ],
+      "prompt": {
+        "summary": "",
+        "sort_order": 0,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": "Web search and fetch tools"
+      },
+      "policy": {
+        "policy_groups": [
+          "group:web"
+        ],
+        "profiles": null,
+        "wizard_group": ""
+      }
+    },
+    "web/web_fetch": {
+      "id": "web/web_fetch",
+      "name": "web_fetch",
+      "kind": "tool",
+      "parent": "web",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "always",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Fetch and extract readable content from a URL",
+        "sort_order": 7,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_multimodal",
+        "exclude_from": null,
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "none",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "display": {
+        "icon": "📄",
+        "title": "Web Fetch",
+        "label": "",
+        "verb": "Fetch",
+        "detail_keys": "url,extractMode,maxChars"
+      },
+      "policy": {
+        "policy_groups": [
+          "group:web"
+        ],
+        "profiles": [
+          "full"
+        ],
+        "wizard_group": "web"
+      }
+    },
+    "web/web_search": {
+      "id": "web/web_search",
+      "name": "web_search",
+      "kind": "tool",
+      "parent": "web",
+      "children": null,
+      "runtime": {
+        "owner": "attempt_runner",
+        "enabled_when": "WebSearchProvider != nil",
+        "dynamic": false
+      },
+      "prompt": {
+        "summary": "Search the web for real-time information",
+        "sort_order": 6,
+        "usage_guide": "",
+        "delegation": "",
+        "group_intro": ""
+      },
+      "routing": {
+        "min_tier": "task_light",
+        "exclude_from": [
+          "task_delete"
+        ],
+        "intent_keywords": {
+          "zh": null,
+          "en": null
+        },
+        "intent_priority": 0
+      },
+      "perms": {
+        "min_security_level": "allowlist",
+        "file_access": "none",
+        "approval_type": "none",
+        "scope_check": "none"
+      },
+      "skills": {
+        "bindable": true,
+        "bound_skills": null,
+        "guidance": false
+      },
+      "display": {
+        "icon": "🔎",
+        "title": "Web Search",
+        "label": "",
+        "verb": "Search",
+        "detail_keys": "query,count"
+      },
+      "policy": {
+        "policy_groups": [
+          "group:web"
+        ],
+        "profiles": [
+          "full"
+        ],
+        "wizard_group": "web"
+      }
+    }
+  },
+  "root_children": [
+    "runtime",
+    "fs",
+    "web",
+    "ui",
+    "memory",
+    "system",
+    "messaging",
+    "sessions",
+    "ai",
+    "media",
+    "skills",
+    "subagents",
+    "internal",
+    "dynamic",
+    "meta"
+  ]
+}

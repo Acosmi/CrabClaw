@@ -1,7 +1,20 @@
-import { html, type TemplateResult } from "lit";
+import { html, svg, type TemplateResult } from "lit";
 
 // Lucide-style SVG icons
 // All icons use currentColor for stroke
+
+function navAccentIcon(
+  symbol: ReturnType<typeof svg>,
+  detail: ReturnType<typeof svg> | string = "",
+): ReturnType<typeof svg> {
+  // Nested SVG fragments must use lit's `svg` template or child nodes can end up in the HTML namespace.
+  return svg`
+    <svg class="nav-accent-icon" viewBox="0 0 24 24" fill="none">
+      ${symbol}
+      ${detail}
+    </svg>
+  `;
+}
 
 export const icons = {
   // Navigation icons
@@ -88,6 +101,156 @@ export const icons = {
       />
     </svg>
   `,
+  chatSpark: navAccentIcon(
+    svg`
+      <path
+        d="M6.95 8.55A2.05 2.05 0 0 1 9 6.5h5.8a2.05 2.05 0 0 1 2.05 2.05v4.1A2.05 2.05 0 0 1 14.8 14.7h-3.15L8.8 16.9v-2.2H9a2.05 2.05 0 0 1-2.05-2.05Z"
+        stroke="#2563eb"
+        stroke-width="1.65"
+        stroke-linejoin="round"
+      />
+      <circle cx="10.25" cy="10.6" r="0.72" fill="#2563eb" />
+      <circle cx="12" cy="10.6" r="0.72" fill="#0ea5e9" />
+      <circle cx="13.75" cy="10.6" r="0.72" fill="#22d3ee" />
+    `,
+    svg`
+      <path d="M17.05 6.9l.4.96.96.4-.96.4-.4.96-.4-.96-.96-.4.96-.4.4-.96Z" fill="#f59e0b" />
+    `,
+  ),
+  taskOrbit: navAccentIcon(
+    svg`
+      <circle cx="11.8" cy="12" r="4.8" stroke="#0891b2" stroke-width="1.55" />
+      <path d="m9.65 12.05 1.5 1.55 2.85-3.05" stroke="#22c55e" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M11.8 6a6.1 6.1 0 0 1 5.4 3.15" stroke="#1d4ed8" stroke-width="1.2" stroke-linecap="round" />
+      <circle cx="17.35" cy="9.2" r="0.96" fill="#f59e0b" />
+    `,
+  ),
+  agentSwarm: navAccentIcon(
+    svg`
+      <path d="M8.2 9.05 12 11.55M15.8 9.05 12 11.55M12 13.2v2.7" stroke="#64748b" stroke-width="1.4" stroke-linecap="round" />
+      <circle cx="8.2" cy="8.8" r="1.7" fill="#0ea5e9" />
+      <circle cx="15.8" cy="8.8" r="1.7" fill="#22c55e" />
+      <circle cx="12" cy="16.05" r="1.95" fill="#f97316" />
+      <circle cx="12" cy="11.55" r="0.72" fill="#0f172a" />
+    `,
+  ),
+  nodeMesh: navAccentIcon(
+    svg`
+      <path d="M9.1 9.25h5.8M10.65 10.65l2.4 2.5M13.05 10.65l-2.4 2.5" stroke="#64748b" stroke-width="1.35" stroke-linecap="round" />
+      <rect x="6.45" y="6.8" width="3.45" height="3.45" rx="1.02" stroke="#2563eb" stroke-width="1.35" />
+      <rect x="14.1" y="6.8" width="3.45" height="3.45" rx="1.02" stroke="#06b6d4" stroke-width="1.35" />
+      <rect x="10.28" y="13.45" width="3.45" height="3.45" rx="1.02" stroke="#475569" stroke-width="1.35" />
+    `,
+  ),
+  navMedia: navAccentIcon(
+    svg`
+      <rect x="6.95" y="10.1" width="2" height="5.35" rx="1" fill="#7c3aed" />
+      <rect x="11" y="7.95" width="2" height="9.7" rx="1" fill="#0ea5e9" />
+      <rect x="15.05" y="9.1" width="2" height="7.4" rx="1" fill="#14b8a6" />
+      <path d="M6.7 14.15c1.15-2.2 2.3-2.2 3.5 0 1.15 2.1 2.25 2.05 3.35-.2 1-1.95 1.95-2.2 3.2-.7" stroke="#f59e0b" stroke-width="1.35" stroke-linecap="round" />
+    `,
+  ),
+  wizardDashboard: navAccentIcon(
+    svg`
+      <path d="M7 14.9a5 5 0 0 1 10 0" stroke="#1d4ed8" stroke-width="1.65" stroke-linecap="round" />
+      <path d="M12 11.15 15 9.4" stroke="#06b6d4" stroke-width="1.8" stroke-linecap="round" />
+      <circle cx="12" cy="11.15" r="1.35" fill="#0ea5e9" />
+      <circle cx="8.1" cy="14.9" r="0.78" fill="#22c55e" />
+      <circle cx="15.9" cy="14.9" r="0.78" fill="#f97316" />
+    `,
+    svg`
+      <path d="M17.35 7.3l.35.85.85.35-.85.35-.35.85-.35-.85-.85-.35.85-.35.35-.85Z" fill="#f59e0b" />
+    `,
+  ),
+  channelBridge: navAccentIcon(
+    svg`
+      <rect x="6.05" y="7.95" width="4.35" height="3.35" rx="1.05" stroke="#0f766e" stroke-width="1.25" />
+      <rect x="13.6" y="12.7" width="4.35" height="3.35" rx="1.05" stroke="#8b5cf6" stroke-width="1.25" />
+      <path d="M10.75 9.65h1.8c1.35 0 2.45 1.1 2.45 2.45v.2" stroke="#0ea5e9" stroke-width="1.55" stroke-linecap="round" />
+      <path d="m13.45 9.15 1.8.55-.9 1.55" stroke="#0ea5e9" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" />
+      <circle cx="8.2" cy="9.62" r="0.62" fill="#0ea5e9" />
+      <circle cx="15.78" cy="14.35" r="0.62" fill="#8b5cf6" />
+    `,
+  ),
+  pluginCircuit: navAccentIcon(
+    svg`
+      <rect x="8.95" y="8.95" width="6.1" height="6.1" rx="1.55" stroke="#7c3aed" stroke-width="1.45" />
+      <path d="M12 6.6v2M12 15.4v2M6.6 12h2M15.4 12h2" stroke="#4338ca" stroke-width="1.35" stroke-linecap="round" />
+      <circle cx="12" cy="12" r="1.02" fill="#ec4899" />
+      <circle cx="16.75" cy="12" r="0.58" fill="#4338ca" />
+    `,
+  ),
+  mcpBridge: navAccentIcon(
+    svg`
+      <rect x="7.15" y="7.8" width="8.75" height="3.2" rx="1.02" stroke="#2563eb" stroke-width="1.3" />
+      <rect x="8.1" y="12.95" width="8.75" height="3.2" rx="1.02" stroke="#14b8a6" stroke-width="1.3" />
+      <path d="M15.9 9.4h1.35a1.4 1.4 0 0 1 0 2.8h-.4M8.1 14.55H6.8" stroke="#475569" stroke-width="1.3" stroke-linecap="round" />
+      <circle cx="8.85" cy="9.4" r="0.52" fill="#2563eb" />
+      <circle cx="9.8" cy="14.55" r="0.52" fill="#14b8a6" />
+    `,
+  ),
+  memoryVault: navAccentIcon(
+    svg`
+      <circle cx="12" cy="12" r="4.85" stroke="#0891b2" stroke-width="1.45" />
+      <circle cx="12" cy="12" r="2.1" stroke="#38bdf8" stroke-width="1.35" />
+      <circle cx="12" cy="12" r="0.92" fill="#0ea5e9" />
+      <path d="M12 7.2v1.45M16.8 12h-1.45M12 16.8v-1.45M7.2 12h1.45" stroke="#0f766e" stroke-width="1.2" stroke-linecap="round" />
+      <circle cx="16.15" cy="8.75" r="0.8" fill="#f59e0b" />
+    `,
+  ),
+  cronOrbit: navAccentIcon(
+    svg`
+      <circle cx="12" cy="12" r="4.8" stroke="#14b8a6" stroke-width="1.55" />
+      <path d="M12 9.15v2.95l2.2 1.45" stroke="#84cc16" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M7.1 10.05A6 6 0 0 1 17.8 8.6" stroke="#0f766e" stroke-width="1.15" stroke-linecap="round" />
+      <circle cx="17.25" cy="9.35" r="0.86" fill="#84cc16" />
+    `,
+  ),
+  securityPulse: navAccentIcon(
+    svg`
+      <path
+        d="M12 7.05c1.45 1.15 3 1.8 4.7 1.95v3.05c0 2.8-1.65 4.65-4.7 5.7-3.05-1.05-4.7-2.9-4.7-5.7V9c1.7-.15 3.25-.8 4.7-1.95Z"
+        stroke="#2563eb"
+        stroke-width="1.55"
+        stroke-linejoin="round"
+      />
+      <path d="m10.1 12.15 1.35 1.35 2.55-2.7" stroke="#22c55e" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+      <circle cx="16.25" cy="8.75" r="0.76" fill="#7c3aed" />
+    `,
+  ),
+  configSliders: navAccentIcon(
+    svg`
+      <path d="M7.25 8.8h9.5M7.25 12h9.5M7.25 15.2h9.5" stroke="#64748b" stroke-width="1.35" stroke-linecap="round" />
+      <circle cx="10.15" cy="8.8" r="1.22" fill="#1f2937" stroke="#0ea5e9" stroke-width="1.05" />
+      <circle cx="13.9" cy="12" r="1.22" fill="#334155" stroke="#38bdf8" stroke-width="1.05" />
+      <circle cx="11.55" cy="15.2" r="1.22" fill="#475569" stroke="#60a5fa" stroke-width="1.05" />
+    `,
+  ),
+  debugRadar: navAccentIcon(
+    svg`
+      <path d="M12 7.15a4.85 4.85 0 0 1 4.85 4.85" stroke="#1d4ed8" stroke-width="1.55" stroke-linecap="round" />
+      <path d="M12 9.65a2.35 2.35 0 0 1 2.35 2.35" stroke="#8b5cf6" stroke-width="1.45" stroke-linecap="round" />
+      <circle cx="12" cy="12" r="1.25" fill="#8b5cf6" />
+      <path d="M12 12 16.05 9.6" stroke="#1d4ed8" stroke-width="1.65" stroke-linecap="round" />
+      <circle cx="16.2" cy="9.45" r="0.76" fill="#f472b6" />
+      <path d="M7.3 16.7a7 7 0 0 0 9.4 0" stroke="#111827" stroke-width="1.15" stroke-linecap="round" />
+    `,
+  ),
+  logStack: navAccentIcon(
+    svg`
+      <path d="M8.2 7.8h6l2 2.05v6.45A1.5 1.5 0 0 1 14.7 17.8H8.2a1.5 1.5 0 0 1-1.5-1.5V9.3A1.5 1.5 0 0 1 8.2 7.8Z" stroke="#475569" stroke-width="1.45" stroke-linejoin="round" />
+      <path d="M14.2 7.8v2.25h2.2" stroke="#0ea5e9" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M9.1 11.35h5.1M9.1 13.4h5.55M9.1 15.45h3.7" stroke="#64748b" stroke-width="1.3" stroke-linecap="round" />
+    `,
+  ),
+  brandGlobe: navAccentIcon(
+    svg`
+      <circle cx="11.15" cy="12.45" r="4.55" stroke="#0ea5e9" stroke-width="1.5" />
+      <path d="M6.6 12.45h9.1M11.15 7.9c1.35 1.3 2.05 2.8 2.05 4.55S12.5 15.7 11.15 17c-1.35-1.3-2.05-2.8-2.05-4.55s.7-3.25 2.05-4.55Z" stroke="#22c55e" stroke-width="1.2" />
+      <path d="M15.95 7.2h2.7v2.7" stroke="#f59e0b" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M18.5 7.35 14.95 10.9" stroke="#f59e0b" stroke-width="1.35" stroke-linecap="round" />
+    `,
+  ),
 
   // UI icons
   menu: html`
@@ -279,6 +442,26 @@ export const icons = {
       <line x1="12" x2="12" y1="19" y2="22" />
     </svg>
   `,
+  mediaPulse: html`
+    <svg viewBox="0 0 24 24" fill="none">
+      <path
+        d="M4.5 12c0-4.142 3.358-7.5 7.5-7.5 2.38 0 4.501 1.108 5.875 2.836"
+        stroke="#67e8f9"
+        stroke-width="1.6"
+        stroke-linecap="round"
+      />
+      <path
+        d="M19.5 12c0 4.142-3.358 7.5-7.5 7.5-2.38 0-4.501-1.108-5.875-2.836"
+        stroke="#c084fc"
+        stroke-width="1.6"
+        stroke-linecap="round"
+      />
+      <rect x="6.1" y="10.1" width="2.7" height="3.8" rx="1.35" fill="#38bdf8" />
+      <rect x="10.65" y="7.1" width="2.7" height="9.8" rx="1.35" fill="#818cf8" />
+      <rect x="15.2" y="8.85" width="2.7" height="6.3" rx="1.35" fill="#fb7185" />
+      <circle cx="18.85" cy="6.15" r="1.2" fill="#f59e0b" />
+    </svg>
+  `,
   stop: html`
     <svg viewBox="0 0 24 24">
       <rect x="6" y="6" width="12" height="12" rx="2" />
@@ -295,6 +478,50 @@ export const icons = {
       <path d="M19.938 10.5a4 4 0 0 1 .585.396" stroke="#e57373" />
       <path d="M6 18a4 4 0 0 1-1.967-.516" stroke="#e57373" />
       <path d="M19.967 17.484A4 4 0 0 1 18 18" stroke="#e57373" />
+    </svg>
+  `,
+  memoryCore: html`
+    <svg class="memory-core-icon" viewBox="0 0 24 24" fill="none">
+      <path
+        class="memory-core-icon__shell"
+        d="M12 4.7a3 3 0 0 0-5.96.58 4.13 4.13 0 0 0-2.06 5.68 4.1 4.1 0 0 0 .58 6.14A4.02 4.02 0 0 0 12 18.62Z"
+        style="fill: rgba(191, 219, 254, 0.78); stroke: #60a5fa;"
+        stroke-width="1.35"
+        stroke-linejoin="round"
+      />
+      <path
+        class="memory-core-icon__shell memory-core-icon__shell--right"
+        d="M12 4.7a3 3 0 0 1 5.96.58 4.13 4.13 0 0 1 2.06 5.68 4.1 4.1 0 0 1-.58 6.14A4.02 4.02 0 0 1 12 18.62Z"
+        style="fill: rgba(96, 165, 250, 0.24); stroke: #2563eb;"
+        stroke-width="1.35"
+        stroke-linejoin="round"
+      />
+      <g class="memory-core-icon__orbit">
+        <circle
+          class="memory-core-icon__ring"
+          cx="12"
+          cy="12"
+          r="4.45"
+          style="stroke: #1d4ed8; stroke-opacity: 0.52; fill: none;"
+          stroke-width="1.15"
+        />
+        <circle class="memory-core-icon__node" cx="16.45" cy="12" r="1.1" style="fill: #1d4ed8;" />
+      </g>
+      <circle class="memory-core-icon__core" cx="12" cy="12" r="2.15" style="fill: #22d3ee;" />
+      <path
+        class="memory-core-icon__spark"
+        d="M12 9.6v4.8"
+        style="stroke: #eff6ff;"
+        stroke-width="1.2"
+        stroke-linecap="round"
+      />
+      <path
+        class="memory-core-icon__spark"
+        d="M9.6 12h4.8"
+        style="stroke: #eff6ff;"
+        stroke-width="1.2"
+        stroke-linecap="round"
+      />
     </svg>
   `,
   skillBolt: html`
@@ -337,6 +564,27 @@ export type IconName = keyof typeof icons;
 
 export function icon(name: IconName): TemplateResult {
   return icons[name];
+}
+
+export function isAccentIcon(name: IconName): boolean {
+  return [
+    "chatSpark",
+    "taskOrbit",
+    "agentSwarm",
+    "nodeMesh",
+    "navMedia",
+    "wizardDashboard",
+    "channelBridge",
+    "pluginCircuit",
+    "mcpBridge",
+    "memoryVault",
+    "cronOrbit",
+    "securityPulse",
+    "configSliders",
+    "debugRadar",
+    "logStack",
+    "brandGlobe",
+  ].includes(name);
 }
 
 export function renderIcon(name: IconName, className = "nav-item__icon"): TemplateResult {

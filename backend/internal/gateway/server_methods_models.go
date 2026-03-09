@@ -6,9 +6,11 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Acosmi/ClawAcosmi/internal/agents/models"
+	"github.com/Acosmi/ClawAcosmi/internal/goproviders/bridge"
 	"github.com/Acosmi/ClawAcosmi/pkg/types"
 )
 
@@ -45,20 +47,24 @@ type ModelEntryWithSource struct {
 
 func handleModelsList(ctx *MethodHandlerContext) {
 	catalog := ctx.Context.ModelCatalog
-	if catalog == nil {
-		ctx.Respond(true, map[string]interface{}{
-			"models": []interface{}{},
-		}, nil)
-		return
+	if cfg := loadLiveModelConfig(ctx); cfg != nil && catalog != nil {
+		catalog.BuildFromConfig(cfg)
 	}
 
-	entries := catalog.All()
-	result := make([]ModelEntryWithSource, 0, len(entries))
-	for _, e := range entries {
-		result = append(result, ModelEntryWithSource{
-			ModelCatalogEntry: e,
-			Source:            types.ModelSourceCustom,
-		})
+	result, seen := buildBuiltinModelEntries()
+	if catalog != nil {
+		entries := catalog.All()
+		for _, e := range entries {
+			key := modelEntryKey(e.Provider, e.ID)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			result = append(result, ModelEntryWithSource{
+				ModelCatalogEntry: e,
+				Source:            types.ModelSourceCustom,
+			})
+			seen[key] = struct{}{}
+		}
 	}
 
 	// Phase 4: 追加托管模型条目（State 可能为 nil — 单元测试场景）
@@ -89,11 +95,69 @@ func handleModelsList(ctx *MethodHandlerContext) {
 	}, nil)
 }
 
+func modelEntryKey(provider, id string) string {
+	return strings.TrimSpace(provider) + "/" + strings.TrimSpace(id)
+}
+
+func buildBuiltinModelEntries() ([]ModelEntryWithSource, map[string]struct{}) {
+	catalog := bridge.BuildWizardProviderCatalog()
+	result := make([]ModelEntryWithSource, 0, len(catalog)*3)
+	seen := make(map[string]struct{}, len(catalog)*3)
+
+	for _, providerEntry := range catalog {
+		providerID := providerFromDefaultRef(providerEntry.DefaultModelRef)
+		if providerID == "" {
+			continue
+		}
+		for _, model := range providerEntry.Models {
+			key := modelEntryKey(providerID, model.ID)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			entry := models.ModelCatalogEntry{
+				ID:       model.ID,
+				Name:     model.Name,
+				Provider: providerID,
+			}
+			if model.ContextWindow > 0 {
+				contextWindow := model.ContextWindow
+				entry.ContextWindow = &contextWindow
+			}
+			if model.Reasoning {
+				reasoning := model.Reasoning
+				entry.Reasoning = &reasoning
+			}
+			if len(model.Input) > 0 {
+				entry.Input = append([]string(nil), model.Input...)
+			}
+			result = append(result, ModelEntryWithSource{
+				ModelCatalogEntry: entry,
+				Source:            types.ModelSourceBuiltin,
+			})
+			seen[key] = struct{}{}
+		}
+	}
+
+	return result, seen
+}
+
+func providerFromDefaultRef(ref string) string {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return ""
+	}
+	slash := strings.Index(ref, "/")
+	if slash <= 0 {
+		return ""
+	}
+	return strings.TrimSpace(ref[:slash])
+}
+
 // ---------- models.default.get ----------
 // 返回当前默认模型配置。
 
 func handleModelsDefaultGet(ctx *MethodHandlerContext) {
-	cfg := ctx.Context.Config
+	cfg := loadLiveModelConfig(ctx)
 	if cfg == nil {
 		ctx.Respond(true, map[string]interface{}{
 			"model": nil,
@@ -110,6 +174,18 @@ func handleModelsDefaultGet(ctx *MethodHandlerContext) {
 	ctx.Respond(true, map[string]interface{}{
 		"model": primary,
 	}, nil)
+}
+
+func loadLiveModelConfig(ctx *MethodHandlerContext) *types.OpenAcosmiConfig {
+	if ctx == nil || ctx.Context == nil {
+		return nil
+	}
+	if loader := ctx.Context.ConfigLoader; loader != nil {
+		if cfg, err := loader.LoadConfig(); err == nil {
+			return cfg
+		}
+	}
+	return ctx.Context.Config
 }
 
 // ---------- models.default.set ----------
@@ -149,10 +225,20 @@ func handleModelsDefaultSet(ctx *MethodHandlerContext) {
 		ctx.Respond(false, nil, NewErrorShape(ErrCodeInternalError, "config save failed: "+err.Error()))
 		return
 	}
+	cfgLoader.ClearCache()
+	if freshCfg, err := cfgLoader.LoadConfig(); err == nil && freshCfg != nil {
+		cfg = freshCfg
+		if ctx.Context != nil {
+			ctx.Context.Config = freshCfg
+			if ctx.Context.ModelCatalog != nil {
+				ctx.Context.ModelCatalog.BuildFromConfig(freshCfg)
+			}
+		}
+	}
 
 	slog.Info("models.default.set: default model updated", "model", model)
 	ctx.Respond(true, map[string]interface{}{
-		"model": model,
+		"model": cfg.Agents.Defaults.Model.Primary,
 	}, nil)
 }
 
@@ -257,7 +343,7 @@ func handleModelsSourceSet(ctx *MethodHandlerContext) {
 // 通过 nexus-v4 查询钱包余额。
 
 func handleModelsWalletBalance(ctx *MethodHandlerContext) {
-	cfg := ctx.Context.Config
+	cfg := loadLiveModelConfig(ctx)
 	if cfg == nil || cfg.Models == nil || cfg.Models.ManagedModels == nil {
 		ctx.Respond(false, nil, NewErrorShape(ErrCodeServiceUnavailable, "managed models not configured"))
 		return
@@ -304,7 +390,7 @@ func handleModelsWalletBalance(ctx *MethodHandlerContext) {
 // 通过 nexus-v4 查询交易记录。
 
 func handleModelsWalletUsage(ctx *MethodHandlerContext) {
-	cfg := ctx.Context.Config
+	cfg := loadLiveModelConfig(ctx)
 	if cfg == nil || cfg.Models == nil || cfg.Models.ManagedModels == nil {
 		ctx.Respond(false, nil, NewErrorShape(ErrCodeServiceUnavailable, "managed models not configured"))
 		return

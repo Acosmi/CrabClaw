@@ -424,14 +424,45 @@ func TestEscalationApprove(t *testing.T) {
 	if status.HasPending {
 		t.Error("pending should be cleared after approve")
 	}
-	if !status.HasActive {
-		t.Error("expected hasActive=true after approve")
+	if status.HasActive {
+		t.Error("full approval should not create temporary active grant")
 	}
-	if status.Active.Level != "full" {
-		t.Errorf("expected level 'full', got %q", status.Active.Level)
+	if status.BaseLevel != "full" {
+		t.Errorf("expected baseLevel 'full', got %q", status.BaseLevel)
 	}
 	if status.ActiveLevel != "full" {
 		t.Errorf("expected activeLevel 'full', got %q", status.ActiveLevel)
+	}
+}
+
+func TestEscalationApprove_BaseRaisedDuringPendingSkipsTemporaryGrant(t *testing.T) {
+	tmpHome := t.TempDir()
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpHome)
+	defer os.Setenv("HOME", origHome)
+
+	mgr := NewEscalationManager(nil, nil, nil)
+	mgr.SetMaxAllowedLevel("full")
+	defer mgr.Close()
+
+	if err := mgr.RequestEscalation("esc_perm_001", "sandboxed", "reason", "run-1", "", "", "", 30); err != nil {
+		t.Fatalf("request should succeed: %v", err)
+	}
+	setBaseSecurityLevelForTest(t, infra.ExecSecurityFull)
+
+	if err := mgr.ResolveEscalation(true, 0); err != nil {
+		t.Fatalf("approve should succeed: %v", err)
+	}
+
+	status := mgr.GetStatus()
+	if status.HasPending {
+		t.Error("pending should be cleared after approve")
+	}
+	if status.HasActive {
+		t.Error("base-satisfied approval should not create temporary active grant")
+	}
+	if status.BaseLevel != "full" || status.ActiveLevel != "full" {
+		t.Fatalf("expected effective level to stay full, got base=%q active=%q", status.BaseLevel, status.ActiveLevel)
 	}
 }
 
@@ -470,17 +501,17 @@ func TestEscalationAutoDeescalate(t *testing.T) {
 	defer os.Setenv("HOME", origHome)
 
 	mgr := NewEscalationManager(nil, nil, nil)
-	mgr.SetMaxAllowedLevel("full")
+	mgr.SetMaxAllowedLevel("sandboxed")
 	defer mgr.Close()
 
-	mgr.RequestEscalation("esc_001", "full", "reason", "", "", "", "", 1) // 1 minute TTL
+	mgr.RequestEscalation("esc_001", "sandboxed", "reason", "", "", "", "", 1) // 1 minute TTL
 
 	// Override TTL to very short for testing
 	mgr.mu.Lock()
 	mgr.pending = nil
 	mgr.active = &ActiveEscalationGrant{
 		ID:        "esc_001",
-		Level:     "full",
+		Level:     "sandboxed",
 		GrantedAt: time.Now(),
 		ExpiresAt: time.Now().Add(100 * time.Millisecond),
 	}
@@ -496,7 +527,7 @@ func TestEscalationAutoDeescalate(t *testing.T) {
 	}
 }
 
-func TestEscalationDeescalate_FallbackBaseKeepsBaseLevel(t *testing.T) {
+func TestEscalationApprove_FullIgnoresFallbackBaseMode(t *testing.T) {
 	tmpHome := t.TempDir()
 	origHome := os.Getenv("HOME")
 	os.Setenv("HOME", tmpHome)
@@ -516,17 +547,16 @@ func TestEscalationDeescalate_FallbackBaseKeepsBaseLevel(t *testing.T) {
 		t.Fatalf("approve failed: %v", err)
 	}
 
-	mgr.ManualRevoke()
 	status := mgr.GetStatus()
-	if status.BaseLevel != string(infra.ExecSecurityAllowlist) {
-		t.Fatalf("expected base level keep allowlist, got %q", status.BaseLevel)
+	if status.BaseLevel != string(infra.ExecSecurityFull) {
+		t.Fatalf("expected base level upgraded to full, got %q", status.BaseLevel)
 	}
-	if status.ActiveLevel != string(infra.ExecSecurityAllowlist) {
-		t.Fatalf("expected active level fallback to allowlist, got %q", status.ActiveLevel)
+	if status.ActiveLevel != string(infra.ExecSecurityFull) {
+		t.Fatalf("expected active level stay full, got %q", status.ActiveLevel)
 	}
 }
 
-func TestEscalationDeescalate_FallbackSandboxedSetsL2ForL3Expiry(t *testing.T) {
+func TestEscalationApprove_FullIgnoresFallbackSandboxedMode(t *testing.T) {
 	tmpHome := t.TempDir()
 	origHome := os.Getenv("HOME")
 	os.Setenv("HOME", tmpHome)
@@ -546,13 +576,12 @@ func TestEscalationDeescalate_FallbackSandboxedSetsL2ForL3Expiry(t *testing.T) {
 		t.Fatalf("approve failed: %v", err)
 	}
 
-	mgr.ManualRevoke()
 	status := mgr.GetStatus()
-	if status.BaseLevel != string(infra.ExecSecuritySandboxed) {
-		t.Fatalf("expected base level upgraded to sandboxed, got %q", status.BaseLevel)
+	if status.BaseLevel != string(infra.ExecSecurityFull) {
+		t.Fatalf("expected base level upgraded to full, got %q", status.BaseLevel)
 	}
-	if status.ActiveLevel != string(infra.ExecSecuritySandboxed) {
-		t.Fatalf("expected active level fallback to sandboxed, got %q", status.ActiveLevel)
+	if status.ActiveLevel != string(infra.ExecSecurityFull) {
+		t.Fatalf("expected active level stay full, got %q", status.ActiveLevel)
 	}
 }
 
@@ -565,10 +594,10 @@ func TestEscalationTaskComplete(t *testing.T) {
 	defer os.Setenv("HOME", origHome)
 
 	mgr := NewEscalationManager(nil, nil, nil)
-	mgr.SetMaxAllowedLevel("full")
+	mgr.SetMaxAllowedLevel("sandboxed")
 	defer mgr.Close()
 
-	mgr.RequestEscalation("esc_001", "full", "reason", "run-1", "", "", "", 30)
+	mgr.RequestEscalation("esc_001", "sandboxed", "reason", "run-1", "", "", "", 30)
 	mgr.ResolveEscalation(true, 30)
 
 	// Task complete with matching runID
@@ -587,10 +616,10 @@ func TestEscalationTaskComplete_WrongRunID(t *testing.T) {
 	defer os.Setenv("HOME", origHome)
 
 	mgr := NewEscalationManager(nil, nil, nil)
-	mgr.SetMaxAllowedLevel("full")
+	mgr.SetMaxAllowedLevel("sandboxed")
 	defer mgr.Close()
 
-	mgr.RequestEscalation("esc_001", "full", "reason", "run-1", "", "", "", 30)
+	mgr.RequestEscalation("esc_001", "sandboxed", "reason", "run-1", "", "", "", 30)
 	mgr.ResolveEscalation(true, 30)
 
 	// Task complete with wrong runID should NOT deescalate
@@ -742,8 +771,11 @@ func TestEscalationHandlers_Resolve(t *testing.T) {
 
 	// Verify active grant
 	status := mgr.GetStatus()
-	if !status.HasActive {
-		t.Error("expected active grant after approval")
+	if status.HasActive {
+		t.Error("full approval should not leave temporary active grant")
+	}
+	if status.BaseLevel != "full" {
+		t.Errorf("expected base level to be full after approval, got %q", status.BaseLevel)
 	}
 }
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { initLocale } from "./i18n.ts";
 import {
   getTabGroups,
   iconForTab,
@@ -11,6 +12,8 @@ import {
   titleForTab,
   type Tab,
 } from "./navigation.ts";
+
+initLocale("en");
 
 /** All valid tab identifiers derived from getTabGroups() */
 const ALL_TABS: Tab[] = getTabGroups().flatMap((group) => group.tabs) as Tab[];
@@ -26,16 +29,17 @@ describe("iconForTab", () => {
   });
 
   it("returns stable icons for known tabs", () => {
-    expect(iconForTab("chat")).toBe("messageSquare");
-    expect(iconForTab("overview")).toBe("barChart");
-    expect(iconForTab("channels")).toBe("link");
-    expect(iconForTab("instances")).toBe("radio");
-    expect(iconForTab("cron")).toBe("loader");
-    expect(iconForTab("skills")).toBe("zap");
-    expect(iconForTab("nodes")).toBe("monitor");
-    expect(iconForTab("config")).toBe("settings");
-    expect(iconForTab("debug")).toBe("bug");
-    expect(iconForTab("logs")).toBe("scrollText");
+    expect(iconForTab("agents")).toBe("agentSwarm");
+    expect(iconForTab("chat")).toBe("chatSpark");
+    expect(iconForTab("overview")).toBe("wizardDashboard");
+    expect(iconForTab("channels")).toBe("channelBridge");
+    expect(iconForTab("instances")).toBe("nodeMesh");
+    expect(iconForTab("cron")).toBe("cronOrbit");
+    expect(iconForTab("skills")).toBe("pluginCircuit");
+    expect(iconForTab("nodes")).toBe("nodeMesh");
+    expect(iconForTab("config")).toBe("configSliders");
+    expect(iconForTab("debug")).toBe("debugRadar");
+    expect(iconForTab("logs")).toBe("logStack");
   });
 
   it("returns a fallback icon for unknown tab", () => {
@@ -55,8 +59,9 @@ describe("titleForTab", () => {
   });
 
   it("returns expected titles", () => {
-    expect(titleForTab("chat")).toBe("Chat");
-    expect(titleForTab("overview")).toBe("Overview");
+    expect(titleForTab("chat")).toBe("Start Chat");
+    expect(titleForTab("agents")).toBe("Workspace (Agent Swarm)");
+    expect(titleForTab("overview")).toBe("Dashboard (Wizard)");
     expect(titleForTab("cron")).toBe("Cron Jobs");
   });
 });
@@ -177,9 +182,9 @@ describe("inferBasePathFromPathname", () => {
 });
 
 describe("getTabGroups", () => {
-  it("contains 4 groups", () => {
+  it("contains 3 groups", () => {
     const groups = getTabGroups();
-    expect(groups).toHaveLength(4);
+    expect(groups).toHaveLength(3);
     for (const g of groups) {
       expect(g.label.length).toBeGreaterThan(0);
     }

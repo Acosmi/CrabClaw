@@ -127,6 +127,8 @@ type AttemptParams struct {
 	RunID              string                    `json:"runId"`
 	ExtraSystemPrompt  string                    `json:"extraSystemPrompt,omitempty"`
 	OnPermissionDenied func(tool, detail string) // 权限拒绝事件回调
+	// OnPermissionDeniedWithContext 回传带审批工作流的权限拒绝上下文。
+	OnPermissionDeniedWithContext func(notice PermissionDeniedNotice)
 	// WaitForApproval 阻塞等待提权审批结果。返回 true=审批通过，false=拒绝/超时。
 	// 由 server.go 注入，内部监听 EscalationManager 状态变化。
 	WaitForApproval func(ctx context.Context) bool

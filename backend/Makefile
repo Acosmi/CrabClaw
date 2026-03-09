@@ -12,7 +12,8 @@
 #   make clean          # 清理构建产物
 
 .PHONY: gateway cli build-all build-cpp test test-multimedia report-multimedia lint clean fmt vet help \
-        gateway-dev gateway-run test-rust install-cli build-go-cli-deprecated gateway-ffi
+        gateway-dev gateway-run test-rust install-cli build-go-cli-deprecated gateway-ffi \
+        gen-frontend native-host install-native-host
 
 # 版本信息
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -38,9 +39,19 @@ gateway-ffi: ## 编译 Gateway 所需的 Rust FFI (openviking-ffi)
 ifeq ($(CGO_ENABLED),0)
 	@echo "ℹ️  CGO_ENABLED=0，跳过 Rust FFI 编译，使用纯 Go fallback"
 else
-	@echo "🦀 编译 Rust FFI (openviking-ffi)..."
-	cd $(RUST_FFI_WORKSPACE) && cargo build -p openviking-ffi --release
-	@echo "✅ Rust FFI 编译完成"
+	@echo ""
+	@echo "🦀 ══════════════════════════════════════════════════════════════"
+	@echo "🦀  编译 Rust FFI (openviking-ffi)"
+	@echo "🦀  ⏱  首次编译约 5-10 分钟（含 qdrant 向量引擎），请耐心等待"
+	@echo "🦀  💡 后续增量编译仅需数秒"
+	@echo "🦀 ══════════════════════════════════════════════════════════════"
+	@echo ""
+	@START_TIME=$$(date +%s); \
+	cd $(RUST_FFI_WORKSPACE) && cargo build -p openviking-ffi --release; \
+	END_TIME=$$(date +%s); \
+	ELAPSED=$$((END_TIME - START_TIME)); \
+	echo ""; \
+	echo "✅ Rust FFI 编译完成（耗时 $${ELAPSED}s）"
 endif
 
 gateway: gateway-ffi fmt vet ## 编译 Go Gateway (acosmi)
@@ -78,8 +89,20 @@ build-cpp: ## 编译 C++ 库
 	cd $(CPP_BUILD_DIR) && cmake ../.. -DCMAKE_BUILD_TYPE=Release && make -j$$(nproc 2>/dev/null || sysctl -n hw.ncpu)
 	@echo "✅ C++ 库编译完成"
 
+# --- Native Messaging Host ---
+NATIVE_HOST_BIN := build/crabclaw-native-host
+
+native-host: fmt vet ## 编译 Chrome Native Messaging Host
+	@echo "🔨 编译 Native Messaging Host..."
+	go build $(LDFLAGS) -o $(NATIVE_HOST_BIN) ./cmd/native-host
+	@echo "✅ 编译完成: $(NATIVE_HOST_BIN)"
+
+install-native-host: native-host ## 安装 Native Messaging Host 到 Chrome
+	./$(NATIVE_HOST_BIN) --install
+	@echo "✅ Native Messaging Host 已安装"
+
 # --- 完整构建 ---
-build-all: gateway cli ## 编译 Gateway + Rust CLI
+build-all: gateway cli native-host ## 编译 Gateway + Rust CLI + Native Host
 	@echo "✅ 全部编译完成"
 
 # --- Go CLI (已弃用) ---
@@ -108,6 +131,12 @@ test-verbose: ## 运行测试（详细输出）
 	go test -race -cover -v ./...
 
 test-all: test test-rust ## 运行 Go + Rust 全部测试
+
+# --- 前端生成 (Phase 2 D6/D7/D8) ---
+gen-frontend: ## 从能力树生成前端 TS/JSON 产物
+	@echo "🔄 从能力树生成前端产物..."
+	go run ./cmd/gen-frontend
+	@echo "✅ 前端生成完成"
 
 # --- 代码质量 ---
 fmt: ## 格式化代码

@@ -14,6 +14,7 @@ import { loadChatHistory } from "./controllers/chat.ts";
 import {
   applyConfig,
   loadConfig,
+  rollbackUpdate,
   runUpdate,
   saveConfig,
   updateConfigFormValue,
@@ -69,7 +70,11 @@ import {
 import { loadUsage, loadSessionTimeSeries, loadSessionLogs } from "./controllers/usage.ts";
 import { icons } from "./icons.ts";
 import { normalizeBasePath, getTabGroups, subtitleForTab, titleForTab, type Tab } from "./navigation.ts";
-import { createChatReadonlyRunState } from "./chat/readonly-run-state.ts";
+import {
+  createChatReadonlyRunState,
+  loadPersistedChatReadonlyRun,
+  loadPersistedChatReadonlyRunHistory,
+} from "./chat/readonly-run-state.ts";
 
 // Module-scope debounce for usage date changes (avoids type-unsafe hacks on state object)
 let usageDateDebounceTimeout: number | null = null;
@@ -109,6 +114,7 @@ import { renderSkills } from "./views/skills.ts";
 import { renderUsage } from "./views/usage.ts";
 import { renderWizardV2 } from "./views/wizard-v2.ts";
 import { renderNotificationCenter } from "./views/notification-center.ts";
+import { renderArgusFailureAlert } from "./views/argus-failure-alert.ts";
 import { renderMediaConfig, loadMediaConfig } from "./views/media-config.ts";
 import { buildMediaManageUrl, renderMediaManage } from "./views/media-manage.ts";
 import { openMediaManageWindow } from "./media-manage-window.ts";
@@ -160,6 +166,8 @@ export function renderApp(state: AppViewState) {
   const chatDisabledReason = state.connected ? null : "Disconnected from gateway.";
   const isChat = state.tab === "chat";
   const chatFocus = isChat && (state.settings.chatFocusMode || state.onboarding);
+  const mediaQuickActive = state.memoryPanel === "media";
+  const memoryQuickActive = state.memoryPanel !== "media";
   const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
   const assistantAvatarUrl = resolveAssistantAvatarUrl(state);
   const chatAvatarUrl = state.chatAvatarUrl ?? assistantAvatarUrl ?? null;
@@ -241,7 +249,7 @@ export function renderApp(state: AppViewState) {
           <div class="topbar-right-controls">
             ${isChat ? html`
               <button
-                class="btn btn--sm btn--icon"
+                class="btn btn--sm btn--icon topbar-quick-action topbar-quick-action--media ${mediaQuickActive ? "is-active" : ""}"
                 @click=${() => {
         state.memoryPanel = "media";
         state.setTab("memory");
@@ -249,16 +257,19 @@ export function renderApp(state: AppViewState) {
       }}
                 title=${t("media.configTitle")}
               >
-                ${icons.mic}
+                ${icons.mediaPulse}
               </button>
               <button
-                class="btn btn--sm btn--icon"
+                class="btn btn--sm btn--icon topbar-quick-action topbar-quick-action--memory ${memoryQuickActive ? "is-active" : ""}"
                 @click=${() => {
+        if (state.memoryPanel === "media") {
+          state.memoryPanel = "uhms";
+        }
         state.setTab("memory");
       }}
                 title=${t("memory.memoryManagement")}
               >
-                ${icons.brainMemory}
+                ${icons.memoryCore}
               </button>
             ` : nothing}
             <div class="pill">
@@ -345,12 +356,12 @@ export function renderApp(state: AppViewState) {
           <div class="nav-group__items">
             <a
               class="nav-item nav-item--external"
-              href="https://github.com/Acosmi/CrabClaw"
+              href="https://acosmi.ai"
               target="_blank"
               rel="noreferrer"
               title="${t("topbar.docsTooltip")}"
             >
-              <span class="nav-item__icon" aria-hidden="true">${icons.book}</span>
+              <span class="nav-item__icon nav-item__icon--accent" aria-hidden="true">${icons.brandGlobe}</span>
               <span class="nav-item__text">${t("topbar.docs")}</span>
             </a>
           </div>
@@ -358,30 +369,30 @@ export function renderApp(state: AppViewState) {
       </aside>
       <main class="content ${isChat ? "content--chat" : ""}">
         ${isChat ? nothing : html`
-        <section class="content-header">
-          <div>
-            ${hidePageHeading ? nothing : html`<div class="page-title">${titleForTab(headerTab)}</div>`}
-            ${hidePageHeading ? nothing : html`<div class="page-sub">${subtitleForTab(headerTab)}</div>`}
-          </div>
-          <div class="page-meta">
-            ${state.tab === "memory" && state.memoryPanel === "uhms" ? html`
-              <div style="display:flex;gap:8px;align-items:center;">
-                ${renderMemoryTypeCapsules(state.memoryStats)}
-              </div>
-            ` : nothing}
-            ${state.tab === "memory" && state.memoryPanel === "media" ? html`
-              <div style="display:flex;gap:8px;align-items:center;">
-                <span class="pill ${(state.sttWizard as Record<string, unknown> | undefined)?.configured ? "success" : "warning"}" style="font-size:11px;">
-                  🎙 ${(state.sttWizard as Record<string, unknown> | undefined)?.configured ? t("media.stt.configured") : t("media.stt.notConfigured")}
-                </span>
-                <span class="pill ${(state.docConvWizard as Record<string, unknown> | undefined)?.configured ? "success" : "warning"}" style="font-size:11px;">
-                  📄 ${(state.docConvWizard as Record<string, unknown> | undefined)?.configured ? t("media.docconv.configured") : t("media.docconv.notConfigured")}
-                </span>
-              </div>
-            ` : nothing}
-            ${state.lastError ? html`<div class="pill danger">${state.lastError}</div>` : nothing}
-          </div>
-        </section>
+          <section class="content-header">
+            <div>
+              ${hidePageHeading ? nothing : html`<div class="page-title">${titleForTab(headerTab)}</div>`}
+              ${hidePageHeading ? nothing : html`<div class="page-sub">${subtitleForTab(headerTab)}</div>`}
+            </div>
+            <div class="page-meta">
+              ${state.tab === "memory" && state.memoryPanel === "uhms" ? html`
+                <div style="display:flex;gap:8px;align-items:center;">
+                  ${renderMemoryTypeCapsules(state.memoryStats)}
+                </div>
+              ` : nothing}
+              ${state.tab === "memory" && state.memoryPanel === "media" ? html`
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <span class="pill ${(state.sttWizard as Record<string, unknown> | undefined)?.configured ? "success" : "warning"}" style="font-size:11px;">
+                    🎙 ${(state.sttWizard as Record<string, unknown> | undefined)?.configured ? t("media.stt.configured") : t("media.stt.notConfigured")}
+                  </span>
+                  <span class="pill ${(state.docConvWizard as Record<string, unknown> | undefined)?.configured ? "success" : "warning"}" style="font-size:11px;">
+                    📄 ${(state.docConvWizard as Record<string, unknown> | undefined)?.configured ? t("media.docconv.configured") : t("media.docconv.notConfigured")}
+                  </span>
+                </div>
+              ` : nothing}
+              ${state.lastError ? html`<div class="pill danger">${state.lastError}</div>` : nothing}
+            </div>
+          </section>
         `}
 
         ${showOverviewTabs
@@ -429,7 +440,8 @@ export function renderApp(state: AppViewState) {
         onSessionKeyChange: (next) => {
           state.sessionKey = next;
           state.chatMessage = "";
-          state.chatReadonlyRun = createChatReadonlyRunState(next);
+          state.chatReadonlyRun = loadPersistedChatReadonlyRun(next) ?? createChatReadonlyRunState(next);
+          state.chatReadonlyRunHistory = loadPersistedChatReadonlyRunHistory(next);
           state.resetToolStream();
           state.applySettings({
             ...state.settings,
@@ -483,6 +495,9 @@ export function renderApp(state: AppViewState) {
         onConfigureChannel: (_channelId: string) => {
           // V1 channel wizard removed — configure via Config panel
         },
+        onEmailTest: (accountId: string) => state.handleEmailTest(accountId),
+        emailTestLoading: state.emailTestLoading,
+        emailTestResult: state.emailTestResult,
         requestUpdate: () => { (state as unknown as { requestUpdate: () => void }).requestUpdate?.(); },
       })
       : nothing
@@ -1485,7 +1500,8 @@ export function renderApp(state: AppViewState) {
           state.sessionKey = next;
           state.chatMessage = "";
           state.chatAttachments = [];
-          state.chatReadonlyRun = createChatReadonlyRunState(next);
+          state.chatReadonlyRun = loadPersistedChatReadonlyRun(next) ?? createChatReadonlyRunState(next);
+          state.chatReadonlyRunHistory = loadPersistedChatReadonlyRunHistory(next);
           state.chatStream = null;
           state.chatStreamStartedAt = null;
           state.chatRunId = null;
@@ -1511,6 +1527,7 @@ export function renderApp(state: AppViewState) {
         toolMessages: state.chatToolMessages,
         uxMode: state.chatUxMode,
         readonlyRun: state.chatReadonlyRun,
+        readonlyRunHistory: state.chatReadonlyRunHistory,
         stream: state.chatStream,
         streamStartedAt: state.chatStreamStartedAt,
         draft: state.chatMessage,
@@ -1569,6 +1586,11 @@ export function renderApp(state: AppViewState) {
             m.setChatModel(state as any, model),
           );
         },
+        onOpenModelConfig: () => {
+          state.setTab("config");
+          state.configActiveSection = "models";
+          state.configActiveSubsection = null;
+        },
         browserExtBannerDismissed: state.browserExtBannerDismissed,
         onDismissBrowserExtBanner: () => { state.browserExtBannerDismissed = true; },
         requestUpdate: () => { (state as unknown as { requestUpdate: () => void }).requestUpdate?.(); },
@@ -1609,7 +1631,7 @@ export function renderApp(state: AppViewState) {
             try {
               await state.client?.request("security.escalation.resolve", {
                 approve: true,
-                ttlMinutes: 1, // 仅用于唤醒当前等待中的 run，长期权限由 base level 决定
+                ttlMinutes: 0,
               });
             } catch (err) {
               const message = err instanceof Error ? err.message : String(err);
@@ -1790,6 +1812,8 @@ export function renderApp(state: AppViewState) {
         saving: state.configSaving,
         applying: state.configApplying,
         updating: state.updateRunning,
+        rollingBack: state.updateRollbackRunning,
+        updateStatus: state.desktopUpdateStatus,
         connected: state.connected,
         schema: state.configSchema,
         schemaLoading: state.configSchemaLoading,
@@ -1815,6 +1839,7 @@ export function renderApp(state: AppViewState) {
         onSave: () => saveConfig(state),
         onApply: () => applyConfig(state),
         onUpdate: () => runUpdate(state),
+        onRollback: () => rollbackUpdate(state),
       })
       : nothing
     }
@@ -1911,6 +1936,7 @@ export function renderApp(state: AppViewState) {
       ${renderGatewayUrlConfirmation(state)}
 
         ${renderWizardV2(state)}
+      ${renderArgusFailureAlert(state)}
     </div>
   `;
 }

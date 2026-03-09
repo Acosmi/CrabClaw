@@ -14,6 +14,7 @@ import (
 	"github.com/Acosmi/ClawAcosmi/internal/config"
 	"github.com/Acosmi/ClawAcosmi/internal/media"
 	"github.com/Acosmi/ClawAcosmi/pkg/mcpremote"
+	"github.com/Acosmi/ClawAcosmi/pkg/types"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
@@ -448,6 +449,13 @@ func wsConnectionLoop(conn *websocket.Conn, r *http.Request, cfg WsServerConfig)
 			continue
 		}
 
+		var liveCfg *types.OpenAcosmiConfig
+		if cfg.ConfigLoader != nil {
+			if currentCfg, err := cfg.ConfigLoader.LoadConfig(); err == nil {
+				liveCfg = currentCfg
+			}
+		}
+
 		// 构建 GatewayClient (对齐 server_methods.go GatewayClient 类型)
 		gatewayClient := &GatewayClient{
 			ConnID: connID,
@@ -461,6 +469,7 @@ func wsConnectionLoop(conn *websocket.Conn, r *http.Request, cfg WsServerConfig)
 		methodCtx := &GatewayMethodContext{
 			SessionStore:           cfg.SessionStore,
 			StorePath:              cfg.StorePath,
+			Config:                 liveCfg,
 			LogFilePath:            cfg.LogFilePath,
 			ConfigLoader:           cfg.ConfigLoader,
 			ModelCatalog:           cfg.ModelCatalog,

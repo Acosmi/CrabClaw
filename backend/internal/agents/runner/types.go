@@ -177,6 +177,8 @@ type RunEmbeddedPiAgentParams struct {
 	FallbackModels      []string                `json:"fallbackModels,omitempty"`
 	// 权限拒绝事件回调 — 通知网关广播 WebSocket 事件
 	OnPermissionDenied func(tool, detail string) `json:"-"`
+	// OnPermissionDeniedWithContext 在权限拒绝时回传更完整的审批上下文。
+	OnPermissionDeniedWithContext func(notice PermissionDeniedNotice) `json:"-"`
 	// WaitForApproval 阻塞等待提权审批结果（由 server.go 注入）
 	WaitForApproval func(ctx context.Context) bool `json:"-"`
 	// SecurityLevelFunc 动态获取当前有效安全级别（由 server.go 注入）

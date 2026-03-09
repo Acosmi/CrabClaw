@@ -32,6 +32,7 @@ type CoderConfirmationRequest struct {
 	Preview     *CoderConfirmPreview `json:"preview"`  // 预览数据
 	CreatedAtMs int64                `json:"createdAtMs"`
 	ExpiresAtMs int64                `json:"expiresAtMs"`
+	Workflow    ApprovalWorkflow     `json:"workflow,omitempty"`
 }
 
 // CoderConfirmBroadcastFunc 广播回调（解耦 runner 与 gateway）。
@@ -51,7 +52,7 @@ type CoderConfirmRemoteNotifyFunc func(req CoderConfirmationRequest, sessionKey 
 // 为 nil 时完全跳过确认（兼容现有行为）。
 type CoderConfirmationManager struct {
 	mu           sync.Mutex
-	pending      map[string]chan string // id → decision ("allow"/"deny")
+	pending      map[string]*coderConfirmationEntry // id → request + decision channel
 	broadcast    CoderConfirmBroadcastFunc
 	remoteNotify CoderConfirmRemoteNotifyFunc
 	timeout      time.Duration // 默认 5min
@@ -61,13 +62,18 @@ type CoderConfirmationManager struct {
 	activeContract *DelegationContract
 }
 
+type coderConfirmationEntry struct {
+	ch  chan string
+	req CoderConfirmationRequest
+}
+
 // NewCoderConfirmationManager 创建确认管理器。
 func NewCoderConfirmationManager(broadcastFn CoderConfirmBroadcastFunc, remoteNotifyFn CoderConfirmRemoteNotifyFunc, timeout time.Duration) *CoderConfirmationManager {
 	if timeout <= 0 {
 		timeout = 5 * time.Minute
 	}
 	return &CoderConfirmationManager{
-		pending:      make(map[string]chan string),
+		pending:      make(map[string]*coderConfirmationEntry),
 		broadcast:    broadcastFn,
 		remoteNotify: remoteNotifyFn,
 		timeout:      timeout,
@@ -79,6 +85,16 @@ func NewCoderConfirmationManager(broadcastFn CoderConfirmBroadcastFunc, remoteNo
 // sessionKey 标识发起会话（如 "feishu:<chatID>"），用于路由远程通知。
 // 返回 true 表示用户批准，false 表示拒绝/超时/取消。
 func (m *CoderConfirmationManager) RequestConfirmation(ctx context.Context, toolName string, args json.RawMessage, sessionKey string) (bool, error) {
+	return m.RequestConfirmationWithMetadata(ctx, toolName, args, sessionKey, ApprovalWorkflow{})
+}
+
+func (m *CoderConfirmationManager) RequestConfirmationWithMetadata(
+	ctx context.Context,
+	toolName string,
+	args json.RawMessage,
+	sessionKey string,
+	workflow ApprovalWorkflow,
+) (bool, error) {
 	// Phase 7: 合约上下文风险评估——低风险自动放行，高风险路由到用户
 	// 快照：在锁下拷贝指针，避免与 SetActiveContract/ClearActiveContract 竞争
 	m.mu.Lock()
@@ -110,17 +126,23 @@ func (m *CoderConfirmationManager) RequestConfirmation(ctx context.Context, tool
 		CreatedAtMs: now.UnixMilli(),
 		ExpiresAtMs: now.Add(m.timeout).UnixMilli(),
 	}
+	if stageType := workflowStageTypeForCoderTool(toolName); stageType != "" && workflow.ID != "" {
+		req.Workflow = workflow.MarkStagePending(stageType, req.ID)
+	} else {
+		req.Workflow = workflow
+	}
 
 	ch := make(chan string, 1)
 
 	m.mu.Lock()
-	m.pending[req.ID] = ch
+	m.pending[req.ID] = &coderConfirmationEntry{ch: ch, req: req}
 	m.mu.Unlock()
 
 	// 广播确认请求到前端（WebSocket）
 	if m.broadcast != nil {
 		m.broadcast("coder.confirm.requested", req)
 	}
+	broadcastApprovalWorkflow(m.broadcast, req.Workflow, "coder.confirm.requested", req.ID)
 
 	// 推送远程通知到非 Web 渠道（飞书卡片等）
 	if m.remoteNotify != nil && sessionKey != "" {
@@ -159,14 +181,25 @@ func (m *CoderConfirmationManager) RequestConfirmation(ctx context.Context, tool
 	delete(m.pending, req.ID)
 	m.mu.Unlock()
 
+	resolvedWorkflow := req.Workflow
+	if stageType := workflowStageTypeForCoderTool(toolName); stageType != "" && resolvedWorkflow.ID != "" {
+		if decision == "allow" {
+			resolvedWorkflow = resolvedWorkflow.MarkStageResolved(stageType, req.ID, "approve")
+		} else {
+			resolvedWorkflow = resolvedWorkflow.MarkStageResolved(stageType, req.ID, "deny")
+		}
+	}
+
 	// 广播决策结果
 	if m.broadcast != nil {
 		m.broadcast("coder.confirm.resolved", map[string]interface{}{
 			"id":       req.ID,
 			"decision": decision,
 			"ts":       time.Now().UnixMilli(),
+			"workflow": resolvedWorkflow,
 		})
 	}
+	broadcastApprovalWorkflow(m.broadcast, resolvedWorkflow, "coder.confirm.resolved", req.ID)
 
 	return decision == "allow", nil
 }
@@ -181,7 +214,7 @@ func (m *CoderConfirmationManager) ResolveConfirmation(id, decision string) erro
 	}
 
 	m.mu.Lock()
-	ch, ok := m.pending[id]
+	entry, ok := m.pending[id]
 	if ok {
 		delete(m.pending, id) // 先删除，确保第二个 resolve 看到 not found
 	}
@@ -198,7 +231,7 @@ func (m *CoderConfirmationManager) ResolveConfirmation(id, decision string) erro
 
 	// 非阻塞写入（channel 有 1 缓冲）
 	select {
-	case ch <- decision:
+	case entry.ch <- decision:
 		slog.Debug("coder confirmation resolved",
 			"id", id,
 			"decision", decision,
@@ -209,6 +242,27 @@ func (m *CoderConfirmationManager) ResolveConfirmation(id, decision string) erro
 	}
 
 	return nil
+}
+
+func (m *CoderConfirmationManager) PendingRequest(id string) (CoderConfirmationRequest, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	entry, ok := m.pending[id]
+	if !ok || entry == nil {
+		return CoderConfirmationRequest{}, false
+	}
+	return entry.req, true
+}
+
+func workflowStageTypeForCoderTool(toolName string) string {
+	switch strings.TrimSpace(toolName) {
+	case "send_media":
+		return ApprovalTypeDataExportRunner
+	case "bash", "bash (write detected)":
+		return ApprovalTypeExecEscalationRunner
+	default:
+		return ""
+	}
 }
 
 // (Phase 2A: isCoderConfirmable 已删除 — 审批逻辑移至 Ask 规则和 Argus 审批)
@@ -244,6 +298,26 @@ func extractCoderPreview(toolName string, args json.RawMessage) *CoderConfirmPre
 	case "bash", "bash (write detected)":
 		if v, ok := parsed["command"].(string); ok {
 			preview.Command = v
+		}
+	case "send_media":
+		if v, ok := parsed["file_path"].(string); ok {
+			preview.FilePath = v
+		}
+		target := "(current channel)"
+		if v, ok := parsed["target"].(string); ok && strings.TrimSpace(v) != "" {
+			target = strings.TrimSpace(v)
+		}
+		fileLabel := strings.TrimSpace(preview.FilePath)
+		if fileLabel == "" {
+			if v, ok := parsed["file_name"].(string); ok && strings.TrimSpace(v) != "" {
+				fileLabel = strings.TrimSpace(v)
+			} else {
+				fileLabel = "(inline media)"
+			}
+		}
+		preview.Command = fmt.Sprintf("send %s to %s", fileLabel, target)
+		if v, ok := parsed["message"].(string); ok && strings.TrimSpace(v) != "" {
+			preview.Content = truncatePreview(v, 200)
 		}
 	default:
 		// Argus 工具（argus_open_url, argus_run_shell 等）：

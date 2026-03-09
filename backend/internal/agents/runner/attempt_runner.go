@@ -29,6 +29,7 @@ import (
 	"github.com/Acosmi/ClawAcosmi/internal/infra"
 	"github.com/Acosmi/ClawAcosmi/internal/routing"
 	"github.com/Acosmi/ClawAcosmi/pkg/types"
+	"github.com/google/uuid"
 )
 
 // ---------- Argus 视觉子智能体接口（agent 侧） ----------
@@ -257,9 +258,11 @@ func (r *EmbeddedAttemptRunner) RunAttempt(ctx context.Context, params AttemptPa
 		}
 	}
 
-	// 3. 意图分级（六级分类，影响工具过滤 + 历史裁剪 + 系统提示词）
+	// 3. 意图分析（六级分类 + IntentAnalysis IR）
+	// P5-7: analyzeIntent 替代 classifyIntent，增强返回 IntentAnalysis IR
 	// 提前到 buildSystemPrompt 之前，使 intent guidance 能注入提示词
-	tier := classifyIntent(params.Prompt)
+	intentAnalysis := analyzeIntent(params.Prompt)
+	tier := intentAnalysis.Tier
 
 	// 4. 构建工具定义（必须在构建系统提示词之前，以便传入真实工具名列表）
 	tools := r.buildToolDefinitions()
@@ -282,35 +285,39 @@ func (r *EmbeddedAttemptRunner) RunAttempt(ctx context.Context, params AttemptPa
 		}
 	}
 
-	// 4b. 提取真实工具名列表（未经意图过滤），用于构建 ## Tooling 段落
+	// 4b. P3-1: 工具过滤（先过滤再建 prompt，修复 5.1 prompt ≠ executor 工具集 bug）
+	// 必须在 buildSystemPrompt 之前完成，确保 prompt ## Tooling 段只展示过滤后的工具
+	tools = filterToolsByIntent(tools, tier)
+	log.Debug("intent filter", "tier", tier, "toolCount", len(tools))
+
+	// 4c. P3-2: 从过滤后工具集提取工具名列表（不再从全量工具集）
 	toolNames := make([]string, len(tools))
 	for i, t := range tools {
 		toolNames[i] = t.Name
 	}
-	toolSummaries := capabilities.ToolSummaries()
+	// P3-3: 只传入过滤后工具对应的 summary（不再传全量 summary）
+	// F-02: 使用 TreeToolSummaries（与 P1+ 迁移方向一致）
+	allSummaries := capabilities.TreeToolSummaries()
+	toolSummaries := make(map[string]string, len(toolNames))
+	for _, name := range toolNames {
+		if s, ok := allSummaries[name]; ok {
+			toolSummaries[name] = s
+		}
+	}
 
-	// 5. 构建系统提示词（含会话状态路由 + 意图行为指引 + 真实工具名）
+	// 5. 构建系统提示词（含会话状态路由 + 意图行为指引 + 过滤后工具名）
 	systemPrompt := r.buildSystemPrompt(params, sessionState, tier, toolNames, toolSummaries)
 
 	// 5a. 按意图裁剪历史（greeting 靠 boot brief 感知上下文，不需要历史）
 	priorMessages = trimHistoryByIntent(priorMessages, tier)
 
-	// 5b. 组装消息列表（含附件图片多模态注入）
-	userMsg := llmclient.TextMessage("user", params.Prompt)
-	// 将 image 类型附件注入到 LLM user message，启用多模态视觉
-	for _, att := range params.Attachments {
-		if att.Type == "image" && att.Source != nil && att.Source.Data != "" {
-			userMsg.Content = append(userMsg.Content, llmclient.ContentBlock{
-				Type: "image",
-				Source: &llmclient.ImageSource{
-					Type:      att.Source.Type,
-					MediaType: att.Source.MediaType,
-					Data:      att.Source.Data,
-				},
-			})
-		}
+	// 5b. 组装消息列表（统一复用 session attachment → llm block 转换）
+	userMsg := session.BuildChatMessageWithTextAndAttachments("user", params.Prompt, params.Attachments)
+	if userMsg == nil {
+		fallback := llmclient.TextMessage("user", params.Prompt)
+		userMsg = &fallback
 	}
-	messages := append(priorMessages, userMsg)
+	messages := append(priorMessages, *userMsg)
 
 	// 5b.1 Transcript 持久化保障: 使用 defer 确保即使 LLM 失败/超时也能持久化用户消息。
 	transcriptPersisted := params.SuppressTranscript
@@ -320,10 +327,6 @@ func (r *EmbeddedAttemptRunner) RunAttempt(ctx context.Context, params AttemptPa
 		}
 	}()
 
-	// 5c. 工具过滤（六级分级暴露 3-12 个工具，约束 LLM 输出收敛性）
-	tools = filterToolsByIntent(tools, tier)
-	log.Debug("intent filter", "tier", tier, "toolCount", len(tools), "historyCount", len(priorMessages))
-
 	// 构建过滤后的工具名集合，用于在工具调用时验证 LLM 是否幻觉出未暴露的工具
 	allowedToolNames := make(map[string]bool, len(tools))
 	for _, t := range tools {
@@ -331,25 +334,49 @@ func (r *EmbeddedAttemptRunner) RunAttempt(ctx context.Context, params AttemptPa
 	}
 
 	effectiveSecurityLevel := resolveEffectiveSecurityLevel(params, r.Config)
+	tree := capabilities.DefaultTree()
+	approvalScope := DeriveApprovalScope(intentAnalysis, tree)
+	if validatedScope, err := ValidateApprovalScope(approvalScope, tree); err == nil {
+		approvalScope = validatedScope
+	}
+	needsPlanGate := needsPlanConfirmation(tier)
+	approvalWorkflow := BuildTaskApprovalWorkflow(params.Prompt, approvalScope, needsPlanGate)
 
 	// 5c. Phase 1: 方案确认门控（三级指挥体系）
 	// [R1] 使用独立 context，不受 RunAttempt timeout 约束。
 	// 用户确认等待（最长 5min）不消耗 RunAttempt 的执行时间预算。
-	if r.PlanConfirmation != nil && needsPlanConfirmation(tier) && r.PlanConfirmation.ShouldGate() {
+	if r.PlanConfirmation != nil && needsPlanGate && r.PlanConfirmation.ShouldGate() {
 		if effectiveSecurityLevel == "full" {
+			approvalWorkflow = approvalWorkflow.MarkStageSkipped(ApprovalTypePlanConfirmRunner)
 			log.Debug("plan confirmation bypassed: full security level", "tier", tier)
 		} else {
 			planCtx, planCancel := context.WithTimeout(context.Background(), r.PlanConfirmation.Timeout())
 			defer planCancel()
 
+			// P5-8: GeneratePlanSteps 从 IntentAnalysis + 树生成 PlanStep 序列
+			planSteps := GeneratePlanSteps(intentAnalysis, tree)
+			// P5-9: EstimatedScope 从树的 Perms.ScopeCheck 推导
+			estimatedScope := EstimatedScopeFromAnalysis(intentAnalysis, tree)
+			planReqID := uuid.NewString()
+
 			planReq := PlanConfirmationRequest{
-				TaskBrief:  params.Prompt,
-				IntentTier: string(tier),
+				ID:                  planReqID,
+				TaskBrief:           params.Prompt,
+				PlanSteps:           planSteps,
+				EstimatedScope:      estimatedScope,
+				PrimaryApproval:     approvalScope.PrimaryApproval,
+				AdditionalApprovals: approvalScope.AdditionalApprovals,
+				ApprovalSummary:     ApprovalSummaryFromScope(approvalScope),
+				IntentTier:          string(tier),
+				Workflow:            approvalWorkflow.MarkStagePending(ApprovalTypePlanConfirmRunner, planReqID),
 			}
 
-			log.Debug("plan confirmation gate triggered", "tier", tier)
+			log.Debug("plan confirmation gate triggered", "tier", tier,
+				"planSteps", len(planSteps), "targets", len(intentAnalysis.Targets),
+				"approvalSummary", len(planReq.ApprovalSummary))
 
-			decision, planErr := r.PlanConfirmation.RequestPlanConfirmation(planCtx, planReq)
+			// P5-10: 传递真实 sessionKey 到远程通知
+			decision, planErr := r.PlanConfirmation.RequestPlanConfirmationWithSessionKey(planCtx, planReq, params.SessionKey)
 			if planErr != nil {
 				log.Warn("plan confirmation error, aborting", "error", planErr)
 				return &AttemptResult{
@@ -374,10 +401,14 @@ func (r *EmbeddedAttemptRunner) RunAttempt(ctx context.Context, params AttemptPa
 						fmt.Sprintf("[用户修改方案] %s", decision.EditedPlan)))
 					log.Debug("plan edited by user, augmenting prompt")
 				}
+				approvalWorkflow = planReq.Workflow.MarkStageResolved(ApprovalTypePlanConfirmRunner, planReq.ID, "edit")
 			case "approve":
+				approvalWorkflow = planReq.Workflow.MarkStageResolved(ApprovalTypePlanConfirmRunner, planReq.ID, "approve")
 				log.Debug("plan approved by user")
 			}
 		}
+	} else if needsPlanGate {
+		approvalWorkflow = approvalWorkflow.MarkStageSkipped(ApprovalTypePlanConfirmRunner)
 	}
 
 	// 6. 设置超时
@@ -606,7 +637,7 @@ func (r *EmbeddedAttemptRunner) RunAttempt(ctx context.Context, params AttemptPa
 				secLvl = params.SecurityLevelFunc()
 			}
 
-			toolExecParams := r.buildToolExecParams(params, secLvl)
+			toolExecParams := r.buildToolExecParams(params, secLvl, approvalWorkflow)
 			toolStartTime := time.Now()
 			output, toolErr := ExecuteToolCall(ctx, tc.Name, tc.Input, toolExecParams)
 
@@ -805,7 +836,7 @@ func (r *EmbeddedAttemptRunner) RunAttempt(ctx context.Context, params AttemptPa
 							secLvl = params.SecurityLevelFunc()
 						}
 
-						retryToolExecParams := r.buildToolExecParams(params, secLvl)
+						retryToolExecParams := r.buildToolExecParams(params, secLvl, approvalWorkflow)
 						retryStartTime := time.Now()
 						output, toolErr := ExecuteToolCall(ctx, tc.Name, tc.Input, retryToolExecParams)
 						isError := false
@@ -1216,6 +1247,12 @@ func (r *EmbeddedAttemptRunner) buildSystemPrompt(params AttemptParams, sessionS
 	return result
 }
 
+// buildToolDefinitions constructs the LLM-visible tool definitions.
+// Stage 4 Phase C: tool names must match tree CapabilityNode.Name.
+// Registration order follows tree Prompt.SortOrder where applicable.
+// Runtime conditions (BrowserController != nil, etc.) remain procedural;
+// full auto-derivation from TreeToolOrder() is deferred until runtime
+// enablement metadata is machine-executable.
 func (r *EmbeddedAttemptRunner) buildToolDefinitions() []llmclient.ToolDef {
 	tools := []llmclient.ToolDef{
 		{
@@ -1361,6 +1398,16 @@ Also supports: navigate, screenshot, evaluate JS, wait_for, go_back/forward, get
 		)
 	}
 
+	// Phase 4: capability_manage 元工具（只读诊断）— 始终注册
+	{
+		cmName, cmDesc, cmSchema := capabilities.CapabilityManageToolDef()
+		tools = append(tools, llmclient.ToolDef{
+			Name:        cmName,
+			Description: cmDesc,
+			InputSchema: cmSchema,
+		})
+	}
+
 	// 注入工具绑定的技能描述
 	if len(r.toolBindings) > 0 {
 		for i := range tools {
@@ -1384,7 +1431,7 @@ func (r *EmbeddedAttemptRunner) resolveBaseURL(provider string) string {
 
 // buildToolExecParams 构造 ToolExecParams 并注入合约约束（如有）。
 // 集中处理 SecurityLevel 封顶 + ApplyConstraints 收窄，消除主路径/重试路径的代码重复。
-func (r *EmbeddedAttemptRunner) buildToolExecParams(params AttemptParams, secLvl string) ToolExecParams {
+func (r *EmbeddedAttemptRunner) buildToolExecParams(params AttemptParams, secLvl string, approvalWorkflow ApprovalWorkflow) ToolExecParams {
 	// Phase 3: 合约约束注入前，先封顶安全级别
 	if params.DelegationContract != nil {
 		maxLevel := deriveMaxSecurityLevel(params.DelegationContract)
@@ -1394,37 +1441,39 @@ func (r *EmbeddedAttemptRunner) buildToolExecParams(params AttemptParams, secLvl
 	}
 
 	tep := ToolExecParams{
-		WorkspaceDir:           params.WorkspaceDir,
-		SessionID:              params.SessionID,
-		RunID:                  params.RunID,
-		SessionKey:             params.SessionKey,
-		TimeoutMs:              params.TimeoutMs,
-		AllowWrite:             secLvl == "full" || secLvl == "sandboxed" || secLvl == "allowlist",
-		AllowExec:              secLvl == "full" || secLvl == "sandboxed" || secLvl == "allowlist",
-		AllowNetwork:           secLvl == "full" || secLvl == "sandboxed", // L2+ 全网络，L1 由 Rust 端 NetworkPolicy::Restricted 处理
-		SandboxMode:            secLvl == "sandboxed" || secLvl == "allowlist",
-		Rules:                  resolveCommandRules(),
-		SecurityLevel:          secLvl,
-		OnPermissionDenied:     params.OnPermissionDenied,
-		ArgusBridge:            r.ArgusBridge,
-		CoderConfirmation:      r.CoderConfirmation,
-		RemoteMCPBridge:        r.RemoteMCPBridge,
-		NativeSandbox:          r.NativeSandbox,
-		SkillsCache:            r.skillsCache,
-		UHMSBridge:             r.UHMSBridge,
-		SpawnSubagent:          r.SpawnSubagent,
-		WebSearchProvider:      r.WebSearchProvider,
-		ArgusApprovalMode:      r.ArgusApprovalMode,
-		BrowserEvaluateEnabled: r.BrowserEvaluateEnabled,
-		BrowserController:      r.BrowserController,
-		ContractStore:          r.ContractStore,
-		MediaSender:            r.MediaSender,
-		EmailSender:            r.EmailSender,
-		QualityReviewFn:        r.QualityReviewFn,
-		ResultApprovalMgr:      r.ResultApprovalMgr,
-		OnProgress:             params.OnProgress,
-		AgentChannel:           params.AgentChannel, // Phase 4: 从 AttemptParams 获取（每次调用独立）
-		MediaSubsystem:         r.MediaSubsystem,    // 媒体工具 dispatch
+		WorkspaceDir:                  params.WorkspaceDir,
+		SessionID:                     params.SessionID,
+		RunID:                         params.RunID,
+		SessionKey:                    params.SessionKey,
+		TimeoutMs:                     params.TimeoutMs,
+		AllowWrite:                    secLvl == "full" || secLvl == "sandboxed" || secLvl == "allowlist",
+		AllowExec:                     secLvl == "full" || secLvl == "sandboxed" || secLvl == "allowlist",
+		AllowNetwork:                  secLvl == "full" || secLvl == "sandboxed", // L2+ 全网络，L1 由 Rust 端 NetworkPolicy::Restricted 处理
+		SandboxMode:                   secLvl == "sandboxed" || secLvl == "allowlist",
+		Rules:                         resolveCommandRules(),
+		SecurityLevel:                 secLvl,
+		OnPermissionDenied:            params.OnPermissionDenied,
+		OnPermissionDeniedWithContext: params.OnPermissionDeniedWithContext,
+		ArgusBridge:                   r.ArgusBridge,
+		CoderConfirmation:             r.CoderConfirmation,
+		RemoteMCPBridge:               r.RemoteMCPBridge,
+		NativeSandbox:                 r.NativeSandbox,
+		SkillsCache:                   r.skillsCache,
+		UHMSBridge:                    r.UHMSBridge,
+		SpawnSubagent:                 r.SpawnSubagent,
+		WebSearchProvider:             r.WebSearchProvider,
+		ArgusApprovalMode:             r.ArgusApprovalMode,
+		BrowserEvaluateEnabled:        r.BrowserEvaluateEnabled,
+		BrowserController:             r.BrowserController,
+		ContractStore:                 r.ContractStore,
+		MediaSender:                   r.MediaSender,
+		EmailSender:                   r.EmailSender,
+		QualityReviewFn:               r.QualityReviewFn,
+		ResultApprovalMgr:             r.ResultApprovalMgr,
+		ApprovalWorkflow:              approvalWorkflow,
+		OnProgress:                    params.OnProgress,
+		AgentChannel:                  params.AgentChannel, // Phase 4: 从 AttemptParams 获取（每次调用独立）
+		MediaSubsystem:                r.MediaSubsystem,    // 媒体工具 dispatch
 	}
 
 	// Phase 3.4: 临时挂载请求注入（从 escalation grant）
@@ -1828,32 +1877,22 @@ func transcriptEntryToChatMessage(raw map[string]interface{}) *llmclient.ChatMes
 		return nil
 	}
 
-	// 提取文本内容
-	var text string
 	switch c := raw["content"].(type) {
 	case string:
-		text = c
+		msg := llmclient.TextMessage(role, c)
+		return &msg
 	case []interface{}:
-		// content block 数组 → 拼接文本
-		var parts []string
-		for _, block := range c {
-			blockMap, ok := block.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			if t, ok := blockMap["text"].(string); ok && t != "" {
-				parts = append(parts, t)
+		data, err := json.Marshal(c)
+		if err == nil {
+			var blocks []session.ContentBlock
+			if unmarshalErr := json.Unmarshal(data, &blocks); unmarshalErr == nil {
+				if msg := session.BuildChatMessage(role, blocks); msg != nil {
+					return msg
+				}
 			}
 		}
-		text = strings.Join(parts, "\n")
 	}
-
-	if strings.TrimSpace(text) == "" {
-		return nil
-	}
-
-	msg := llmclient.TextMessage(role, text)
-	return &msg
+	return nil
 }
 
 // persistToTranscript 将当前轮次的 user 消息和 assistant 回复写入 transcript 文件。
@@ -1894,7 +1933,7 @@ func (r *EmbeddedAttemptRunner) persistToTranscript(params AttemptParams, messag
 		}
 		if shouldWriteUser {
 			// 构建 user 消息 content blocks: 文本 + 附件
-			userContent := []session.ContentBlock{{Type: "text", Text: params.Prompt}}
+			userContent := []session.ContentBlock{session.TextBlock(params.Prompt)}
 			if len(params.Attachments) > 0 {
 				userContent = append(userContent, params.Attachments...)
 			}

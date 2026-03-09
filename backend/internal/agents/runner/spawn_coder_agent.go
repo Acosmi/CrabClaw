@@ -272,19 +272,25 @@ func executeSpawnCoderAgent(ctx context.Context, inputJSON json.RawMessage, para
 
 		tr := outcome.ThoughtResult
 
+		resultWorkflow := NewSingleStageApprovalWorkflow(
+			input.TaskBrief,
+			ApprovalTypeResultReview,
+			"result_review（交付前最终签收）",
+		)
 		approvalReq := ResultApprovalRequest{
 			OriginalTask:  input.TaskBrief,
 			ContractID:    contract.ContractID,
 			Result:        truncate(tr.Result, 500),
 			Artifacts:     tr.Artifacts,
 			ReviewSummary: qualityReviewSummary,
+			Workflow:      resultWorkflow,
 		}
 
 		// 使用独立 context（同 Phase 1 R1 策略）
 		approvalCtx, approvalCancel := context.WithTimeout(context.Background(), params.ResultApprovalMgr.Timeout())
 		defer approvalCancel()
 
-		approvalDecision, approvalErr := params.ResultApprovalMgr.RequestResultApproval(approvalCtx, approvalReq)
+		approvalDecision, approvalErr := params.ResultApprovalMgr.RequestResultApprovalWithSessionKey(approvalCtx, approvalReq, params.SessionKey)
 		if approvalErr != nil {
 			slog.Warn("spawn_coder_agent: result approval error, proceeding with result",
 				"contractID", contract.ContractID,

@@ -7,6 +7,7 @@ import type { MessageGroup } from "../types/chat-types.ts";
 import { formatTimeShort } from "../format.ts";
 import { toSanitizedMarkdownHtml } from "../markdown.ts";
 import { renderCopyAsMarkdownButton } from "./copy-as-markdown.ts";
+import { renderCodexReadonlyPanel } from "./codex-readonly-surface.ts";
 import {
   extractTextCached,
   extractThinkingCached,
@@ -16,6 +17,7 @@ import { isToolResultMessage, normalizeRoleForGrouping } from "./message-normali
 import { extractToolCards, renderToolCardSidebar } from "./tool-cards.ts";
 import { openLightbox } from "./image-lightbox.ts";
 import { renderMermaidBlocks } from "./mermaid-renderer.ts";
+import type { ChatReadonlyRunState } from "./readonly-run-state.ts";
 
 type ImageBlock = {
   url: string;
@@ -210,10 +212,12 @@ export function renderMessageGroup(
     showReasoning: boolean;
     assistantName?: string;
     assistantAvatar?: string | null;
+    workflowRun?: ChatReadonlyRunState | null;
   },
 ) {
   const normalizedRole = normalizeRoleForGrouping(group.role);
   const assistantName = opts.assistantName ?? t("chat.assistantName");
+  const workflowMode = Boolean(opts.workflowRun && normalizedRole === "assistant");
   const who =
     normalizedRole === "user"
       ? t("chat.you")
@@ -223,24 +227,30 @@ export function renderMessageGroup(
   const roleClass =
     normalizedRole === "user" ? "user" : normalizedRole === "assistant" ? "assistant" : "other";
   const timestamp = formatTimeShort(group.timestamp);
-
-  return html`
-    <div class="chat-group ${roleClass}">
-      ${renderAvatar(group.role, {
-    name: assistantName,
-    avatar: opts.assistantAvatar ?? null,
-  })}
-      <div class="chat-group-messages">
-        ${group.messages.map((item, index) =>
+  const renderedMessages = group.messages.map((item, index) =>
     renderGroupedMessage(
       item.message,
       {
         isStreaming: group.isStreaming && index === group.messages.length - 1,
         showReasoning: opts.showReasoning,
+        workflowStyle: workflowMode,
       },
       opts.onOpenSidebar,
-    ),
-  )}
+    )
+  );
+
+  return html`
+    <div class="chat-group ${roleClass} ${workflowMode ? "chat-group--workflow" : ""}">
+      ${renderAvatar(group.role, {
+    name: assistantName,
+    avatar: opts.assistantAvatar ?? null,
+  })}
+      <div class="chat-group-messages">
+        ${workflowMode
+          ? renderCodexReadonlyPanel(opts.workflowRun!, {
+            replyContent: renderedMessages.length > 0 ? html`${renderedMessages}` : nothing,
+          })
+          : renderedMessages}
         <div class="chat-group-footer">
           <span class="chat-sender-name">${who}</span>
           <span class="chat-group-timestamp">${timestamp}</span>
@@ -339,7 +349,7 @@ function formatDocSize(bytes: number): string {
 
 function renderGroupedMessage(
   message: unknown,
-  opts: { isStreaming: boolean; showReasoning: boolean },
+  opts: { isStreaming: boolean; showReasoning: boolean; workflowStyle?: boolean },
   onOpenSidebar?: (content: string) => void,
 ) {
   const m = message as Record<string, unknown>;
@@ -372,6 +382,7 @@ function renderGroupedMessage(
 
   const bubbleClasses = [
     "chat-bubble",
+    opts.workflowStyle && role === "assistant" ? "chat-bubble--workflow" : "",
     canCopyMarkdown ? "has-copy" : "",
     opts.isStreaming ? "streaming" : "",
     "fade-in",

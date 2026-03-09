@@ -1,14 +1,16 @@
 package prompt
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/Acosmi/ClawAcosmi/internal/agents/capabilities"
 )
 
-// TestCoreToolSummariesAlignWithRegistry 确保 coreToolSummaries 中的主链路工具名
+// TestTreeToolSummariesAlignWithRegistry 确保 TreeToolSummaries 中的主链路工具名
 // 与 capabilities.Registry 一致（不出现 Registry 中不存在的工具名）。
-func TestCoreToolSummariesAlignWithRegistry(t *testing.T) {
+// P1-2: 迁移自 coreToolSummaries → capabilities.TreeToolSummaries()
+func TestTreeToolSummariesAlignWithRegistry(t *testing.T) {
 	registered := make(map[string]bool)
 	for _, spec := range capabilities.Registry {
 		if spec.ToolName != "" {
@@ -16,7 +18,9 @@ func TestCoreToolSummariesAlignWithRegistry(t *testing.T) {
 		}
 	}
 
-	// 主链路工具（在 coreToolSummaries 注释中标记为"主链路"的）必须在 Registry 中。
+	treeSummaries := capabilities.TreeToolSummaries()
+
+	// 主链路工具必须在 tree summaries 和 Registry 中。
 	mainPathTools := []string{
 		"bash", "read_file", "write_file", "list_dir",
 		"web_search", "browser", "send_media",
@@ -26,19 +30,20 @@ func TestCoreToolSummariesAlignWithRegistry(t *testing.T) {
 		"report_progress", "request_help",
 	}
 	for _, tool := range mainPathTools {
-		if _, ok := coreToolSummaries[tool]; !ok {
-			t.Errorf("main path tool %q missing from coreToolSummaries", tool)
+		if _, ok := treeSummaries[tool]; !ok {
+			t.Errorf("main path tool %q missing from TreeToolSummaries", tool)
 		}
 		if !registered[tool] {
-			t.Errorf("main path tool %q in coreToolSummaries but missing from capabilities.Registry", tool)
+			t.Errorf("main path tool %q in TreeToolSummaries but missing from capabilities.Registry", tool)
 		}
 	}
 }
 
-// TestToolOrderContainsAllMainPathTools 确保 toolOrder 包含所有主链路工具。
-func TestToolOrderContainsAllMainPathTools(t *testing.T) {
+// TestTreeToolOrderContainsAllMainPathTools 确保 TreeToolOrder 包含所有主链路工具。
+// P1-3: 迁移自 toolOrder → capabilities.TreeToolOrder()
+func TestTreeToolOrderContainsAllMainPathTools(t *testing.T) {
 	orderSet := make(map[string]bool)
-	for _, name := range toolOrder {
+	for _, name := range capabilities.TreeToolOrder() {
 		orderSet[name] = true
 	}
 
@@ -72,6 +77,16 @@ func TestBuildToolingSectionOutputsRegisteredTools(t *testing.T) {
 	}
 }
 
+func TestBuildToolingSectionIncludesSendMediaDelegationHint(t *testing.T) {
+	output := buildToolingSection([]string{"send_media", "spawn_argus_agent"}, capabilities.TreeToolSummaries())
+	if !contains(output, "existing local file send/forward → send_media") {
+		t.Fatalf("tooling section should mention send_media for existing local files, got: %q", output)
+	}
+	if !contains(output, "desktop/GUI discovery or native app interaction → spawn_argus_agent") {
+		t.Fatalf("tooling section should narrow argus delegation scope, got: %q", output)
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && searchString(s, substr)
 }
@@ -83,6 +98,70 @@ func searchString(s, sub string) bool {
 		}
 	}
 	return false
+}
+
+// ---------- P1-13: Prompt ## Tooling output contract test ----------
+
+// TestBuildToolingSectionTreeDerived 确保 tree-derived buildToolingSection 输出
+// 包含所有预期的结构元素和主链路工具。
+func TestBuildToolingSectionTreeDerived(t *testing.T) {
+	// Use tree-derived summaries and order
+	treeSummaries := capabilities.TreeToolSummaries()
+	treeOrder := capabilities.TreeToolOrder()
+
+	output := buildToolingSection(treeOrder, treeSummaries)
+
+	// Must contain header
+	if !contains(output, "## Tooling") {
+		t.Error("output missing '## Tooling' header")
+	}
+	if !contains(output, "Tool availability (filtered by policy):") {
+		t.Error("output missing availability description")
+	}
+
+	// Main path tools must appear
+	mainPathTools := []string{
+		"bash", "read_file", "write_file", "list_dir",
+		"web_search", "browser", "send_media",
+		"spawn_coder_agent", "spawn_argus_agent", "spawn_media_agent",
+		"memory_search", "memory_get",
+		"report_progress", "request_help",
+	}
+	for _, tool := range mainPathTools {
+		if !contains(output, tool) {
+			t.Errorf("output missing main path tool %q", tool)
+		}
+	}
+
+	// Each tool with a summary should appear as "- toolname: summary"
+	for _, tool := range mainPathTools {
+		if summary, ok := treeSummaries[tool]; ok && summary != "" {
+			expected := "- " + tool + ": "
+			if !contains(output, expected) {
+				t.Errorf("output missing formatted entry for %q", tool)
+			}
+		}
+	}
+}
+
+// TestBuildToolingSectionOrderMatchesTree 确保输出中工具的顺序与 TreeToolOrder 一致。
+func TestBuildToolingSectionOrderMatchesTree(t *testing.T) {
+	treeOrder := capabilities.TreeToolOrder()
+	treeSummaries := capabilities.TreeToolSummaries()
+	output := buildToolingSection(treeOrder, treeSummaries)
+
+	// Find positions of each tool in the output
+	lastPos := -1
+	for _, tool := range treeOrder {
+		pos := strings.Index(output, "- "+tool)
+		if pos < 0 {
+			continue // tool may have been filtered
+		}
+		if pos < lastPos {
+			t.Errorf("tool %q appears before previous tool in output (order violation)", tool)
+		}
+		lastPos = pos
+	}
 }
 
 // ---------- S6-T4: WARM_START / COLD_START 判定测试 ----------

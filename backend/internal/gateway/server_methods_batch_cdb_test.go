@@ -341,6 +341,8 @@ func TestDW1Handlers_AllRegistered(t *testing.T) {
 		"device.token.rotate", "device.token.revoke",
 		"voicewake.get", "voicewake.set",
 		"update.check", "update.run",
+		"desktop.update.status", "desktop.update.check",
+		"desktop.update.download", "desktop.update.apply", "desktop.update.rollback", "desktop.update.dismiss",
 		"browser.request",
 		"talk.mode",
 		"web.login.start", "web.login.wait",

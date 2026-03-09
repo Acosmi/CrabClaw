@@ -152,43 +152,43 @@ export function inferBasePathFromPathname(pathname: string): string {
 export function iconForTab(tab: Tab): IconName {
   switch (tab) {
     case "agents":
-      return "folder";
+      return "agentSwarm";
     case "chat":
-      return "messageSquare";
+      return "chatSpark";
     case "overview":
-      return "barChart";
+      return "wizardDashboard";
     case "channels":
-      return "link";
+      return "channelBridge";
     case "plugins":
-      return "puzzle";
+      return "pluginCircuit";
     case "instances":
-      return "radio";
+      return "nodeMesh";
     case "usage":
-      return "barChart";
+      return "wizardDashboard";
     case "cron":
-      return "loader";
+      return "cronOrbit";
     case "skills":
-      return "zap";
+      return "pluginCircuit";
     case "memory":
-      return "memoryChip";
+      return "memoryVault";
     case "nodes":
-      return "monitor";
+      return "nodeMesh";
     case "security":
-      return "shield";
+      return "securityPulse";
     case "config":
-      return "settings";
+      return "configSliders";
     case "debug":
-      return "bug";
+      return "debugRadar";
     case "logs":
-      return "scrollText";
+      return "logStack";
     case "subagents":
-      return "monitor";
+      return "agentSwarm";
     case "media":
-      return "barChart";
+      return "navMedia";
     case "mcp":
-      return "puzzle";
+      return "mcpBridge";
     case "tasks":
-      return "loader";
+      return "taskOrbit";
     default:
       return "folder";
   }

@@ -31,6 +31,10 @@
   max-width: min(900px, 100%);
 }
 
+.chat-group--workflow .chat-group-messages {
+  gap: 12px;
+}
+
 /* User messages align content right */
 .chat-group.user .chat-group-messages {
   align-items: flex-end;
@@ -149,6 +153,28 @@ img.chat-avatar {
   word-wrap: break-word;
 }
 
+.chat-bubble--workflow {
+  display: block;
+  width: min(780px, 100%);
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.chat-bubble--workflow.has-copy {
+  padding-right: 32px;
+}
+
+.chat-bubble--workflow:hover {
+  background: transparent;
+}
+
+.chat-bubble--workflow .chat-text {
+  padding: 2px 2px 0;
+}
+
 .chat-bubble.has-copy {
   padding-right: 36px;
 }
@@ -259,23 +285,34 @@ img.chat-avatar {
   box-shadow: inset 0 1px 0 var(--card-highlight);
 }
 
+:root[data-theme="light"] .chat-bubble--workflow {
+  border-color: transparent;
+  box-shadow: none;
+}
+
 .chat-bubble:hover {
   background: var(--bg-hover);
 }
 
+.chat-group--workflow .chat-bubble--workflow:hover {
+  background: transparent;
+}
+
 /* User bubbles have different styling */
 .chat-group.user .chat-bubble {
-  background: var(--accent-subtle);
+  background: color-mix(in srgb, var(--panel) 82%, var(--bg) 18%);
   border-color: transparent;
+  box-shadow: none;
 }
 
 :root[data-theme="light"] .chat-group.user .chat-bubble {
-  border-color: rgba(234, 88, 12, 0.2);
-  background: rgba(251, 146, 60, 0.12);
+  border-color: transparent;
+  background: #f3f4f6;
+  box-shadow: none;
 }
 
 .chat-group.user .chat-bubble:hover {
-  background: rgba(255, 77, 77, 0.15);
+  background: color-mix(in srgb, var(--panel) 88%, var(--bg) 12%);
 }
 
 /* Streaming animation */

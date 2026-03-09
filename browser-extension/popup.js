@@ -1,4 +1,4 @@
-// popup.js — OpenAcosmi Extension Popup UI
+// popup.js — CrabClaw Extension Popup UI
 
 const statusEl = document.getElementById('status');
 const relayUrlInput = document.getElementById('relayUrl');

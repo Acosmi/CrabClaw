@@ -1,5 +1,6 @@
 import { html, nothing } from "lit";
 import { t } from "../i18n.ts";
+import type { DesktopUpdateStatus } from "../controllers/config.ts";
 import type { ConfigUiHints } from "../types.ts";
 import { hintForPath, humanize, localizeSchemaLabel, schemaType, type JsonSchema } from "./config-form.shared.ts";
 import { analyzeConfigSchema, renderConfigForm, SECTION_META } from "./config-form.ts";
@@ -13,6 +14,8 @@ export type ConfigProps = {
   saving: boolean;
   applying: boolean;
   updating: boolean;
+  rollingBack: boolean;
+  updateStatus: DesktopUpdateStatus | null;
   connected: boolean;
   schema: unknown;
   schemaLoading: boolean;
@@ -33,7 +36,67 @@ export type ConfigProps = {
   onSave: () => void;
   onApply: () => void;
   onUpdate: () => void;
+  onRollback: () => void;
 };
+
+function formatUpdateTime(value: string | undefined): string {
+  if (!value) {
+    return "";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleString();
+}
+
+function resolveUpdateStatusText(status: DesktopUpdateStatus | null): string | null {
+  if (!status) {
+    return null;
+  }
+  if (status.action === "installer-launched-restart-required") {
+    return t("config.updateStatus.installerLaunched");
+  }
+  if (status.action === "appimage-applied-restart-required") {
+    return t("config.updateStatus.restartRequired");
+  }
+  if (status.action === "rollback-applied-restart-required") {
+    return t("config.updateStatus.rollbackRestartRequired");
+  }
+  if (status.lastError) {
+    return t("config.updateStatus.failed", { error: status.lastError });
+  }
+  if (status.managedBySystem) {
+    return t("config.updateStatus.managed");
+  }
+  if (status.updateManager === "package-manager") {
+    return t("config.updateStatus.packageManager");
+  }
+  if (status.readyToInstall && status.candidateVersion) {
+    return t("config.updateStatus.ready", { version: status.candidateVersion });
+  }
+  if (status.updateAvailable && status.candidateVersion) {
+    return t("config.updateStatus.available", { version: status.candidateVersion });
+  }
+  if (status.rollbackAvailable) {
+    return t("config.updateStatus.rollbackAvailable", {
+      version: status.rollbackVersion || t("config.updateStatus.previousVersion"),
+    });
+  }
+  if (status.state === "applying") {
+    return t("config.updateStatus.applying");
+  }
+  if (status.state === "rolled-back") {
+    return t("config.updateStatus.rolledBack");
+  }
+  if (status.lastCheckedAt) {
+    return t("config.updateStatus.checkedAt", { time: formatUpdateTime(status.lastCheckedAt) });
+  }
+  if (status.state) {
+    return t("config.updateStatus.state", { state: humanize(status.state) });
+  }
+  return null;
+}
 
 // SVG Icons for sidebar (Lucide-style)
 const sidebarIcons = {
@@ -468,9 +531,17 @@ export function renderConfig(props: ConfigProps) {
     props.connected &&
     !props.applying &&
     !props.updating &&
+    !props.rollingBack &&
     hasChanges &&
     (props.formMode === "raw" ? true : canSaveForm);
-  const canUpdate = props.connected && !props.applying && !props.updating;
+  const canUpdate = props.connected && !props.applying && !props.updating && !props.rollingBack;
+  const canRollback =
+    props.connected &&
+    !props.applying &&
+    !props.updating &&
+    !props.rollingBack &&
+    Boolean(props.updateStatus?.rollbackAvailable);
+  const updateStatusText = resolveUpdateStatusText(props.updateStatus);
 
   return html`
     <div class="config-layout">
@@ -611,6 +682,23 @@ export function renderConfig(props: ConfigProps) {
             </button>
           </div>
         </div>
+
+        ${updateStatusText
+      ? html`<div class="config-status muted">${updateStatusText}</div>`
+      : nothing}
+        ${props.updateStatus?.rollbackAvailable
+      ? html`
+              <div class="config-update-secondary">
+                <button
+                  class="btn btn--sm"
+                  ?disabled=${!canRollback}
+                  @click=${props.onRollback}
+                >
+                  ${props.rollingBack ? t("config.rollingBack") : t("config.rollback")}
+                </button>
+              </div>
+            `
+      : nothing}
 
         <!-- Diff panel (form mode only - raw mode doesn't have granular diff) -->
         ${hasChanges && props.formMode === "form"

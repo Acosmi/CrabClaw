@@ -1,6 +1,10 @@
 package models
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/Acosmi/ClawAcosmi/pkg/types"
+)
 
 func TestModelCatalog(t *testing.T) {
 	registry := NewModelRegistry()
@@ -86,5 +90,48 @@ func TestModelSupportsVision(t *testing.T) {
 	withImage := &ModelCatalogEntry{ID: "test", Input: []string{"text", "image"}}
 	if !ModelSupportsVision(withImage) {
 		t.Error("image input should return true")
+	}
+}
+
+func TestModelCatalogBuildFromConfig(t *testing.T) {
+	catalog := NewModelCatalog()
+	catalog.BuildFromConfig(&types.OpenAcosmiConfig{
+		Models: &types.ModelsConfig{
+			Providers: map[string]*types.ModelProviderConfig{
+				"openai": {
+					Models: []types.ModelDefinitionConfig{
+						{
+							ID:            "gpt-4o",
+							Name:          "GPT-4o",
+							ContextWindow: 128000,
+							Reasoning:     true,
+							Input:         []types.ModelInputType{types.ModelInputText, types.ModelInputImage},
+						},
+					},
+				},
+				"anthropic": {
+					Models: []types.ModelDefinitionConfig{
+						{ID: "claude-sonnet-4", Name: "Claude Sonnet 4"},
+					},
+				},
+			},
+		},
+	})
+
+	all := catalog.All()
+	if len(all) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(all))
+	}
+	if all[0].Provider != "anthropic" {
+		t.Fatalf("expected anthropic to sort first, got %+v", all[0])
+	}
+	if all[1].Provider != "openai" || all[1].Name != "GPT-4o" {
+		t.Fatalf("unexpected openai entry: %+v", all[1])
+	}
+	if all[1].ContextWindow == nil || *all[1].ContextWindow != 128000 {
+		t.Fatalf("expected context window to be carried over, got %+v", all[1].ContextWindow)
+	}
+	if !ModelSupportsVision(&all[1]) {
+		t.Fatal("expected GPT-4o entry to support vision")
 	}
 }

@@ -1,23 +1,22 @@
-# Windows Artifact Plan
+# Windows 产物规划
 
-This document records the intended Windows desktop outputs for future build
-activation.
+本文档记录 Windows 桌面产物的规划命名。
 
-## Planned outputs
+## 规划输出
 
-- raw desktop binary
-- zipped developer artifact
-- installer artifact if packaging is approved
+- 原始桌面二进制
+- 开发调试用压缩产物
+- 正式安装器产物
 
-## Suggested naming
+## 建议命名
 
-- `ClawAcosmi-desktop-windows-x64.exe`
-- `ClawAcosmi-windows-x64.zip`
+- `CrabClaw.exe`
+- `CrabClaw-windows-amd64-installer.exe`
 
-## Open questions
+## 待确认事项
 
-- whether installer generation is in scope for the first active workflow
-- whether signing is required from day one
-- whether legacy compatibility naming must appear in the executable metadata
+- 首个正式 workflow 是否只发布安装器
+- 是否从第一天起就强制签名
+- 遗留兼容命名是否还需要保留在元数据里
 
-This is a planning artifact only.
+此文件仅作为规划说明。

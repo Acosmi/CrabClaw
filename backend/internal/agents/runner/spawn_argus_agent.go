@@ -230,18 +230,24 @@ func executeSpawnArgusAgent(ctx context.Context, inputJSON json.RawMessage, para
 		outcome.ThoughtResult.Status == ThoughtCompleted {
 
 		tr := outcome.ThoughtResult
+		resultWorkflow := NewSingleStageApprovalWorkflow(
+			input.TaskBrief,
+			ApprovalTypeResultReview,
+			"result_review（交付前最终签收）",
+		)
 		approvalReq := ResultApprovalRequest{
 			OriginalTask:  input.TaskBrief,
 			ContractID:    contract.ContractID,
 			Result:        truncate(tr.Result, 500),
 			Artifacts:     tr.Artifacts,
 			ReviewSummary: qualityReviewSummary,
+			Workflow:      resultWorkflow,
 		}
 
 		approvalCtx, approvalCancel := context.WithTimeout(context.Background(), params.ResultApprovalMgr.Timeout())
 		defer approvalCancel()
 
-		approvalDecision, approvalErr := params.ResultApprovalMgr.RequestResultApproval(approvalCtx, approvalReq)
+		approvalDecision, approvalErr := params.ResultApprovalMgr.RequestResultApprovalWithSessionKey(approvalCtx, approvalReq, params.SessionKey)
 		if approvalErr != nil {
 			slog.Warn("spawn_argus_agent: result approval error, proceeding with result",
 				"contractID", contract.ContractID, "error", approvalErr)

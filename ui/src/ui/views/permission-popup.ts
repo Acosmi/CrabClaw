@@ -87,6 +87,7 @@ export function renderPermissionPopup(
 
     const state = _state;
     const ev = state.event;
+    const permanentOnly = ev.level === "full";
 
     const handleAllowOnce = () => {
         callbacks.onAllowOnce(ev);
@@ -195,18 +196,20 @@ export function renderPermissionPopup(
           `
             : html`
             <div class="permission-popup__actions">
-              <button
-                class="permission-popup__btn permission-popup__btn--once"
-                @click=${handleAllowOnce}
-              >
-                ${t("permission.popup.allowOnce")}
-              </button>
-              <button
-                class="permission-popup__btn permission-popup__btn--session"
-                @click=${handleAllowSession}
-              >
-                ${t("permission.popup.allowSession")}
-              </button>
+              ${permanentOnly ? nothing : html`
+                <button
+                  class="permission-popup__btn permission-popup__btn--once"
+                  @click=${handleAllowOnce}
+                >
+                  ${t("permission.popup.allowOnce")}
+                </button>
+                <button
+                  class="permission-popup__btn permission-popup__btn--session"
+                  @click=${handleAllowSession}
+                >
+                  ${t("permission.popup.allowSession")}
+                </button>
+              `}
               <button
                 class="permission-popup__btn permission-popup__btn--permanent"
                 @click=${handleShowConfirm}

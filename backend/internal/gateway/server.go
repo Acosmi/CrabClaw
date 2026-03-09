@@ -26,6 +26,7 @@ import (
 	"github.com/Acosmi/ClawAcosmi/internal/autoreply"
 	"github.com/Acosmi/ClawAcosmi/internal/autoreply/reply"
 	"github.com/Acosmi/ClawAcosmi/internal/browser"
+	"github.com/Acosmi/ClawAcosmi/internal/browser/nativemsg"
 	"github.com/Acosmi/ClawAcosmi/internal/channels"
 	"github.com/Acosmi/ClawAcosmi/internal/channels/dingtalk"
 	emailchannel "github.com/Acosmi/ClawAcosmi/internal/channels/email"
@@ -107,6 +108,13 @@ func (rt *GatewayRuntime) Close(reason string) error {
 
 	// 停止 MCP 远程工具 Bridge
 	rt.State.StopRemoteMCP()
+
+	// 停止浏览器扩展 relay
+	if rt.State.extensionRelay != nil {
+		if err := rt.State.extensionRelay.Close(); err != nil {
+			slog.Error("gateway: extension relay shutdown error", "error", err)
+		}
+	}
 
 	// 停止合约 TTL 清理 goroutine
 	if rt.State.contractCleanupDone != nil {
@@ -391,6 +399,29 @@ func resolveBrowserCdpURL(cfg *types.BrowserConfig) string {
 		}
 	}
 	return ""
+}
+
+// ---------- Native Messaging Host 安装 ----------
+
+// ensureNativeHostManifest installs the Chrome native messaging host manifest
+// so the extension can use connectNative() for a persistent connection.
+func ensureNativeHostManifest(logger *slog.Logger) error {
+	// Find the native-host binary next to the gateway binary.
+	exe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("resolve executable: %w", err)
+	}
+	hostBin := filepath.Join(filepath.Dir(exe), "crabclaw-native-host")
+	if _, err := os.Stat(hostBin); err != nil {
+		return fmt.Errorf("native host binary not found at %s", hostBin)
+	}
+
+	_, err = nativemsg.Install(nativemsg.InstallConfig{
+		HostBinaryPath: hostBin,
+		ExtensionIDs:   []string{"ijkcckheapdhooinidgdccbgabahmgnl"},
+		Logger:         logger,
+	})
+	return err
 }
 
 // ---------- UHMS Bridge → Agent 适配器 ----------
@@ -1196,7 +1227,7 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 		approved := decision == "allow-once" || decision == "allow-always"
 		ttl := 30
 		if decision == "allow-always" {
-			ttl = 60
+			ttl = 0
 		}
 		if ttlRaw, ok := ctx.Params["ttlMinutes"].(float64); ok && ttlRaw > 0 {
 			ttl = int(ttlRaw)
@@ -1273,6 +1304,38 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 	var loadedCfg *types.OpenAcosmiConfig
 	if cfg, err := cfgLoader.LoadConfig(); err == nil {
 		loadedCfg = cfg
+		modelCatalog.BuildFromConfig(cfg)
+	}
+
+	// 浏览器扩展 relay 使用运行时网关端口推导，避免与实际监听端口偏离。
+	browserEnabled := loadedCfg == nil || loadedCfg.Browser == nil || loadedCfg.Browser.Enabled == nil || *loadedCfg.Browser.Enabled
+	expectedRelayPort := config.DeriveDefaultBrowserControlPort(port) + 1
+	expectedRelayURL := fmt.Sprintf("ws://127.0.0.1:%d/ws", expectedRelayPort)
+	if config.SkipBrowserControl {
+		slog.Info("gateway: browser extension relay skipped because browser control is disabled")
+	} else if !browserEnabled {
+		slog.Info("gateway: browser extension relay disabled by browser.enabled=false")
+	} else {
+		relayTokenFile := filepath.Join(config.ResolveStateDir(), "relay-token")
+		relay, err := browser.NewExtensionRelay(browser.ExtensionRelayConfig{
+			Port:            expectedRelayPort,
+			Logger:          slog.Default(),
+			ValidateOrigins: true,
+			TokenFile:       relayTokenFile,
+		})
+		if err != nil {
+			slog.Warn("gateway: extension relay start failed (non-fatal)",
+				"port", expectedRelayPort,
+				"error", err,
+			)
+		} else {
+			state.extensionRelay = relay
+
+			// Auto-install native messaging host manifest (non-fatal).
+			if err := ensureNativeHostManifest(slog.Default()); err != nil {
+				slog.Debug("gateway: native messaging host manifest install skipped", "err", err)
+			}
+		}
 	}
 
 	// ---------- 4a-wizard. 注册 Wizard V2 方法 ----------
@@ -1901,7 +1964,9 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 				// AuthStore, CompactionRunner 暂留 nil — fallback 到默认行为
 			},
 			Config: currentCfg,
-			OnPermissionDenied: func(tool, detail string) {
+			OnPermissionDeniedWithContext: func(notice runner.PermissionDeniedNotice) {
+				tool := notice.Tool
+				detail := notice.Detail
 				bc := state.Broadcaster()
 				if bc != nil {
 					// 读取安全等级（与前端 PermissionDeniedEvent 契约一致）
@@ -1974,7 +2039,18 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 							originatorChatID = msgCtx.ChannelID
 							originatorUserID = msgCtx.SenderID
 						}
-						if err := escMgr.RequestEscalation(escId, escLevel, reason, "", "", originatorChatID, originatorUserID, 30, mountRequests...); err != nil {
+						if err := escMgr.RequestEscalationWithMetadata(EscalationRequestOptions{
+							ID:               escId,
+							Level:            escLevel,
+							Reason:           reason,
+							RunID:            notice.RunID,
+							SessionID:        notice.SessionID,
+							OriginatorChatID: originatorChatID,
+							OriginatorUserID: originatorUserID,
+							TTLMinutes:       30,
+							MountRequests:    mountRequests,
+							Workflow:         notice.ApprovalWorkflow,
+						}); err != nil {
 							slog.Debug("auto-escalation skipped (expected if already pending)", "error", err)
 						}
 					}
@@ -2102,6 +2178,7 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 				}
 
 				sessionKey := fmt.Sprintf("feishu:%s", chatID)
+				runId := fmt.Sprintf("run_%d", time.Now().UnixNano())
 
 				// ===== 步骤 1: 确保 session 注册到 SessionStore =====
 				var resolvedSessionId string
@@ -2128,19 +2205,27 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 				// 用户消息 transcript 由 attempt_runner.persistToTranscript 写入，此处不再双写
 
 				msgCtx := &autoreply.MsgContext{
-					Body:        text,
-					ChannelType: channel,
-					ChannelID:   chatID,
-					SenderID:    userID,
-					AccountID:   accountID,
-					SessionID:   resolvedSessionId,
-					SessionKey:  sessionKey,
+					Body:               text,
+					ChannelType:        channel,
+					ChannelID:          chatID,
+					SenderID:           userID,
+					AccountID:          accountID,
+					SessionID:          resolvedSessionId,
+					SessionKey:         sessionKey,
+					OriginatingChannel: channel,
+					OriginatingTo:      chatID,
 				}
 
 				// 广播用户消息到前端（让聊天页面能看到飞书会话）
 				bc := state.Broadcaster()
 				if bc != nil {
 					ts := time.Now().UnixMilli()
+					bc.Broadcast("chat", map[string]interface{}{
+						"sessionKey": sessionKey,
+						"state":      "delta",
+						"runId":      runId,
+						"ts":         ts,
+					}, nil)
 					userPayload := map[string]interface{}{
 						"sessionKey": sessionKey,
 						"channel":    "feishu",
@@ -2186,6 +2271,7 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 				result := DispatchInboundMessage(context.Background(), DispatchInboundParams{
 					MsgCtx:     msgCtx,
 					SessionKey: sessionKey,
+					RunID:      runId,
 					Dispatcher: pipelineDispatcher,
 					OnProgress: buildMsgContextProgressCallback(state, msgCtx),
 				})
@@ -2211,35 +2297,19 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 
 				// AI 回复 transcript 由 attempt_runner.persistToTranscript 写入，此处不再双写
 
-				// 广播 AI 回复到前端
-				if bc != nil && (replyText != "" || len(mediaItems) > 0) {
-					chatPayload := map[string]interface{}{
-						"sessionKey": sessionKey,
-						"channel":    "feishu",
-						"role":       "assistant",
-						"text":       replyText,
-						"chatId":     chatID,
-						"ts":         time.Now().UnixMilli(),
-					}
-					if mediaB64 != "" {
-						chatPayload["mediaBase64"] = mediaB64
-						chatPayload["mediaMimeType"] = mediaMime
-					}
-					if len(mediaItems) > 0 {
-						items := make([]map[string]string, 0, len(mediaItems))
-						for _, item := range mediaItems {
-							if item.Base64Data == "" {
-								continue
-							}
-							items = append(items, map[string]string{
-								"mediaBase64":   item.Base64Data,
-								"mediaMimeType": item.MimeType,
-							})
-						}
-						if len(items) > 0 {
-							chatPayload["mediaItems"] = items
-						}
-					}
+				replyTs := time.Now().UnixMilli()
+				assistantMessage := buildRemoteAssistantMessage(replyText, replyTs, mediaItems, mediaB64, mediaMime)
+				chatPayload := buildRemoteAssistantChatPayload(
+					sessionKey,
+					"feishu",
+					chatID,
+					replyText,
+					replyTs,
+					mediaItems,
+					mediaB64,
+					mediaMime,
+				)
+				if bc != nil && chatPayload != nil {
 					bc.Broadcast("chat.message", chatPayload, nil)
 				}
 
@@ -2247,10 +2317,15 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 				// 若前端当前在飞书 session → handleChatEvent 匹配 → loadChatHistory。
 				// 若前端在其他 session → fix 1a (app-gateway.ts) 自动切换回飞书 session。
 				if bc != nil {
-					bc.Broadcast("chat", map[string]interface{}{
+					finalPayload := map[string]interface{}{
 						"sessionKey": sessionKey,
 						"state":      "final",
-					}, nil)
+						"runId":      runId,
+					}
+					if assistantMessage != nil {
+						finalPayload["message"] = assistantMessage
+					}
+					bc.Broadcast("chat", finalPayload, nil)
 				}
 
 				return feishuDispatchResult{
@@ -2343,6 +2418,7 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 					ctx = context.Background()
 				}
 				sessionKey := fmt.Sprintf("dingtalk:%s", chatID)
+				runId := fmt.Sprintf("run_%d", time.Now().UnixNano())
 
 				// 步骤 1: session 注册
 				var resolvedSessionId string
@@ -2369,18 +2445,27 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 				// 用户消息 transcript 由 attempt_runner.persistToTranscript 写入，此处不再双写。
 
 				msgCtx := &autoreply.MsgContext{
-					Body:        text,
-					ChannelType: channel,
-					ChannelID:   chatID,
-					SenderID:    userID,
-					AccountID:   accountID,
-					SessionID:   resolvedSessionId,
-					SessionKey:  sessionKey,
+					Body:               text,
+					ChannelType:        channel,
+					ChannelID:          chatID,
+					SenderID:           userID,
+					AccountID:          accountID,
+					SessionID:          resolvedSessionId,
+					SessionKey:         sessionKey,
+					OriginatingChannel: channel,
+					OriginatingTo:      chatID,
 				}
 
 				// 广播用户消息到前端
 				bc := state.Broadcaster()
 				if bc != nil {
+					ts := time.Now().UnixMilli()
+					bc.Broadcast("chat", map[string]interface{}{
+						"sessionKey": sessionKey,
+						"state":      "delta",
+						"runId":      runId,
+						"ts":         ts,
+					}, nil)
 					bc.Broadcast("chat.message", map[string]interface{}{
 						"sessionKey": sessionKey,
 						"channel":    "dingtalk",
@@ -2388,13 +2473,14 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 						"text":       text,
 						"from":       userID,
 						"chatId":     chatID,
-						"ts":         time.Now().UnixMilli(),
+						"ts":         ts,
 					}, nil)
 				}
 
 				result := DispatchInboundMessage(ctx, DispatchInboundParams{
 					MsgCtx:     msgCtx,
 					SessionKey: sessionKey,
+					RunID:      runId,
 					Dispatcher: pipelineDispatcher,
 					OnProgress: buildMsgContextProgressCallback(state, msgCtx),
 				})
@@ -2416,36 +2502,31 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 
 				// AI 回复 transcript 由 attempt_runner.persistToTranscript 写入，此处不再双写。
 
-				// 广播 AI 回复到前端
-				if bc != nil && (reply != "" || dtMediaB64 != "" || len(dtMediaItems) > 0) {
-					dtPayload := map[string]interface{}{
-						"sessionKey": sessionKey,
-						"channel":    "dingtalk",
-						"role":       "assistant",
-						"text":       reply,
-						"chatId":     chatID,
-						"ts":         time.Now().UnixMilli(),
-					}
-					if dtMediaB64 != "" {
-						dtPayload["mediaBase64"] = dtMediaB64
-						dtPayload["mediaMimeType"] = dtMediaMime
-					}
-					if len(dtMediaItems) > 0 {
-						items := make([]map[string]string, 0, len(dtMediaItems))
-						for _, item := range dtMediaItems {
-							if item.Base64Data == "" {
-								continue
-							}
-							items = append(items, map[string]string{
-								"mediaBase64":   item.Base64Data,
-								"mediaMimeType": item.MimeType,
-							})
-						}
-						if len(items) > 0 {
-							dtPayload["mediaItems"] = items
-						}
-					}
+				replyTs := time.Now().UnixMilli()
+				assistantMessage := buildRemoteAssistantMessage(reply, replyTs, dtMediaItems, dtMediaB64, dtMediaMime)
+				dtPayload := buildRemoteAssistantChatPayload(
+					sessionKey,
+					"dingtalk",
+					chatID,
+					reply,
+					replyTs,
+					dtMediaItems,
+					dtMediaB64,
+					dtMediaMime,
+				)
+				if bc != nil && dtPayload != nil {
 					bc.Broadcast("chat.message", dtPayload, nil)
+				}
+				if bc != nil {
+					finalPayload := map[string]interface{}{
+						"sessionKey": sessionKey,
+						"state":      "final",
+						"runId":      runId,
+					}
+					if assistantMessage != nil {
+						finalPayload["message"] = assistantMessage
+					}
+					bc.Broadcast("chat", finalPayload, nil)
 				}
 
 				return dingtalkDispatchResult{
@@ -2545,6 +2626,7 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 					ctx = context.Background()
 				}
 				sessionKey := fmt.Sprintf("wecom:%s", chatID)
+				runId := fmt.Sprintf("run_%d", time.Now().UnixNano())
 
 				// 步骤 1: session 注册
 				var resolvedSessionId string
@@ -2571,18 +2653,27 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 				// 用户消息 transcript 由 attempt_runner.persistToTranscript 写入，此处不再双写。
 
 				msgCtx := &autoreply.MsgContext{
-					Body:        text,
-					ChannelType: channel,
-					ChannelID:   chatID,
-					SenderID:    userID,
-					AccountID:   accountID,
-					SessionID:   resolvedSessionId,
-					SessionKey:  sessionKey,
+					Body:               text,
+					ChannelType:        channel,
+					ChannelID:          chatID,
+					SenderID:           userID,
+					AccountID:          accountID,
+					SessionID:          resolvedSessionId,
+					SessionKey:         sessionKey,
+					OriginatingChannel: channel,
+					OriginatingTo:      chatID,
 				}
 
 				// 广播用户消息到前端
 				bc := state.Broadcaster()
 				if bc != nil {
+					ts := time.Now().UnixMilli()
+					bc.Broadcast("chat", map[string]interface{}{
+						"sessionKey": sessionKey,
+						"state":      "delta",
+						"runId":      runId,
+						"ts":         ts,
+					}, nil)
 					bc.Broadcast("chat.message", map[string]interface{}{
 						"sessionKey": sessionKey,
 						"channel":    "wecom",
@@ -2590,13 +2681,14 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 						"text":       text,
 						"from":       userID,
 						"chatId":     chatID,
-						"ts":         time.Now().UnixMilli(),
+						"ts":         ts,
 					}, nil)
 				}
 
 				result := DispatchInboundMessage(ctx, DispatchInboundParams{
 					MsgCtx:     msgCtx,
 					SessionKey: sessionKey,
+					RunID:      runId,
 					Dispatcher: pipelineDispatcher,
 					OnProgress: buildMsgContextProgressCallback(state, msgCtx),
 				})
@@ -2618,36 +2710,31 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 
 				// AI 回复 transcript 由 attempt_runner.persistToTranscript 写入，此处不再双写。
 
-				// 广播 AI 回复到前端
-				if bc != nil && (reply != "" || wcMediaB64 != "" || len(wcMediaItems) > 0) {
-					wcPayload := map[string]interface{}{
-						"sessionKey": sessionKey,
-						"channel":    "wecom",
-						"role":       "assistant",
-						"text":       reply,
-						"chatId":     chatID,
-						"ts":         time.Now().UnixMilli(),
-					}
-					if wcMediaB64 != "" {
-						wcPayload["mediaBase64"] = wcMediaB64
-						wcPayload["mediaMimeType"] = wcMediaMime
-					}
-					if len(wcMediaItems) > 0 {
-						items := make([]map[string]string, 0, len(wcMediaItems))
-						for _, item := range wcMediaItems {
-							if item.Base64Data == "" {
-								continue
-							}
-							items = append(items, map[string]string{
-								"mediaBase64":   item.Base64Data,
-								"mediaMimeType": item.MimeType,
-							})
-						}
-						if len(items) > 0 {
-							wcPayload["mediaItems"] = items
-						}
-					}
+				replyTs := time.Now().UnixMilli()
+				assistantMessage := buildRemoteAssistantMessage(reply, replyTs, wcMediaItems, wcMediaB64, wcMediaMime)
+				wcPayload := buildRemoteAssistantChatPayload(
+					sessionKey,
+					"wecom",
+					chatID,
+					reply,
+					replyTs,
+					wcMediaItems,
+					wcMediaB64,
+					wcMediaMime,
+				)
+				if bc != nil && wcPayload != nil {
 					bc.Broadcast("chat.message", wcPayload, nil)
+				}
+				if bc != nil {
+					finalPayload := map[string]interface{}{
+						"sessionKey": sessionKey,
+						"state":      "final",
+						"runId":      runId,
+					}
+					if assistantMessage != nil {
+						finalPayload["message"] = assistantMessage
+					}
+					bc.Broadcast("chat", finalPayload, nil)
 				}
 
 				return wecomDispatchResult{
@@ -2895,19 +2982,29 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 					text = msg.Text
 				}
 
+				runId := fmt.Sprintf("run_%d", time.Now().UnixNano())
+
 				msgCtx := &autoreply.MsgContext{
-					Body:        text,
-					ChannelType: channel,
-					ChannelID:   chatID,
-					SenderID:    userID,
-					AccountID:   accountID,
-					SessionID:   resolvedSessionId,
-					SessionKey:  sessionKey,
+					Body:               text,
+					ChannelType:        channel,
+					ChannelID:          chatID,
+					SenderID:           userID,
+					AccountID:          accountID,
+					SessionID:          resolvedSessionId,
+					SessionKey:         sessionKey,
+					OriginatingChannel: channel,
+					OriginatingTo:      chatID,
 				}
 
 				bc := state.Broadcaster()
 				if bc != nil {
 					ts := time.Now().UnixMilli()
+					bc.Broadcast("chat", map[string]interface{}{
+						"sessionKey": sessionKey,
+						"state":      "delta",
+						"runId":      runId,
+						"ts":         ts,
+					}, nil)
 					userPayload := map[string]interface{}{
 						"sessionKey": sessionKey,
 						"channel":    "email",
@@ -2924,6 +3021,7 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 				result := DispatchInboundMessage(context.Background(), DispatchInboundParams{
 					MsgCtx:     msgCtx,
 					SessionKey: sessionKey,
+					RunID:      runId,
 					Dispatcher: pipelineDispatcher,
 					OnProgress: buildMsgContextProgressCallback(state, msgCtx),
 				})
@@ -2940,17 +3038,29 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 					return nil
 				}
 
-				// 广播 assistant 回复到前端
-				if bc != nil {
-					bc.Broadcast("chat.message", map[string]interface{}{
+				replyTs := time.Now().UnixMilli()
+				assistantMessage := buildRemoteAssistantMessage(replyText, replyTs, nil, "", "")
+				emailPayload := buildRemoteAssistantChatPayload(
+					sessionKey,
+					"email",
+					chatID,
+					replyText,
+					replyTs,
+					nil,
+					"",
+					"",
+				)
+				if bc != nil && emailPayload != nil {
+					bc.Broadcast("chat.message", emailPayload, nil)
+					finalPayload := map[string]interface{}{
 						"sessionKey": sessionKey,
-						"channel":    "email",
-						"role":       "assistant",
-						"text":       replyText,
-						"chatId":     chatID,
-						"ts":         time.Now().UnixMilli(),
 						"state":      "final",
-					}, nil)
+						"runId":      runId,
+					}
+					if assistantMessage != nil {
+						finalPayload["message"] = assistantMessage
+					}
+					bc.Broadcast("chat", finalPayload, nil)
 				}
 
 				return &channels.DispatchReply{Text: replyText}
@@ -3288,6 +3398,8 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 
 	// 浏览器扩展安装引导页
 	RegisterBrowserExtensionRoutes(mux, BrowserExtensionHandlerConfig{
+		ExpectedRelayPort: expectedRelayPort,
+		ExpectedRelayURL:  expectedRelayURL,
 		GetRelayInfo: func() *RelayStatusInfo {
 			relay := state.extensionRelay
 			if relay == nil {
@@ -3297,7 +3409,7 @@ func StartGatewayServer(port int, opts GatewayServerOptions) (*GatewayRuntime, e
 				Port:      relay.Port(),
 				Token:     relay.AuthToken(),
 				RelayURL:  fmt.Sprintf("ws://127.0.0.1:%d/ws", relay.Port()),
-				Connected: relay.Port() > 0,
+				Connected: relay.ExtensionConnected(),
 			}
 		},
 	})
@@ -3493,6 +3605,7 @@ func (l *slogCronLogger) Debug(msg string, fields ...interface{}) {
 // 通过 value["type"] 区分卡片类型：
 //   - 无 type 或空 → 权限提升审批（escalation，向后兼容）
 //   - "coder_confirm" → 操作确认（CoderConfirmation）
+//   - "typed_approval" → 类型化审批（mount_access/data_export/plan_confirm/exec_escalation）
 func buildFeishuCardActionHandler(state *GatewayState) feishu.CardActionHandler {
 	return func(ctx context.Context, event *callback.CardActionTriggerEvent) (*callback.CardActionTriggerResponse, error) {
 		if event == nil || event.Event == nil || event.Event.Action == nil {
@@ -3520,6 +3633,9 @@ func buildFeishuCardActionHandler(state *GatewayState) feishu.CardActionHandler 
 			return handleFeishuCoderConfirmAction(state, cardID, actionStr)
 		case "plan_confirm":
 			return handleFeishuPlanConfirmAction(state, cardID, actionStr)
+		case "typed_approval":
+			approvalType, _ := value["approval_type"].(string)
+			return handleFeishuTypedApprovalAction(state, cardID, approvalType, actionStr, value)
 		default:
 			// 向后兼容：无 type 字段视为 escalation 审批
 			return handleFeishuEscalationAction(state, cardID, actionStr, value)
@@ -3588,6 +3704,41 @@ func handleFeishuEscalationAction(state *GatewayState, escalationID, actionStr s
 	}
 }
 
+func handleFeishuTypedApprovalAction(
+	state *GatewayState,
+	approvalID, approvalType, actionStr string,
+	value map[string]interface{},
+) (*callback.CardActionTriggerResponse, error) {
+	switch approvalType {
+	case ApprovalTypePlanConfirm:
+		switch actionStr {
+		case "approve":
+			return handleFeishuPlanConfirmAction(state, approvalID, "approve")
+		case "reject", "deny":
+			return handleFeishuPlanConfirmAction(state, approvalID, "reject")
+		}
+	case ApprovalTypeExecEscalation, ApprovalTypeMountAccess:
+		switch actionStr {
+		case "approve":
+			return handleFeishuEscalationAction(state, approvalID, "approve", value)
+		case "reject", "deny":
+			return handleFeishuEscalationAction(state, approvalID, "deny", value)
+		}
+	case ApprovalTypeDataExport:
+		return handleFeishuDataExportAction(state, approvalID, actionStr)
+	case ApprovalTypeResultReview:
+		return handleFeishuResultReviewAction(state, approvalID, actionStr)
+	}
+
+	slog.Warn("feishu card action: unknown typed approval action",
+		"approvalType", approvalType,
+		"action", actionStr,
+	)
+	return &callback.CardActionTriggerResponse{
+		Toast: &callback.Toast{Type: "error", Content: "未知类型化审批操作: " + approvalType},
+	}, nil
+}
+
 // handleFeishuCoderConfirmAction 处理操作确认卡片回调。
 func handleFeishuCoderConfirmAction(state *GatewayState, confirmID, actionStr string) (*callback.CardActionTriggerResponse, error) {
 	confirmMgr := state.CoderConfirmMgr()
@@ -3637,6 +3788,67 @@ func handleFeishuCoderConfirmAction(state *GatewayState, confirmID, actionStr st
 	}, nil
 }
 
+func handleFeishuDataExportAction(state *GatewayState, confirmID, actionStr string) (*callback.CardActionTriggerResponse, error) {
+	confirmMgr := state.CoderConfirmMgr()
+	if confirmMgr == nil {
+		slog.Warn("feishu card action: data export confirm manager not available")
+		return &callback.CardActionTriggerResponse{
+			Toast: &callback.Toast{Type: "error", Content: "确认系统未初始化"},
+		}, nil
+	}
+
+	decision := ""
+	switch actionStr {
+	case "approve", "allow":
+		decision = "allow"
+	case "reject", "deny":
+		decision = "deny"
+	default:
+		slog.Warn("feishu card action: unknown data_export action", "action", actionStr)
+		return &callback.CardActionTriggerResponse{
+			Toast: &callback.Toast{Type: "error", Content: "未知操作: " + actionStr},
+		}, nil
+	}
+
+	pendingReq, _ := confirmMgr.PendingRequest(confirmID)
+
+	if err := confirmMgr.ResolveConfirmation(confirmID, decision); err != nil {
+		slog.Warn("feishu card action: data export resolve failed", "id", confirmID, "error", err)
+		return &callback.CardActionTriggerResponse{
+			Toast: &callback.Toast{Type: "warning", Content: "确认失败: " + err.Error()},
+		}, nil
+	}
+
+	approved := decision == "allow"
+	slog.Info("feishu card action: data export resolved", "id", confirmID, "decision", decision)
+
+	if notifier := state.RemoteApprovalNotifier(); notifier != nil {
+		resultWorkflow := pendingReq.Workflow
+		if resultWorkflow.ID != "" {
+			resultWorkflow = resultWorkflow.MarkStageResolved(runner.ApprovalTypeDataExportRunner, confirmID, actionStr)
+		}
+		result := &TypedApprovalResultNotification{
+			Type:     ApprovalTypeDataExport,
+			ID:       confirmID,
+			Approved: approved,
+			Workflow: resultWorkflow,
+		}
+		if !approved {
+			result.Reason = "管理员拒绝 / Denied by administrator"
+		}
+		notifier.NotifyTypedOrCoderConfirmResult(result, confirmID, approved)
+	}
+
+	if approved {
+		return &callback.CardActionTriggerResponse{
+			Toast: &callback.Toast{Type: "success", Content: "✅ 数据导出已批准"},
+		}, nil
+	}
+	return &callback.CardActionTriggerResponse{
+		Toast: &callback.Toast{Type: "info", Content: "❌ 数据导出已拒绝"},
+	}, nil
+}
+
 // handleFeishuPlanConfirmAction 处理方案确认卡片回调。
 func handleFeishuPlanConfirmAction(state *GatewayState, confirmID, actionStr string) (*callback.CardActionTriggerResponse, error) {
 	planMgr := state.PlanConfirmMgr()
@@ -3661,6 +3873,8 @@ func handleFeishuPlanConfirmAction(state *GatewayState, confirmID, actionStr str
 		}, nil
 	}
 
+	pendingReq, _ := planMgr.PendingRequest(confirmID)
+
 	if err := planMgr.ResolvePlanConfirmation(confirmID, decision); err != nil {
 		slog.Warn("feishu card action: plan confirm resolve failed", "id", confirmID, "error", err)
 		return &callback.CardActionTriggerResponse{
@@ -3672,7 +3886,20 @@ func handleFeishuPlanConfirmAction(state *GatewayState, confirmID, actionStr str
 
 	// 推送结果卡片
 	if notifier := state.RemoteApprovalNotifier(); notifier != nil {
-		notifier.NotifyPlanConfirmResult(confirmID, actionStr)
+		resultWorkflow := pendingReq.Workflow
+		if resultWorkflow.ID != "" {
+			resultWorkflow = resultWorkflow.MarkStageResolved(runner.ApprovalTypePlanConfirmRunner, confirmID, actionStr)
+		}
+		result := &TypedApprovalResultNotification{
+			Type:     ApprovalTypePlanConfirm,
+			ID:       confirmID,
+			Approved: actionStr == "approve",
+			Workflow: resultWorkflow,
+		}
+		if actionStr != "approve" {
+			result.Reason = decision.Feedback
+		}
+		notifier.NotifyTypedOrPlanConfirmResult(result, confirmID, actionStr)
 	}
 
 	if actionStr == "approve" {
@@ -3682,5 +3909,69 @@ func handleFeishuPlanConfirmAction(state *GatewayState, confirmID, actionStr str
 	}
 	return &callback.CardActionTriggerResponse{
 		Toast: &callback.Toast{Type: "info", Content: "❌ 方案已拒绝"},
+	}, nil
+}
+
+func handleFeishuResultReviewAction(state *GatewayState, confirmID, actionStr string) (*callback.CardActionTriggerResponse, error) {
+	resultMgr := state.ResultApprovalMgr()
+	if resultMgr == nil {
+		slog.Warn("feishu card action: result review manager not available")
+		return &callback.CardActionTriggerResponse{
+			Toast: &callback.Toast{Type: "error", Content: "签收系统未初始化"},
+		}, nil
+	}
+
+	var decision runner.ResultApprovalDecision
+	switch actionStr {
+	case "approve":
+		decision = runner.ResultApprovalDecision{Action: "approve"}
+	case "reject", "deny":
+		decision = runner.ResultApprovalDecision{Action: "reject", Feedback: "rejected via feishu"}
+	default:
+		slog.Warn("feishu card action: unknown result_review action", "action", actionStr)
+		return &callback.CardActionTriggerResponse{
+			Toast: &callback.Toast{Type: "error", Content: "未知操作: " + actionStr},
+		}, nil
+	}
+
+	pendingReq, _ := resultMgr.PendingRequest(confirmID)
+
+	if err := resultMgr.ResolveResultApproval(confirmID, decision); err != nil {
+		slog.Warn("feishu card action: result review resolve failed", "id", confirmID, "error", err)
+		return &callback.CardActionTriggerResponse{
+			Toast: &callback.Toast{Type: "warning", Content: "签收失败: " + err.Error()},
+		}, nil
+	}
+
+	if notifier := state.RemoteApprovalNotifier(); notifier != nil {
+		resultWorkflow := pendingReq.Workflow
+		if resultWorkflow.ID != "" {
+			resultWorkflow = resultWorkflow.MarkStageResolved(runner.ApprovalTypeResultReview, confirmID, decision.Action)
+		}
+		result := &TypedApprovalResultNotification{
+			Type:          ApprovalTypeResultReview,
+			ID:            confirmID,
+			Approved:      decision.Action == "approve",
+			Workflow:      resultWorkflow,
+			ResultSummary: pendingReq.Result,
+			ReviewSummary: pendingReq.ReviewSummary,
+		}
+		if decision.Action != "approve" {
+			result.Reason = decision.Feedback
+		}
+		notifier.NotifyTypedOrApprovalResult(result, ApprovalResultNotification{
+			EscalationID: confirmID,
+			Approved:     decision.Action == "approve",
+			Reason:       decision.Feedback,
+		})
+	}
+
+	if decision.Action == "approve" {
+		return &callback.CardActionTriggerResponse{
+			Toast: &callback.Toast{Type: "success", Content: "✅ 结果已签收"},
+		}, nil
+	}
+	return &callback.CardActionTriggerResponse{
+		Toast: &callback.Toast{Type: "info", Content: "❌ 结果已退回"},
 	}, nil
 }

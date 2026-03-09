@@ -383,7 +383,8 @@ func FormatSkillIndex(resolvedSkills []Skill) string {
 
 // ResolveToolSkillBindings 从技能列表构建 toolName → 技能描述 映射。
 // 用于将技能指引注入到工具 Description 中，LLM 读工具定义时自动获得使用指南。
-// 验证门控：只有 Registry 中标记为 SkillBindable 的工具才允许绑定。
+// P1-9: D9 derivation — validation via capability tree instead of flat Registry.
+// P1-10: Dynamic group tools (argus_/remote_/mcp_) no longer produce warnings.
 func ResolveToolSkillBindings(entries []SkillEntry) map[string]string {
 	bindings := make(map[string]string)
 	for _, e := range entries {
@@ -401,12 +402,12 @@ func ResolveToolSkillBindings(entries []SkillEntry) map[string]string {
 			if _, exists := bindings[toolName]; exists {
 				continue
 			}
-			spec := capabilities.LookupByToolName(toolName)
-			if spec == nil {
+			// P1-9: validate against tree (covers static + dynamic tools)
+			if !capabilities.IsInTreeOrDynamic(toolName) {
 				slog.Warn("skill binds to unknown tool", "skill", e.Skill.Name, "tool", toolName)
 				continue
 			}
-			if !spec.SkillBindable {
+			if !capabilities.IsTreeBindable(toolName) {
 				slog.Warn("skill binds to non-bindable tool", "skill", e.Skill.Name, "tool", toolName)
 				continue
 			}

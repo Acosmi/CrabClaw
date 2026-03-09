@@ -1,5 +1,5 @@
 import type { Tab } from "./navigation.ts";
-import type { ChatReadonlyRunState } from "./chat/readonly-run-state.ts";
+import { persistChatReadonlyRun, type ChatReadonlyRunState } from "./chat/readonly-run-state.ts";
 import { connectGateway } from "./app-gateway.ts";
 import {
   startLogsPolling,
@@ -21,6 +21,7 @@ import {
 
 type LifecycleHost = {
   basePath: string;
+  sessionKey: string;
   tab: Tab;
   chatHasAutoScrolled: boolean;
   chatManualRefreshInFlight: boolean;
@@ -28,6 +29,7 @@ type LifecycleHost = {
   chatMessages: unknown[];
   chatToolMessages: unknown[];
   chatReadonlyRun: ChatReadonlyRunState;
+  chatReadonlyRunHistory: ChatReadonlyRunState[];
   chatStream: string;
   logsAutoFollow: boolean;
   logsAtBottom: boolean;
@@ -68,6 +70,9 @@ export function handleDisconnected(host: LifecycleHost) {
 }
 
 export function handleUpdated(host: LifecycleHost, changed: Map<PropertyKey, unknown>) {
+  if (changed.has("chatReadonlyRun") || changed.has("chatReadonlyRunHistory")) {
+    persistChatReadonlyRun(host.chatReadonlyRun, host.sessionKey, host.chatReadonlyRunHistory);
+  }
   if (host.tab === "chat" && host.chatManualRefreshInFlight) {
     return;
   }
@@ -76,6 +81,7 @@ export function handleUpdated(host: LifecycleHost, changed: Map<PropertyKey, unk
     (changed.has("chatMessages") ||
       changed.has("chatToolMessages") ||
       changed.has("chatReadonlyRun") ||
+      changed.has("chatReadonlyRunHistory") ||
       changed.has("chatStream") ||
       changed.has("chatLoading") ||
       changed.has("tab"))

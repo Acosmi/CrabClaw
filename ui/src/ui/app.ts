@@ -2,6 +2,7 @@ import { LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { EventLogEntry } from "./app-events.ts";
 import type { AppViewState } from "./app-view-state.ts";
+import type { DesktopUpdateStatus } from "./controllers/config.ts";
 import type { DevicePairingList } from "./controllers/devices.ts";
 import type { CoderConfirmRequest } from "./controllers/coder-confirmation.ts";
 import { removeCoderConfirm } from "./controllers/coder-confirmation.ts";
@@ -41,6 +42,7 @@ import type { NostrProfileFormState } from "./views/channels.nostr-profile-form.
 import {
   handleChannelConfigReload as handleChannelConfigReloadInternal,
   handleChannelConfigSave as handleChannelConfigSaveInternal,
+  handleEmailTest as handleEmailTestInternal,
   handleNostrProfileCancel as handleNostrProfileCancelInternal,
   handleNostrProfileEdit as handleNostrProfileEditInternal,
   handleNostrProfileFieldChange as handleNostrProfileFieldChangeInternal,
@@ -96,6 +98,8 @@ import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./contro
 import {
   createChatReadonlyRunState,
   isReadonlyRunActive,
+  loadPersistedChatReadonlyRun,
+  loadPersistedChatReadonlyRunHistory,
   syncChatReadonlyRunSession,
   type ChatReadonlyRunState,
   type ChatUxMode,
@@ -158,7 +162,10 @@ export class OpenAcosmiApp extends LitElement {
   @state() chatMessages: unknown[] = [];
   @state() chatToolMessages: unknown[] = [];
   @state() chatUxMode: ChatUxMode = this.settings.chatUxMode;
-  @state() chatReadonlyRun: ChatReadonlyRunState = createChatReadonlyRunState(this.settings.sessionKey);
+  @state() chatReadonlyRun: ChatReadonlyRunState =
+    loadPersistedChatReadonlyRun(this.settings.sessionKey) ?? createChatReadonlyRunState(this.settings.sessionKey);
+  @state() chatReadonlyRunHistory: ChatReadonlyRunState[] =
+    loadPersistedChatReadonlyRunHistory(this.settings.sessionKey);
   @state() chatStream: string | null = null;
   @state() chatStreamStartedAt: number | null = null;
   @state() chatRunId: string | null = null;
@@ -246,6 +253,8 @@ export class OpenAcosmiApp extends LitElement {
   @state() configSaving = false;
   @state() configApplying = false;
   @state() updateRunning = false;
+  @state() updateRollbackRunning = false;
+  @state() desktopUpdateStatus: DesktopUpdateStatus | null = null;
   @state() applySessionKey = this.settings.lastActiveSessionKey;
   @state() configSnapshot: ConfigSnapshot | null = null;
   @state() configSchema: unknown = null;
@@ -268,6 +277,8 @@ export class OpenAcosmiApp extends LitElement {
   @state() whatsappLoginQrDataUrl: string | null = null;
   @state() whatsappLoginConnected: boolean | null = null;
   @state() whatsappBusy = false;
+  @state() emailTestLoading = false;
+  @state() emailTestResult: import("./views/channels.email.ts").EmailTestResult | null = null;
   @state() nostrProfileFormState: NostrProfileFormState | null = null;
   @state() nostrProfileAccountId: string | null = null;
 
@@ -523,6 +534,7 @@ export class OpenAcosmiApp extends LitElement {
   @state() subagentsError: string | null = null;
   @state() subagentsBusyKey: string | null = null;
   @state() subagentsActiveTab = "";
+  @state() argusFailureAlert: AppViewState["argusFailureAlert"] = null;
 
   // MCP Local Servers
   @state() mcpServersLoading = false;
@@ -778,6 +790,10 @@ export class OpenAcosmiApp extends LitElement {
 
   async handleWhatsAppLogout() {
     await handleWhatsAppLogoutInternal(this);
+  }
+
+  async handleEmailTest(accountId: string) {
+    await handleEmailTestInternal(this, accountId);
   }
 
   async handleChannelConfigSave() {

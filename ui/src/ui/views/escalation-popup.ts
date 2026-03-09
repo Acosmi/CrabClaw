@@ -26,7 +26,6 @@ const TTL_OPTIONS = [
 
 // 分级 TTL 上限（与后端 permission_escalation.go 保持一致）
 const LEVEL_MAX_TTL: Record<string, number> = {
-    full: 60,        // L3: 60 分钟
     sandboxed: 240,  // L2: 4 小时
     allowlist: 480,  // L1: 8 小时
 };
@@ -52,6 +51,7 @@ const LEVEL_COLORS: Record<string, string> = {
 
 function renderRequestPopup(props: EscalationPopupProps) {
     const req = props.request!;
+    const permanentOnly = req.requestedLevel === "full";
     const levelLabel = LEVEL_LABELS[req.requestedLevel] ?? req.requestedLevel;
     const levelColor = LEVEL_COLORS[req.requestedLevel] ?? "var(--text-secondary)";
 
@@ -85,17 +85,25 @@ function renderRequestPopup(props: EscalationPopupProps) {
             </div>
           ` : nothing}
 
-          <div class="escalation-popup__ttl">
-            <strong>${t("security.escalation.ttlLabel")}</strong>
-            <div class="escalation-popup__ttl-options">
-              ${getFilteredTtlOptions(req.requestedLevel).map(opt => html`
-                <button
-                  class="escalation-ttl-btn ${props.selectedTtl === opt.value ? "escalation-ttl-btn--active" : ""}"
-                  @click=${() => props.onTtlChange(opt.value)}
-                >${opt.label}</button>
-              `)}
+          ${permanentOnly ? html`
+            <div class="escalation-popup__field">
+              <strong>${t("security.escalation.ttlLabel")}</strong>
+              <p>${t("security.escalation.permanentGrant")}</p>
+              <p>${t("security.escalation.permanentHint")}</p>
             </div>
-          </div>
+          ` : html`
+            <div class="escalation-popup__ttl">
+              <strong>${t("security.escalation.ttlLabel")}</strong>
+              <div class="escalation-popup__ttl-options">
+                ${getFilteredTtlOptions(req.requestedLevel).map(opt => html`
+                  <button
+                    class="escalation-ttl-btn ${props.selectedTtl === opt.value ? "escalation-ttl-btn--active" : ""}"
+                    @click=${() => props.onTtlChange(opt.value)}
+                  >${opt.label}</button>
+                `)}
+              </div>
+            </div>
+          `}
         </div>
 
         <div class="escalation-popup__actions">
@@ -107,7 +115,7 @@ function renderRequestPopup(props: EscalationPopupProps) {
           <button
             class="escalation-btn escalation-btn--approve"
             ?disabled=${props.loading}
-            @click=${() => props.onApprove(props.selectedTtl)}
+            @click=${() => props.onApprove(permanentOnly ? 0 : props.selectedTtl)}
           >${props.loading ? t("common.loading") : t("security.escalation.approve")}</button>
         </div>
       </div>

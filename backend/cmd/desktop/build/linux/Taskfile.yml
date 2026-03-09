@@ -4,7 +4,7 @@ includes:
   common: ../Taskfile.yml
 
 vars:
-  DOCKER_IMAGE: '{{.DOCKER_IMAGE | default "clawacosmi-desktop-linux-builder:bookworm"}}'
+  DOCKER_IMAGE: '{{.DOCKER_IMAGE | default "crabclaw-linux-builder:bookworm"}}'
   DOCKER_PLATFORM: '{{.DOCKER_PLATFORM | default "linux/arm64"}}'
   DOCKER_WORKDIR: '{{.DOCKER_WORKDIR | default "/workspace"}}'
   WORKSPACE_ROOT:
@@ -78,7 +78,7 @@ tasks:
     cmds:
       - '{{.WAILS3_BIN}} tool package -name {{.PACKAGE_NAME}} -format deb -config ./build/linux/nfpm/nfpm.yaml -out {{.USER_WORKING_DIR}}/bin'
     vars:
-      PACKAGE_NAME: 'clawacosmi-desktop'
+      PACKAGE_NAME: 'crabclaw'
 
   create:rpm:
     summary: Creates an rpm package
@@ -88,7 +88,7 @@ tasks:
     cmds:
       - '{{.WAILS3_BIN}} tool package -name {{.PACKAGE_NAME}} -format rpm -config ./build/linux/nfpm/nfpm.yaml -out {{.USER_WORKING_DIR}}/bin'
     vars:
-      PACKAGE_NAME: 'clawacosmi-desktop'
+      PACKAGE_NAME: 'crabclaw'
 
   generate:dotdesktop:
     summary: Generates a `.desktop` file
@@ -97,7 +97,7 @@ tasks:
       - mkdir -p build/linux/appimage
       - '{{.WAILS3_BIN}} generate .desktop -name "{{.PRODUCT_NAME}}" -exec "{{.APP_NAME}}" -icon "{{.ICON}}" -outputfile build/linux/{{.APP_NAME}}.desktop -categories "{{.CATEGORIES}}"'
     vars:
-      ICON: 'clawacosmi-desktop'
+      ICON: 'crabclaw'
       CATEGORIES: 'Development;Utility;'
 
   run:

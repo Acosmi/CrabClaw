@@ -19,6 +19,8 @@ import {
 import { handleAgentEvent, resetToolStream, type AgentEventPayload } from "./app-tool-stream.ts";
 import {
   isReadonlyRunActive,
+  loadPersistedChatReadonlyRun,
+  loadPersistedChatReadonlyRunHistory,
   resetChatReadonlyRun,
   setChatReadonlyRunTerminal,
   startChatReadonlyRun,
@@ -99,6 +101,7 @@ type GatewayHost = {
   chatStream?: string | null;
   chatStreamStartedAt?: number | null;
   chatReadonlyRun?: import("./chat/readonly-run-state.ts").ChatReadonlyRunState;
+  chatReadonlyRunHistory?: import("./chat/readonly-run-state.ts").ChatReadonlyRunState[];
   refreshSessionsAfterChat: Set<string>;
   execApprovalQueue: ExecApprovalRequest[];
   execApprovalError: string | null;
@@ -237,8 +240,14 @@ export function connectGateway(host: GatewayHost) {
       host.chatRunId = null;
       (host as unknown as { chatStream: string | null }).chatStream = null;
       (host as unknown as { chatStreamStartedAt: number | null }).chatStreamStartedAt = null;
-      if (host.chatReadonlyRun) {
+      if (Array.isArray(host.chatReadonlyRunHistory)) {
+        host.chatReadonlyRunHistory = loadPersistedChatReadonlyRunHistory(host.sessionKey);
+      }
+      if (host.chatReadonlyRun && isReadonlyRunActive(host.chatReadonlyRun)) {
         resetChatReadonlyRun(host as unknown as Parameters<typeof resetChatReadonlyRun>[0]);
+      } else if (host.chatReadonlyRun && host.chatReadonlyRun.phase === "idle") {
+        host.chatReadonlyRun =
+          loadPersistedChatReadonlyRun(host.sessionKey) ?? host.chatReadonlyRun;
       }
       resetToolStream(host as unknown as Parameters<typeof resetToolStream>[0]);
       void loadAssistantIdentity(host as unknown as OpenAcosmiApp);
@@ -482,7 +491,9 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       const app = host as unknown as OpenAcosmiApp;
       app.chatMessages = [...app.chatMessages, msg];
 
-      // 远程频道动画：user 消息到达 → 显示思考动画；assistant 回复到达 → 清除
+      // 远程频道占位 workflow：仅在 user 消息到达时启动。
+      // assistant 回复的真实收尾交给 chat(final/error/aborted) 事件处理，
+      // 否则会在真实 runId 到达前把占位 workflow 提前清空。
       const isRemoteChannel = payload.channel && payload.channel !== "web" && payload.channel !== "webchat";
       if (isRemoteChannel) {
         const role = payload.role ?? "user";
@@ -499,13 +510,6 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
               (app as unknown as { chatStreamStartedAt: number | null }).chatStreamStartedAt ?? Date.now(),
               app.sessionKey,
             );
-          }
-        } else if (role === "assistant" && app.chatRunId?.startsWith("remote-")) {
-          app.chatRunId = null;
-          (app as unknown as { chatStream: string | null }).chatStream = null;
-          (app as unknown as { chatStreamStartedAt: number | null }).chatStreamStartedAt = null;
-          if (app.chatReadonlyRun) {
-            resetChatReadonlyRun(app as unknown as Parameters<typeof resetChatReadonlyRun>[0]);
           }
         }
       }
@@ -578,6 +582,7 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     const payload = evt.payload as {
       state?: string;
       reason?: string;
+      recovery?: string;
     } | undefined;
     const app = host as unknown as OpenAcosmiApp;
     if (payload?.state === "stopped") {
@@ -587,15 +592,29 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
       if (typeof app.addNotification === "function") {
         app.addNotification(msg, "error");
       }
+      // 弹出故障 Toast 引导用户重启
+      app.argusFailureAlert = {
+        visible: true,
+        reason,
+        recovery: payload.recovery ?? "",
+        restarting: false,
+        error: null,
+      };
+    } else if (payload?.state === "ready") {
+      // 恢复正常 → 自动清除故障 Toast
+      app.argusFailureAlert = null;
     }
     // 同步 subagentsList 中 argus-screen 状态
     syncArgusSubagentStatus(app, mapArgusState(payload?.state), payload?.state === "stopped" || payload?.state === "degraded" ? payload?.reason : undefined);
+    if (typeof app.requestUpdate === "function") {
+      app.requestUpdate();
+    }
     return;
   }
 
   // Argus 熔断崩溃通知
   if (evt.event === "argus.crash.notify") {
-    const payload = evt.payload as { reason?: string } | undefined;
+    const payload = evt.payload as { reason?: string; recovery?: string } | undefined;
     const app = host as unknown as OpenAcosmiApp;
     const reason = payload?.reason ?? "rapid crash detected";
     const msg = `[Argus] Visual agent stopped due to crash: ${reason}. Send 'argus restart' to recover.`;
@@ -603,8 +622,19 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     if (typeof app.addNotification === "function") {
       app.addNotification(msg, "error");
     }
+    // 弹出故障 Toast 引导用户重启
+    app.argusFailureAlert = {
+      visible: true,
+      reason,
+      recovery: payload?.recovery ?? "",
+      restarting: false,
+      error: null,
+    };
     // 同步 subagentsList 中 argus-screen 状态
     syncArgusSubagentStatus(app, "stopped", reason);
+    if (typeof app.requestUpdate === "function") {
+      app.requestUpdate();
+    }
     return;
   }
 

@@ -63,7 +63,11 @@ func StartChrome(ctx context.Context, cfg ChromeStartConfig) (*ChromeInstance, e
 
 	args := buildChromeArgs(cfg.Profile, dataDir)
 
-	cmd := exec.CommandContext(ctx, cfg.Executable.Path, args...)
+	// Use exec.Command (NOT exec.CommandContext) so Chrome survives task
+	// context cancellation. The browser should persist across tasks and only
+	// be stopped explicitly via Stop(). Binding to ctx would SIGKILL Chrome
+	// when any parent task finishes or times out.
+	cmd := exec.Command(cfg.Executable.Path, args...)
 	cmd.Dir = dataDir
 
 	// Redirect stderr for CDP URL discovery.

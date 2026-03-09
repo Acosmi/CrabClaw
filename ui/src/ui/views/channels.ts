@@ -18,6 +18,7 @@ import type { ChannelKey, ChannelsChannelData, ChannelsProps } from "./channels.
 import { formatRelativeTimestamp } from "../format.ts";
 import { renderDingTalkCard } from "./channels.dingtalk.ts";
 import { renderDiscordCard } from "./channels.discord.ts";
+import { renderEmailCard } from "./channels.email.ts";
 import { renderFeishuCard } from "./channels.feishu.ts";
 import { renderGoogleChatCard } from "./channels.googlechat.ts";
 import { renderIMessageCard } from "./channels.imessage.ts";
@@ -261,6 +262,17 @@ function renderChannelBody(key: ChannelKey, props: ChannelsProps, data: Channels
       const feishuStatus = props.snapshot?.channels?.["feishu"] as Record<string, unknown> | null;
       return renderFeishuCard({ props, feishu: feishuStatus, accountCountLabel });
     }
+    case "email": {
+      const emailAccounts = data.channelAccounts?.email ?? [];
+      return renderEmailCard({
+        props,
+        emailAccounts,
+        accountCountLabel,
+        onTestConnection: props.onEmailTest,
+        emailTestLoading: props.emailTestLoading,
+        emailTestResult: props.emailTestResult,
+      });
+    }
     default:
       return renderGenericChannelBody(key, props, data.channelAccounts ?? {});
   }
@@ -363,7 +375,7 @@ function resolveChannelOrder(snapshot: ChannelsStatusSnapshot | null): ChannelKe
   if (snapshot?.channelOrder?.length) {
     return snapshot.channelOrder;
   }
-  return ["wecom", "dingtalk", "feishu", "whatsapp", "telegram", "discord", "googlechat", "slack", "signal", "imessage", "nostr"];
+  return ["email", "wecom", "dingtalk", "feishu", "whatsapp", "telegram", "discord", "googlechat", "slack", "signal", "imessage", "nostr"];
 }
 
 function resolveChannelMetaMap(

@@ -254,6 +254,42 @@ func TestToGeminiContents_ToolUseConversion(t *testing.T) {
 	}
 }
 
+func TestToGeminiContents_UserImageConversion(t *testing.T) {
+	msgs := []ChatMessage{
+		{
+			Role: "user",
+			Content: []ContentBlock{
+				{Type: "text", Text: "describe"},
+				{
+					Type: "image",
+					Source: &ImageSource{
+						Type:      "base64",
+						MediaType: "image/png",
+						Data:      "ZmFrZQ==",
+					},
+				},
+			},
+		},
+	}
+
+	contents := toGeminiContents(msgs)
+	if len(contents) != 1 {
+		t.Fatalf("expected 1 content, got %d", len(contents))
+	}
+	if len(contents[0].Parts) != 2 {
+		t.Fatalf("expected 2 parts, got %d", len(contents[0].Parts))
+	}
+	if contents[0].Parts[0].Text != "describe" {
+		t.Fatalf("unexpected text part: %+v", contents[0].Parts[0])
+	}
+	if contents[0].Parts[1].InlineData == nil {
+		t.Fatalf("expected inlineData part, got %+v", contents[0].Parts[1])
+	}
+	if contents[0].Parts[1].InlineData.MimeType != "image/png" || contents[0].Parts[1].InlineData.Data != "ZmFrZQ==" {
+		t.Fatalf("unexpected inlineData: %+v", contents[0].Parts[1].InlineData)
+	}
+}
+
 // S1-4: 验证 tool_result Name 为空时的 fallback 行为
 func TestToGeminiContents_ToolResultNameFallback(t *testing.T) {
 	msgs := []ChatMessage{

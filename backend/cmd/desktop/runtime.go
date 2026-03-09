@@ -85,6 +85,15 @@ func prepareDesktopBootstrap(
 			return nil, fmt.Errorf("desktop control UI probe failed: %w", err)
 		}
 	}
+	if err := syncDesktopUpdateStateFromConfig(cfg); err != nil {
+		return nil, fmt.Errorf("desktop update state init failed: %w", err)
+	}
+	if err := finalizeDesktopPendingUpdate(); err != nil {
+		return nil, fmt.Errorf("desktop pending update finalize failed: %w", err)
+	}
+	if err := finalizeDesktopInstallerHandoff(); err != nil {
+		return nil, fmt.Errorf("desktop installer handoff finalize failed: %w", err)
+	}
 	return bootstrap, nil
 }
 

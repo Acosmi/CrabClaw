@@ -6,6 +6,7 @@ export type ReadonlyRunPhase =
   | "working"
   | "drafting"
   | "finalizing"
+  | "complete"
   | "aborted"
   | "error";
 
@@ -14,6 +15,7 @@ export type ReadonlyToolStepStatus = "running" | "done" | "error";
 export type ReadonlyToolStep = {
   toolCallId: string;
   name: string;
+  detail: string | null;
   status: ReadonlyToolStepStatus;
   startedAt: number;
   updatedAt: number;
@@ -41,6 +43,7 @@ export type ReadonlyRunActivity =
     kind: "tool";
     toolCallId: string;
     name: string;
+    detail: string | null;
     status: ReadonlyToolStepStatus;
     phase: string;
     outputPreview: string | null;
@@ -68,6 +71,7 @@ export type ChatReadonlyRunState = {
   phase: ReadonlyRunPhase;
   startedAt: number | null;
   updatedAt: number | null;
+  completedAt: number | null;
   latestProgress: string | null;
   progressPhase: string | null;
   draftingText: string | null;
@@ -75,11 +79,20 @@ export type ChatReadonlyRunState = {
   toolSteps: ReadonlyToolStep[];
   activity: ReadonlyRunActivity[];
   lastError: string | null;
+  finalMessageId: string | null;
+  finalMessageTimestamp: number | null;
+  finalMessageText: string | null;
 };
 
 export type ChatReadonlyRunHost = {
   sessionKey: string;
   chatReadonlyRun: ChatReadonlyRunState;
+  chatReadonlyRunHistory?: ChatReadonlyRunState[];
+};
+
+export type ChatReadonlyRunStorageState = {
+  current: ChatReadonlyRunState | null;
+  history: ChatReadonlyRunState[];
 };
 
 type RunBindingInput = {
@@ -96,6 +109,7 @@ type ProgressInput = RunBindingInput & {
 type ToolInput = RunBindingInput & {
   toolCallId: string;
   name: string;
+  detail?: string | null;
   phase: string;
   isError?: boolean;
   output?: string | null;
@@ -108,11 +122,15 @@ type ChatInput = {
   ts: number;
   text?: string | null;
   errorMessage?: string | null;
+  messageId?: string | null;
+  messageTimestamp?: number | null;
 };
 
 const READONLY_TOOL_STEP_LIMIT = 8;
 const READONLY_ACTIVITY_LIMIT = 12;
 const READONLY_OUTPUT_PREVIEW_LIMIT = 240;
+const READONLY_RUN_HISTORY_LIMIT = 24;
+const READONLY_RUN_STORAGE_PREFIX = "openacosmi.control.chat-readonly-run.v1";
 
 export function createChatReadonlyRunState(sessionKey: string): ChatReadonlyRunState {
   return {
@@ -121,6 +139,7 @@ export function createChatReadonlyRunState(sessionKey: string): ChatReadonlyRunS
     phase: "idle",
     startedAt: null,
     updatedAt: null,
+    completedAt: null,
     latestProgress: null,
     progressPhase: null,
     draftingText: null,
@@ -128,7 +147,234 @@ export function createChatReadonlyRunState(sessionKey: string): ChatReadonlyRunS
     toolSteps: [],
     activity: [],
     lastError: null,
+    finalMessageId: null,
+    finalMessageTimestamp: null,
+    finalMessageText: null,
   };
+}
+
+export function normalizeReadonlyRunAnchorText(text: string | null | undefined): string | null {
+  if (typeof text !== "string") {
+    return null;
+  }
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return null;
+  }
+  return normalized.slice(0, 280);
+}
+
+function readonlyRunStorageKey(sessionKey: string): string {
+  return `${READONLY_RUN_STORAGE_PREFIX}:${sessionKey}`;
+}
+
+function isPersistableReadonlyRunPhase(
+  phase: ChatReadonlyRunState["phase"] | null | undefined,
+): phase is Exclude<ChatReadonlyRunState["phase"], "idle"> {
+  return (
+    phase === "starting" ||
+    phase === "working" ||
+    phase === "drafting" ||
+    phase === "finalizing" ||
+    phase === "complete" ||
+    phase === "aborted" ||
+    phase === "error"
+  );
+}
+
+export function isReadonlyRunTerminal(
+  run: ChatReadonlyRunState | null | undefined,
+): run is ChatReadonlyRunState & { phase: "complete" | "aborted" | "error" } {
+  return Boolean(run && isTerminalReadonlyRunPhase(run.phase));
+}
+
+function isTerminalReadonlyRunPhase(
+  phase: ChatReadonlyRunState["phase"] | null | undefined,
+): phase is "complete" | "aborted" | "error" {
+  return phase === "complete" || phase === "aborted" || phase === "error";
+}
+
+function shouldPersistReadonlyRun(run: ChatReadonlyRunState | null | undefined): boolean {
+  if (!run) {
+    return false;
+  }
+  if (!isPersistableReadonlyRunPhase(run.phase)) {
+    return false;
+  }
+  if (
+    (run.phase === "starting" || run.phase === "working" || run.phase === "drafting" || run.phase === "finalizing") &&
+    !run.runId
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function normalizePersistedReadonlyRun(
+  value: unknown,
+  sessionKey: string,
+): ChatReadonlyRunState | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const parsed = value as Partial<ChatReadonlyRunState>;
+  if (
+    typeof parsed.sessionKey !== "string" ||
+    parsed.sessionKey !== sessionKey ||
+    !isPersistableReadonlyRunPhase(parsed.phase)
+  ) {
+    return null;
+  }
+  const base = createChatReadonlyRunState(sessionKey);
+  return {
+    ...base,
+    ...parsed,
+    sessionKey,
+    phase: parsed.phase,
+    runId: typeof parsed.runId === "string" && parsed.runId.trim() ? parsed.runId : null,
+    startedAt: typeof parsed.startedAt === "number" ? parsed.startedAt : null,
+    updatedAt: typeof parsed.updatedAt === "number" ? parsed.updatedAt : null,
+    completedAt: typeof parsed.completedAt === "number" ? parsed.completedAt : null,
+    latestProgress: typeof parsed.latestProgress === "string" ? parsed.latestProgress : null,
+    progressPhase: typeof parsed.progressPhase === "string" ? parsed.progressPhase : null,
+    draftingText: typeof parsed.draftingText === "string" ? parsed.draftingText : null,
+    lastToolName: typeof parsed.lastToolName === "string" ? parsed.lastToolName : null,
+    toolSteps: Array.isArray(parsed.toolSteps) ? parsed.toolSteps : [],
+    activity: Array.isArray(parsed.activity) ? parsed.activity : [],
+    lastError: typeof parsed.lastError === "string" ? parsed.lastError : null,
+    finalMessageId: typeof parsed.finalMessageId === "string" && parsed.finalMessageId.trim()
+      ? parsed.finalMessageId
+      : null,
+    finalMessageTimestamp: typeof parsed.finalMessageTimestamp === "number"
+      ? parsed.finalMessageTimestamp
+      : null,
+    finalMessageText: normalizeReadonlyRunAnchorText(parsed.finalMessageText),
+  };
+}
+
+function readonlyRunHistoryIdentity(run: ChatReadonlyRunState): string {
+  const finalMessageId = run.finalMessageId?.trim();
+  if (finalMessageId) {
+    return `msg:${finalMessageId}`;
+  }
+  if (typeof run.finalMessageTimestamp === "number") {
+    return `ts:${run.finalMessageTimestamp}`;
+  }
+  if (run.finalMessageText) {
+    return `text:${run.finalMessageText}`;
+  }
+  if (run.runId) {
+    return `run:${run.runId}`;
+  }
+  return `fallback:${run.sessionKey}:${run.startedAt ?? "na"}:${run.completedAt ?? run.updatedAt ?? "na"}:${run.phase}`;
+}
+
+function sortReadonlyRuns(
+  left: ChatReadonlyRunState,
+  right: ChatReadonlyRunState,
+): number {
+  const leftTs = left.finalMessageTimestamp ?? left.completedAt ?? left.updatedAt ?? left.startedAt ?? 0;
+  const rightTs = right.finalMessageTimestamp ?? right.completedAt ?? right.updatedAt ?? right.startedAt ?? 0;
+  if (leftTs !== rightTs) {
+    return leftTs - rightTs;
+  }
+  return readonlyRunHistoryIdentity(left).localeCompare(readonlyRunHistoryIdentity(right));
+}
+
+function mergeReadonlyRunHistory(
+  history: Array<ChatReadonlyRunState | null | undefined>,
+): ChatReadonlyRunState[] {
+  const byId = new Map<string, ChatReadonlyRunState>();
+  for (const item of history) {
+    if (!isReadonlyRunTerminal(item)) {
+      continue;
+    }
+    const key = readonlyRunHistoryIdentity(item);
+    const previous = byId.get(key);
+    if (!previous || sortReadonlyRuns(previous, item) <= 0) {
+      byId.set(key, item);
+    }
+  }
+  return [...byId.values()].sort(sortReadonlyRuns).slice(-READONLY_RUN_HISTORY_LIMIT);
+}
+
+function loadPersistedReadonlyRunState(sessionKey: string): ChatReadonlyRunStorageState {
+  const targetSessionKey = sessionKey.trim();
+  if (!targetSessionKey) {
+    return { current: null, history: [] };
+  }
+  try {
+    const raw = window.localStorage.getItem(readonlyRunStorageKey(targetSessionKey));
+    if (!raw) {
+      return { current: null, history: [] };
+    }
+    const parsed = JSON.parse(raw) as Record<string, unknown> | null;
+    if (!parsed || typeof parsed !== "object") {
+      return { current: null, history: [] };
+    }
+
+    if ("current" in parsed || "history" in parsed) {
+      const current = normalizePersistedReadonlyRun(parsed.current, targetSessionKey);
+      const history = mergeReadonlyRunHistory(
+        Array.isArray(parsed.history)
+          ? parsed.history.map((item) => normalizePersistedReadonlyRun(item, targetSessionKey))
+          : [],
+      );
+      return { current, history };
+    }
+
+    const legacy = normalizePersistedReadonlyRun(parsed, targetSessionKey);
+    return {
+      current: legacy,
+      history: isReadonlyRunTerminal(legacy) ? [legacy] : [],
+    };
+  } catch {
+    return { current: null, history: [] };
+  }
+}
+
+export function loadPersistedChatReadonlyRunHistory(sessionKey: string): ChatReadonlyRunState[] {
+  return loadPersistedReadonlyRunState(sessionKey).history;
+}
+
+export function persistChatReadonlyRun(
+  run: ChatReadonlyRunState | null | undefined,
+  sessionKey?: string,
+  history?: ChatReadonlyRunState[] | null,
+) {
+  const targetSessionKey =
+    sessionKey?.trim() ||
+    run?.sessionKey?.trim() ||
+    history?.find((item) => item?.sessionKey?.trim())?.sessionKey?.trim() ||
+    "";
+  if (!targetSessionKey) {
+    return;
+  }
+  const key = readonlyRunStorageKey(targetSessionKey);
+  try {
+    const current =
+      shouldPersistReadonlyRun(run) && run?.sessionKey === targetSessionKey
+        ? normalizePersistedReadonlyRun(run, targetSessionKey)
+        : null;
+    const nextHistory = mergeReadonlyRunHistory([
+      ...(Array.isArray(history) ? history : []),
+      current && isReadonlyRunTerminal(current) ? current : null,
+    ]);
+    if (!current && nextHistory.length === 0) {
+      window.localStorage.removeItem(key);
+      return;
+    }
+    window.localStorage.setItem(key, JSON.stringify({
+      current,
+      history: nextHistory,
+    }));
+  } catch {
+    // Ignore persistence failures in private/test contexts.
+  }
+}
+
+export function loadPersistedChatReadonlyRun(sessionKey: string): ChatReadonlyRunState | null {
+  return loadPersistedReadonlyRunState(sessionKey).current;
 }
 
 export function isReadonlyRunVisible(
@@ -144,7 +390,7 @@ export function isReadonlyRunVisible(
   if (run.phase === "idle") {
     return false;
   }
-  return run.runId !== null || run.phase === "aborted" || run.phase === "error";
+  return run.runId !== null || run.phase === "complete" || run.phase === "aborted" || run.phase === "error";
 }
 
 export function isReadonlyRunActive(run: ChatReadonlyRunState | null | undefined): boolean {
@@ -162,6 +408,16 @@ export function isReadonlyRunActive(run: ChatReadonlyRunState | null | undefined
   );
 }
 
+function archiveReadonlyRun(host: ChatReadonlyRunHost, run: ChatReadonlyRunState) {
+  if (!isReadonlyRunTerminal(run)) {
+    return;
+  }
+  host.chatReadonlyRunHistory = mergeReadonlyRunHistory([
+    ...(host.chatReadonlyRunHistory ?? []),
+    run,
+  ]);
+}
+
 export function resetChatReadonlyRun(
   host: ChatReadonlyRunHost,
   sessionKey: string = host.sessionKey,
@@ -175,6 +431,9 @@ export function syncChatReadonlyRunSession(host: ChatReadonlyRunHost) {
     return;
   }
   if (current.phase === "aborted" || current.phase === "error") {
+    return;
+  }
+  if (current.phase === "complete") {
     return;
   }
   if (current.sessionKey === host.sessionKey) {
@@ -195,6 +454,7 @@ export function startChatReadonlyRun(
     phase: "starting",
     startedAt,
     updatedAt: startedAt,
+    completedAt: null,
     latestProgress: null,
     progressPhase: null,
     draftingText: null,
@@ -202,7 +462,33 @@ export function startChatReadonlyRun(
     toolSteps: [],
     activity: [createPhaseActivity("starting", startedAt)],
     lastError: null,
+    finalMessageId: null,
+    finalMessageTimestamp: null,
+    finalMessageText: null,
   };
+}
+
+export function rebindChatReadonlyRun(
+  host: ChatReadonlyRunHost,
+  nextRunId: string,
+  opts?: { previousRunId?: string | null; sessionKey?: string | null; ts?: number | null },
+): boolean {
+  const current = host.chatReadonlyRun;
+  const targetRunId = nextRunId.trim();
+  if (!targetRunId || isReadonlyRunTerminal(current)) {
+    return false;
+  }
+  const previousRunId = opts?.previousRunId?.trim() || current.runId;
+  if (!previousRunId || current.runId !== previousRunId || previousRunId === targetRunId) {
+    return false;
+  }
+  host.chatReadonlyRun = {
+    ...current,
+    runId: targetRunId,
+    sessionKey: opts?.sessionKey?.trim() || current.sessionKey,
+    updatedAt: opts?.ts ?? current.updatedAt ?? Date.now(),
+  };
+  return true;
 }
 
 export function setChatReadonlyRunTerminal(
@@ -231,9 +517,11 @@ export function setChatReadonlyRunTerminal(
     sessionKey: nextSessionKey,
     phase,
     updatedAt: ts,
+    completedAt: ts,
     activity,
     lastError: message,
   };
+  archiveReadonlyRun(host, host.chatReadonlyRun);
 }
 
 export function updateChatReadonlyRunFromLifecycle(
@@ -273,6 +561,7 @@ export function updateChatReadonlyRunFromLifecycle(
       updatedAt: input.ts,
       activity: upsertActivity(current.activity, createPhaseActivity("error", input.ts)),
     };
+    archiveReadonlyRun(host, host.chatReadonlyRun);
   }
 }
 
@@ -348,7 +637,21 @@ export function updateChatReadonlyRunFromChat(
   }
 
   if (input.state === "final") {
-    host.chatReadonlyRun = createChatReadonlyRunState(input.sessionKey);
+    const nextText = input.text?.trim() ? input.text : current.draftingText;
+    host.chatReadonlyRun = {
+      ...current,
+      runId: null,
+      sessionKey: input.sessionKey,
+      phase: "complete",
+      updatedAt: input.ts,
+      completedAt: input.ts,
+      draftingText: nextText ?? current.draftingText,
+      activity: upsertActivity(current.activity, createPhaseActivity("complete", input.ts)),
+      finalMessageId: input.messageId?.trim() || null,
+      finalMessageTimestamp: input.messageTimestamp ?? input.ts,
+      finalMessageText: normalizeReadonlyRunAnchorText(nextText ?? current.draftingText),
+    };
+    archiveReadonlyRun(host, host.chatReadonlyRun);
     return;
   }
 
@@ -358,8 +661,10 @@ export function updateChatReadonlyRunFromChat(
       runId: null,
       phase: "aborted",
       updatedAt: input.ts,
+      completedAt: input.ts,
       activity: upsertActivity(current.activity, createPhaseActivity("aborted", input.ts)),
     };
+    archiveReadonlyRun(host, host.chatReadonlyRun);
     return;
   }
 
@@ -374,9 +679,11 @@ export function updateChatReadonlyRunFromChat(
       runId: null,
       phase: "error",
       updatedAt: input.ts,
+      completedAt: input.ts,
       lastError: message,
       activity,
     };
+    archiveReadonlyRun(host, host.chatReadonlyRun);
   }
 }
 
@@ -400,6 +707,7 @@ function bindReadonlyRun(
       phase: "starting",
       startedAt: input.ts,
       updatedAt: input.ts,
+      completedAt: null,
       activity: [createPhaseActivity("starting", input.ts)],
     };
   }
@@ -439,6 +747,7 @@ function upsertToolStep(
     nextSteps.push({
       toolCallId: input.toolCallId,
       name: input.name,
+      detail: input.detail?.trim() || null,
       status: nextStatus,
       startedAt,
       updatedAt: input.ts,
@@ -449,11 +758,12 @@ function upsertToolStep(
 
   const existing = nextSteps[existingIndex];
   nextSteps[existingIndex] = {
-    ...existing,
-    name: input.name,
-    status: nextStatus,
-    updatedAt: input.ts,
-    outputPreview: outputPreview ?? existing.outputPreview,
+      ...existing,
+      name: input.name,
+      detail: input.detail?.trim() || existing.detail,
+      status: nextStatus,
+      updatedAt: input.ts,
+      outputPreview: outputPreview ?? existing.outputPreview,
   };
   return trimToolSteps(nextSteps);
 }
@@ -540,6 +850,7 @@ function upsertToolActivity(
     kind: "tool",
     toolCallId: step.toolCallId,
     name: step.name,
+    detail: step.detail,
     status: step.status,
     phase,
     outputPreview: step.outputPreview,

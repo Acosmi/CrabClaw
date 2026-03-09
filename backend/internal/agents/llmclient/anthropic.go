@@ -243,6 +243,14 @@ func toAnthropicMessages(msgs []ChatMessage) []anthropicMessage {
 				switch b.Type {
 				case "text":
 					block["text"] = b.Text
+				case "image":
+					if b.Source != nil {
+						block["source"] = map[string]interface{}{
+							"type":       b.Source.Type,
+							"media_type": b.Source.MediaType,
+							"data":       b.Source.Data,
+						}
+					}
 				case "tool_use":
 					block["id"] = b.ID
 					block["name"] = b.Name

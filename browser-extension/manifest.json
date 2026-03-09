@@ -1,13 +1,18 @@
 {
   "manifest_version": 3,
-  "name": "OpenAcosmi Browser Control",
+  "name": "CrabClaw Browser Control",
   "version": "1.0.0",
-  "description": "Let OpenAcosmi AI agent control your Chrome tabs via CDP relay",
+  "description": "Let CrabClaw AI agent control your Chrome tabs via CDP relay",
   "permissions": [
     "debugger",
     "tabs",
     "activeTab",
-    "storage"
+    "storage",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*"
   ],
   "background": {
     "service_worker": "background.js"

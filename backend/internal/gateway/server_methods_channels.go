@@ -196,9 +196,9 @@ func handleChannelsStatus(ctx *MethodHandlerContext) {
 
 	// 构建频道顺序和标签
 	channelOrder := []string{
+		"email",
 		"wecom", "dingtalk", "feishu",
 		"telegram", "discord", "slack", "whatsapp", "signal", "imessage",
-		"email",
 	}
 	channelLabels := map[string]string{
 		"telegram": "Telegram",

@@ -184,9 +184,15 @@ type geminiContent struct {
 
 type geminiPart struct {
 	Text             string              `json:"text,omitempty"`
+	InlineData       *geminiInlineData   `json:"inlineData,omitempty"`
 	FunctionCall     *geminiFunctionCall `json:"functionCall,omitempty"`
 	FunctionResp     *geminiFunctionResp `json:"functionResponse,omitempty"`
 	ThoughtSignature string              `json:"thoughtSignature,omitempty"`
+}
+
+type geminiInlineData struct {
+	MimeType string `json:"mimeType"`
+	Data     string `json:"data"`
 }
 
 type geminiFunctionCall struct {
@@ -273,6 +279,15 @@ func toGeminiContents(msgs []ChatMessage) []geminiContent {
 			case "text":
 				if b.Text != "" {
 					gc.Parts = append(gc.Parts, geminiPart{Text: b.Text})
+				}
+			case "image":
+				if b.Source != nil && b.Source.Data != "" && b.Source.MediaType != "" {
+					gc.Parts = append(gc.Parts, geminiPart{
+						InlineData: &geminiInlineData{
+							MimeType: b.Source.MediaType,
+							Data:     b.Source.Data,
+						},
+					})
 				}
 			case "tool_use":
 				// assistant tool_use → Gemini functionCall

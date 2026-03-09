@@ -1,42 +1,68 @@
-# Desktop Artifact Conventions
+# 桌面产物命名约定
 
-This document defines the intended artifact naming and retention conventions
-for future desktop CI runs.
+本文档定义桌面发布产物的标准命名与保留约定。
 
-Current status:
+当前状态：
 
-- planning only
-- no active workflow consumes these conventions yet
+- 已启用的手动 workflow 当前消费以下平台：
+  - `windows-nsis-amd64`
+  - `linux-appimage-amd64`
+- macOS 仍为手动发布 / 暂缓接入
 
-## Product naming
+## 1. 品牌命名
 
-- User-facing product name: `ClawAcosmi`
-- Desktop shell label: `ClawAcosmi Desktop`
-- Legacy compatibility names may still exist in code and must be reviewed
-  before workflow activation
+- 用户可见产品名：`Crab Claw`
+- 带品牌归属说明的完整名称：`Crab Claw by Acosmi.ai`
+- 技术标识、二进制与产物前缀：`CrabClaw`
 
-## Windows artifact targets
+## 2. Windows 产物
 
-- installer archive label: `ClawAcosmi-windows-x64`
-- package examples:
-  - `ClawAcosmi-windows-x64.zip`
-  - `ClawAcosmi-desktop-windows-x64.exe`
+- 标准安装器前缀：`CrabClaw-windows`
+- 示例：
+  - `CrabClaw-windows-amd64-installer.exe`
+  - `CrabClaw-windows-arm64-installer.exe`
+- manifest platform key：
+  - `windows-nsis-amd64`
+  - `windows-nsis-arm64`
+- `msix` 仍由系统托管，不写入 `update.json`
 
-## Linux artifact targets
+## 3. macOS 产物
 
-- archive label: `ClawAcosmi-linux-x64`
-- package examples:
-  - `ClawAcosmi-linux-x64.tar.gz`
-  - `ClawAcosmi-desktop-linux-x64.AppImage`
-  - `ClawAcosmi-desktop-linux-x64.deb`
+- 标准归档前缀：`CrabClaw-macos`
+- 示例：
+  - `CrabClaw-macos-arm64.zip`
+  - `CrabClaw-macos-amd64.zip`
+- manifest platform key：
+  - `macos-wails-arm64`
+  - `macos-wails-amd64`
+- 不直接把原始 `.app` 写入 `update.json`，应先归档
 
-## Retention baseline
+## 4. Linux 产物
 
-- branch validation artifacts: short retention
-- tagged release artifacts: long retention
-- unsigned artifacts must be explicitly labeled as unsigned
+- 标准归档前缀：`CrabClaw-linux`
+- 示例：
+  - `CrabClaw-linux-amd64.AppImage`
+  - `CrabClaw-linux-arm64.AppImage`
+  - `CrabClaw-linux-amd64.deb`
+- manifest platform key：
+  - `linux-appimage-amd64`
+  - `linux-appimage-arm64`
+- `deb` / `rpm` 仍由包管理器托管，不写入 `update.json`
 
-## Activation gate
+## 5. Release metadata
 
-Do not treat these names as frozen until the CI activation checklist and naming
-freeze are both approved.
+- 使用 `wails3 task release:manifest` 基于产物生成 `release/<channel>/update.json`
+- 将 `release/<channel>/SHA256SUMS` 与 manifest 一起发布
+- 若自动探测无法判断平台 key，可传显式覆盖：
+  - `-artifact key=/path/to/file`
+
+## 6. 保留策略基线
+
+- 分支验证产物：短期保留
+- 正式发布产物：长期保留
+- 未签名产物必须显式标记为 unsigned
+
+## 7. 变更门槛
+
+Windows / Linux 命名已经进入真实 workflow 输入。  
+后续不要再单独改文件名或平台 key；若要调整，必须同步更新运行手册与验收清单。

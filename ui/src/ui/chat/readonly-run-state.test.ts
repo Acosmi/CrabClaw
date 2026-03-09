@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   createChatReadonlyRunState,
   isReadonlyRunActive,
+  loadPersistedChatReadonlyRunHistory,
+  loadPersistedChatReadonlyRun,
+  persistChatReadonlyRun,
   setChatReadonlyRunTerminal,
   startChatReadonlyRun,
   updateChatReadonlyRunFromChat,
@@ -14,10 +17,36 @@ function createHost() {
   return {
     sessionKey: "main",
     chatReadonlyRun: createChatReadonlyRunState("main"),
+    chatReadonlyRunHistory: [] as ReturnType<typeof loadPersistedChatReadonlyRunHistory>,
   };
 }
 
+beforeEach(() => {
+  window.localStorage.clear();
+});
+
 describe("readonly run state", () => {
+  it("persists an active workflow snapshot for reload recovery", () => {
+    const host = createHost();
+    startChatReadonlyRun(host, "run-0", 100, "main");
+
+    updateChatReadonlyRunFromTool(host, {
+      runId: "run-0",
+      sessionKey: "main",
+      ts: 120,
+      toolCallId: "tool-1",
+      name: "read_files",
+      phase: "start",
+    });
+
+    persistChatReadonlyRun(host.chatReadonlyRun, "main");
+    const restored = loadPersistedChatReadonlyRun("main");
+
+    expect(restored?.phase).toBe("working");
+    expect(restored?.runId).toBe("run-0");
+    expect(restored?.toolSteps).toHaveLength(1);
+  });
+
   it("transitions from starting to working to drafting", () => {
     const host = createHost();
     startChatReadonlyRun(host, "run-1", 100, "main");
@@ -63,7 +92,7 @@ describe("readonly run state", () => {
     expect(host.chatReadonlyRun.activity.at(-1)?.kind).toBe("draft");
   });
 
-  it("resets to idle when the run finalizes", () => {
+  it("keeps a completed workflow summary when the run finalizes", () => {
     const host = createHost();
     startChatReadonlyRun(host, "run-2", 100, "main");
 
@@ -73,11 +102,48 @@ describe("readonly run state", () => {
       state: "final",
       ts: 220,
       text: "Done.",
+      messageId: "msg-final",
+      messageTimestamp: 230,
     });
 
     expect(host.chatReadonlyRun.runId).toBeNull();
-    expect(host.chatReadonlyRun.phase).toBe("idle");
+    expect(host.chatReadonlyRun.phase).toBe("complete");
     expect(host.chatReadonlyRun.sessionKey).toBe("main");
+    expect(host.chatReadonlyRun.completedAt).toBe(220);
+    expect(host.chatReadonlyRun.finalMessageId).toBe("msg-final");
+    expect(host.chatReadonlyRun.finalMessageTimestamp).toBe(230);
+    expect(host.chatReadonlyRun.finalMessageText).toBe("Done.");
+    expect(host.chatReadonlyRunHistory).toHaveLength(1);
+    expect(host.chatReadonlyRunHistory[0]?.finalMessageId).toBe("msg-final");
+  });
+
+  it("persists archived workflow history alongside the current run", () => {
+    const completedRun = {
+      ...createChatReadonlyRunState("main"),
+      phase: "complete" as const,
+      startedAt: 100,
+      updatedAt: 180,
+      completedAt: 190,
+      finalMessageId: "msg-1",
+      finalMessageTimestamp: 200,
+      finalMessageText: "first",
+    };
+    const activeRun = {
+      ...createChatReadonlyRunState("main"),
+      runId: "run-active",
+      phase: "working" as const,
+      startedAt: 210,
+      updatedAt: 240,
+    };
+
+    persistChatReadonlyRun(activeRun, "main", [completedRun]);
+
+    const restoredCurrent = loadPersistedChatReadonlyRun("main");
+    const restoredHistory = loadPersistedChatReadonlyRunHistory("main");
+
+    expect(restoredCurrent?.runId).toBe("run-active");
+    expect(restoredHistory).toHaveLength(1);
+    expect(restoredHistory[0]?.finalMessageId).toBe("msg-1");
   });
 
   it("marks terminal errors without keeping the run active", () => {

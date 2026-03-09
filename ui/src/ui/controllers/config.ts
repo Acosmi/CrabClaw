@@ -7,6 +7,24 @@ import {
   setPathValue,
 } from "./config/form-utils.ts";
 
+export type DesktopUpdateStatus = {
+  action?: string;
+  currentVersion?: string;
+  candidateVersion?: string;
+  channel?: string;
+  installKind?: string;
+  updateManager?: string;
+  managedBySystem?: boolean;
+  state?: string;
+  publishedAt?: string;
+  readyToInstall?: boolean;
+  rollbackAvailable?: boolean;
+  rollbackVersion?: string;
+  lastCheckedAt?: string;
+  lastError?: string;
+  updateAvailable?: boolean;
+};
+
 export type ConfigState = {
   client: GatewayBrowserClient | null;
   connected: boolean;
@@ -19,6 +37,7 @@ export type ConfigState = {
   configSaving: boolean;
   configApplying: boolean;
   updateRunning: boolean;
+  updateRollbackRunning: boolean;
   configSnapshot: ConfigSnapshot | null;
   configSchema: unknown;
   configSchemaVersion: string | null;
@@ -31,6 +50,7 @@ export type ConfigState = {
   configSearchQuery: string;
   configActiveSection: string | null;
   configActiveSubsection: string | null;
+  desktopUpdateStatus: DesktopUpdateStatus | null;
   lastError: string | null;
 };
 
@@ -109,6 +129,7 @@ export async function loadConfig(state: ConfigState) {
   try {
     const res = await state.client.request<ConfigSnapshot>("config.get", {});
     applyConfigSnapshot(state, res);
+    await loadDesktopUpdateStatus(state, { silent: true });
   } catch (err) {
     state.lastError = String(err);
   } finally {
@@ -222,12 +243,35 @@ export async function applyConfig(state: ConfigState) {
 }
 
 export async function runUpdate(state: ConfigState) {
-  if (!state.client || !state.connected) {
+  if (!state.client || !state.connected || state.updateRollbackRunning || state.updateRunning) {
     return;
   }
   state.updateRunning = true;
   state.lastError = null;
   try {
+    const status = await loadDesktopUpdateStatus(state, { check: true });
+    if (!status) {
+      return;
+    }
+    if (isPackagedDesktopInstall(status.installKind)) {
+      if (status.managedBySystem || status.updateManager === "package-manager") {
+        return;
+      }
+      if (status.readyToInstall) {
+        state.desktopUpdateStatus = await state.client.request<DesktopUpdateStatus>(
+          "desktop.update.apply",
+          {},
+        );
+        return;
+      }
+      if (status.updateAvailable) {
+        state.desktopUpdateStatus = await state.client.request<DesktopUpdateStatus>(
+          "desktop.update.download",
+          {},
+        );
+      }
+      return;
+    }
     await state.client.request("update.run", {
       sessionKey: state.applySessionKey,
     });
@@ -235,6 +279,24 @@ export async function runUpdate(state: ConfigState) {
     state.lastError = String(err);
   } finally {
     state.updateRunning = false;
+  }
+}
+
+export async function rollbackUpdate(state: ConfigState) {
+  if (!state.client || !state.connected || state.updateRunning || state.updateRollbackRunning) {
+    return;
+  }
+  state.updateRollbackRunning = true;
+  state.lastError = null;
+  try {
+    state.desktopUpdateStatus = await state.client.request<DesktopUpdateStatus>(
+      "desktop.update.rollback",
+      {},
+    );
+  } catch (err) {
+    state.lastError = String(err);
+  } finally {
+    state.updateRollbackRunning = false;
   }
 }
 
@@ -260,4 +322,44 @@ export function removeConfigFormValue(state: ConfigState, path: Array<string | n
   if (state.configFormMode === "form") {
     state.configRaw = serializeConfigForm(base);
   }
+}
+
+type LoadDesktopUpdateStatusOptions = {
+  check?: boolean;
+  silent?: boolean;
+};
+
+async function loadDesktopUpdateStatus(
+  state: ConfigState,
+  options: LoadDesktopUpdateStatusOptions = {},
+): Promise<DesktopUpdateStatus | null> {
+  if (!state.client || !state.connected) {
+    state.desktopUpdateStatus = null;
+    return null;
+  }
+
+  try {
+    const res = await state.client.request<DesktopUpdateStatus>(
+      options.check ? "desktop.update.check" : "desktop.update.status",
+      {},
+    );
+    state.desktopUpdateStatus = res ?? null;
+    return res ?? null;
+  } catch (err) {
+    state.desktopUpdateStatus = null;
+    if (!options.silent) {
+      state.lastError = String(err);
+    }
+    return null;
+  }
+}
+
+function isPackagedDesktopInstall(installKind: string | null | undefined): boolean {
+  return (
+    installKind === "macos-wails" ||
+    installKind === "windows-msix" ||
+    installKind === "windows-nsis" ||
+    installKind === "linux-appimage" ||
+    installKind === "linux-system-package"
+  );
 }

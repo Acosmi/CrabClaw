@@ -286,6 +286,12 @@
   color: var(--muted);
 }
 
+.config-update-secondary {
+  display: flex;
+  justify-content: flex-start;
+  padding: 0 22px 12px;
+}
+
 /* Diff Panel */
 .config-diff {
   margin: 18px 22px 0;
@@ -1376,6 +1382,11 @@
   .config-actions__left,
   .config-actions__right {
     width: 100%;
+    justify-content: center;
+  }
+
+  .config-update-secondary {
+    padding: 0 16px 12px;
     justify-content: center;
   }
 

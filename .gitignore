@@ -81,3 +81,10 @@ backend/internal/memory/go-api/server
 Rust 沙箱设计方案文档.md
 .claude/
 *.zip
+
+# Native messaging host binary
+backend/native-host
+backend/build/crabclaw-native-host
+
+# Screenshots (test artifacts)
+__screenshots__/

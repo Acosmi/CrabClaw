@@ -84,6 +84,8 @@ type ollamaMessage struct {
 
 // ---------- 消息转换 ----------
 
+const ollamaUnsupportedImageNotice = "[用户附带了图片，但当前 Ollama 客户端仅支持文本聊天，图片未发送给模型。]"
+
 func toOllamaMessages(systemPrompt string, msgs []ChatMessage) []ollamaMessage {
 	out := make([]ollamaMessage, 0, len(msgs)+1)
 	if systemPrompt != "" {
@@ -94,10 +96,22 @@ func toOllamaMessages(systemPrompt string, msgs []ChatMessage) []ollamaMessage {
 			continue
 		}
 		var text strings.Builder
+		hasImage := false
 		for _, b := range m.Content {
-			if b.Type == "text" {
+			switch b.Type {
+			case "text":
 				text.WriteString(b.Text)
+			case "image":
+				if b.Source != nil && b.Source.Data != "" {
+					hasImage = true
+				}
 			}
+		}
+		if hasImage {
+			if text.Len() > 0 {
+				text.WriteString("\n")
+			}
+			text.WriteString(ollamaUnsupportedImageNotice)
 		}
 		out = append(out, ollamaMessage{Role: m.Role, Content: text.String()})
 	}

@@ -29,7 +29,8 @@ let fallbackConfig: Record<string, string> = {};
 
 // Mock states for UI interactivity
 let securityAck = false;
-let selectedSkills: Record<string, boolean> = { fs: true, runtime: true, ui: true, web: true, memory: true, sessions: true, automation: false, messaging: false, nodes: false };
+// D8 derivation: skill groups from capability tree WizardGroups
+let selectedSkills: Record<string, boolean> = { fs: true, runtime: true, ui: true, web: true, memory: true, sessions: true, system: false, messaging: false };
 let channelConfig: any = {
    feishu: { appId: "", appSecret: "" },
    wecom: { appId: "", appSecret: "" },
@@ -66,7 +67,7 @@ function resetWizardV2State(): void {
    primaryConfig = {};
    fallbackConfig = {};
    securityAck = false;
-   selectedSkills = { fs: true, runtime: true, ui: true, web: true, memory: true, sessions: true, automation: false, messaging: false, nodes: false };
+   selectedSkills = { fs: true, runtime: true, ui: true, web: true, memory: true, sessions: true, system: false, messaging: false };
    channelConfig = { feishu: { appId: "", appSecret: "" }, wecom: { appId: "", appSecret: "" }, dingtalk: { appKey: "", appSecret: "" }, telegram: { botToken: "" } };
    subAgentsConfig = {};
    memoryConfig = { enableVector: false, hostingType: "local", apiEndpoint: "", llmProvider: "", llmModel: "", llmApiKey: "", llmBaseUrl: "" };
@@ -107,7 +108,7 @@ export async function startWizardV2(state: AppViewState, opts?: { resumeDraft?: 
          primaryConfig = draft.primaryConfig || {};
          fallbackConfig = draft.fallbackConfig || {};
          securityAck = draft.securityAck ?? false;
-         selectedSkills = draft.selectedSkills || { fs: true, runtime: true, ui: true, web: true, memory: true, sessions: true, automation: false, messaging: false, nodes: false };
+         selectedSkills = draft.selectedSkills || { fs: true, runtime: true, ui: true, web: true, memory: true, sessions: true, system: false, messaging: false };
          channelConfig = draft.channelConfig || { feishu: { appId: "", appSecret: "" }, wecom: { appId: "", appSecret: "" }, dingtalk: { appKey: "", appSecret: "" }, telegram: { botToken: "" } };
          subAgentsConfig = draft.subAgentsConfig || {};
          memoryConfig = draft.memoryConfig || { enableVector: false, hostingType: "local", apiEndpoint: "", llmProvider: "", llmModel: "", llmApiKey: "", llmBaseUrl: "" };
@@ -596,16 +597,15 @@ export function renderWizardV2(state: AppViewState) {
               <p class="wizard-v2-subtitle">系统检测到如下核心技能。如果有需要额外 API Key 的技能，请在下方填入。</p>
               
               <div class="wizard-v2-providers-grid">
-                 ${[
-            { key: "fs", name: "文件系统", desc: "读取、编辑、搜索文件 (read/write/edit)", icon: "📁" },
-            { key: "runtime", name: "命令执行", desc: "终端命令与进程管理 (exec/process)", icon: "⚡" },
-            { key: "ui", name: "浏览器与画布", desc: "无头浏览器和画布交互 (browser/canvas)", icon: "🌐" },
-            { key: "web", name: "网页搜索", desc: "在线搜索与网页抓取 (web_search/fetch)", icon: "🔍" },
+                 ${/* D8 derivation: skill groups from capability tree WizardGroups */[
+            { key: "fs", name: "文件系统", desc: "读取、写入、列目录 (read/write/list_dir)", icon: "📁" },
+            { key: "runtime", name: "命令执行", desc: "终端命令执行 (exec/bash)", icon: "⚡" },
+            { key: "ui", name: "画布", desc: "画布交互 (canvas)", icon: "🖼️" },
+            { key: "web", name: "网页与浏览器", desc: "搜索、抓取与浏览器 (browser/web_search/fetch)", icon: "🌐" },
             { key: "memory", name: "记忆调用", desc: "搜索和获取长期记忆 (memory_*)", icon: "🧠" },
             { key: "sessions", name: "会话管理", desc: "列出、发送、生成会话 (sessions_*)", icon: "💬" },
-            { key: "automation", name: "自动化", desc: "定时任务与网关 (cron/gateway)", icon: "⏰" },
+            { key: "system", name: "系统管理", desc: "节点、定时任务与网关 (nodes/cron/gateway)", icon: "⚙️" },
             { key: "messaging", name: "消息推送", desc: "主动发送消息到频道 (message)", icon: "📤" },
-            { key: "nodes", name: "节点管理", desc: "管理远端计算节点 (nodes)", icon: "🖥️" },
          ].map(sg => html`
                     <label class="wizard-v2-provider-card" style="display:flex; align-items:center; gap: 12px; cursor: pointer;">
                        <input type="checkbox" .checked=${selectedSkills[sg.key] ?? false} @change=${(e: Event) => { selectedSkills[sg.key] = (e.target as HTMLInputElement).checked; state.requestUpdate(); }}>

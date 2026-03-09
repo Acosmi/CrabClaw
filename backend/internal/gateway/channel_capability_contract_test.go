@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"testing"
+
+	"github.com/Acosmi/ClawAcosmi/internal/autoreply"
 )
 
 // TestAllDispatchPathsWireOnProgress S6-T5:
@@ -21,6 +23,21 @@ func TestProgressDeliveryTargetFromNilMsgContext(t *testing.T) {
 	target := progressDeliveryTargetFromMsgContext(nil)
 	if target.Channel != "" || target.To != "" {
 		t.Error("nil MsgContext should produce empty target")
+	}
+}
+
+func TestProgressDeliveryTargetFromMsgContextUsesOriginatingFields(t *testing.T) {
+	target := progressDeliveryTargetFromMsgContext(&autoreply.MsgContext{
+		OriginatingChannel: "feishu",
+		OriginatingTo:      "oc_123",
+		AccountID:          "default",
+		MessageThreadID:    "thread-1",
+	})
+	if target.Channel != "feishu" || target.To != "oc_123" {
+		t.Fatalf("unexpected target: %+v", target)
+	}
+	if target.AccountID != "default" || target.ThreadID != "thread-1" {
+		t.Fatalf("unexpected metadata: %+v", target)
 	}
 }
 

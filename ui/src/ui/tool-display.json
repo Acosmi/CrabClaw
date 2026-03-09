@@ -1,4 +1,5 @@
 {
+  "_generated": "D7 derivation from capability tree — simple tool entries are generated, action-based tools are preserved. Source: gen_frontend.go",
   "version": 1,
   "fallback": {
     "icon": "puzzle",
@@ -25,99 +26,26 @@
     ]
   },
   "tools": {
-    "bash": {
-      "icon": "wrench",
-      "title": "Bash",
-      "detailKeys": ["command"]
-    },
-    "coder_edit": {
-      "icon": "penLine",
-      "title": "Coder Edit",
-      "detailKeys": ["filePath"]
-    },
-    "coder_write": {
-      "icon": "edit",
-      "title": "Coder Write",
-      "detailKeys": ["filePath"]
-    },
-    "coder_read": {
-      "icon": "fileText",
-      "title": "Coder Read",
-      "detailKeys": ["filePath"]
-    },
-    "coder_bash": {
-      "icon": "wrench",
-      "title": "Coder Bash",
-      "detailKeys": ["command"]
-    },
-    "coder_grep": {
-      "icon": "search",
-      "title": "Coder Grep",
-      "detailKeys": ["pattern"]
-    },
-    "coder_glob": {
-      "icon": "folder",
-      "title": "Coder Glob",
-      "detailKeys": ["pattern"]
-    },
-    "process": {
-      "icon": "wrench",
-      "title": "Process",
-      "detailKeys": ["sessionId"]
-    },
-    "read": {
-      "icon": "fileText",
-      "title": "Read",
-      "detailKeys": ["path"]
-    },
-    "write": {
-      "icon": "edit",
-      "title": "Write",
-      "detailKeys": ["path"]
-    },
-    "edit": {
-      "icon": "penLine",
-      "title": "Edit",
-      "detailKeys": ["path"]
-    },
     "attach": {
       "icon": "paperclip",
       "title": "Attach",
-      "detailKeys": ["path", "url", "fileName"]
+      "detailKeys": [
+        "path",
+        "url",
+        "fileName"
+      ]
+    },
+    "bash": {
+      "icon": "wrench",
+      "title": "Bash",
+      "detailKeys": [
+        "command"
+      ]
     },
     "browser": {
       "icon": "globe",
       "title": "Browser",
       "actions": {
-        "status": { "label": "status" },
-        "start": { "label": "start" },
-        "stop": { "label": "stop" },
-        "tabs": { "label": "tabs" },
-        "open": { "label": "open", "detailKeys": ["targetUrl"] },
-        "focus": { "label": "focus", "detailKeys": ["targetId"] },
-        "close": { "label": "close", "detailKeys": ["targetId"] },
-        "snapshot": {
-          "label": "snapshot",
-          "detailKeys": ["targetUrl", "targetId", "ref", "element", "format"]
-        },
-        "screenshot": {
-          "label": "screenshot",
-          "detailKeys": ["targetUrl", "targetId", "ref", "element"]
-        },
-        "navigate": {
-          "label": "navigate",
-          "detailKeys": ["targetUrl", "targetId"]
-        },
-        "console": { "label": "console", "detailKeys": ["level", "targetId"] },
-        "pdf": { "label": "pdf", "detailKeys": ["targetId"] },
-        "upload": {
-          "label": "upload",
-          "detailKeys": ["paths", "ref", "inputRef", "element", "targetId"]
-        },
-        "dialog": {
-          "label": "dialog",
-          "detailKeys": ["accept", "promptText", "targetId"]
-        },
         "act": {
           "label": "act",
           "detailKeys": [
@@ -127,6 +55,93 @@
             "request.text",
             "request.value"
           ]
+        },
+        "close": {
+          "label": "close",
+          "detailKeys": [
+            "targetId"
+          ]
+        },
+        "console": {
+          "label": "console",
+          "detailKeys": [
+            "level",
+            "targetId"
+          ]
+        },
+        "dialog": {
+          "label": "dialog",
+          "detailKeys": [
+            "accept",
+            "promptText",
+            "targetId"
+          ]
+        },
+        "focus": {
+          "label": "focus",
+          "detailKeys": [
+            "targetId"
+          ]
+        },
+        "navigate": {
+          "label": "navigate",
+          "detailKeys": [
+            "targetUrl",
+            "targetId"
+          ]
+        },
+        "open": {
+          "label": "open",
+          "detailKeys": [
+            "targetUrl"
+          ]
+        },
+        "pdf": {
+          "label": "pdf",
+          "detailKeys": [
+            "targetId"
+          ]
+        },
+        "screenshot": {
+          "label": "screenshot",
+          "detailKeys": [
+            "targetUrl",
+            "targetId",
+            "ref",
+            "element"
+          ]
+        },
+        "snapshot": {
+          "label": "snapshot",
+          "detailKeys": [
+            "targetUrl",
+            "targetId",
+            "ref",
+            "element",
+            "format"
+          ]
+        },
+        "start": {
+          "label": "start"
+        },
+        "status": {
+          "label": "status"
+        },
+        "stop": {
+          "label": "stop"
+        },
+        "tabs": {
+          "label": "tabs"
+        },
+        "upload": {
+          "label": "upload",
+          "detailKeys": [
+            "paths",
+            "ref",
+            "inputRef",
+            "element",
+            "targetId"
+          ]
         }
       }
     },
@@ -134,133 +149,653 @@
       "icon": "image",
       "title": "Canvas",
       "actions": {
-        "present": { "label": "present", "detailKeys": ["target", "node", "nodeId"] },
-        "hide": { "label": "hide", "detailKeys": ["node", "nodeId"] },
-        "navigate": { "label": "navigate", "detailKeys": ["url", "node", "nodeId"] },
-        "eval": { "label": "eval", "detailKeys": ["javaScript", "node", "nodeId"] },
-        "snapshot": { "label": "snapshot", "detailKeys": ["format", "node", "nodeId"] },
-        "a2ui_push": { "label": "A2UI push", "detailKeys": ["jsonlPath", "node", "nodeId"] },
-        "a2ui_reset": { "label": "A2UI reset", "detailKeys": ["node", "nodeId"] }
-      }
-    },
-    "nodes": {
-      "icon": "smartphone",
-      "title": "Nodes",
-      "actions": {
-        "status": { "label": "status" },
-        "describe": { "label": "describe", "detailKeys": ["node", "nodeId"] },
-        "pending": { "label": "pending" },
-        "approve": { "label": "approve", "detailKeys": ["requestId"] },
-        "reject": { "label": "reject", "detailKeys": ["requestId"] },
-        "notify": { "label": "notify", "detailKeys": ["node", "nodeId", "title", "body"] },
-        "camera_snap": {
-          "label": "camera snap",
-          "detailKeys": ["node", "nodeId", "facing", "deviceId"]
+        "a2ui_push": {
+          "label": "A2UI push",
+          "detailKeys": [
+            "jsonlPath",
+            "node",
+            "nodeId"
+          ]
         },
-        "camera_list": { "label": "camera list", "detailKeys": ["node", "nodeId"] },
-        "camera_clip": {
-          "label": "camera clip",
-          "detailKeys": ["node", "nodeId", "facing", "duration", "durationMs"]
+        "a2ui_reset": {
+          "label": "A2UI reset",
+          "detailKeys": [
+            "node",
+            "nodeId"
+          ]
         },
-        "screen_record": {
-          "label": "screen record",
-          "detailKeys": ["node", "nodeId", "duration", "durationMs", "fps", "screenIndex"]
+        "eval": {
+          "label": "eval",
+          "detailKeys": [
+            "javaScript",
+            "node",
+            "nodeId"
+          ]
+        },
+        "hide": {
+          "label": "hide",
+          "detailKeys": [
+            "node",
+            "nodeId"
+          ]
+        },
+        "navigate": {
+          "label": "navigate",
+          "detailKeys": [
+            "url",
+            "node",
+            "nodeId"
+          ]
+        },
+        "present": {
+          "label": "present",
+          "detailKeys": [
+            "target",
+            "node",
+            "nodeId"
+          ]
+        },
+        "snapshot": {
+          "label": "snapshot",
+          "detailKeys": [
+            "format",
+            "node",
+            "nodeId"
+          ]
         }
       }
+    },
+    "capability_manage": {
+      "icon": "puzzle",
+      "title": "Capability Manage"
+    },
+    "coder_bash": {
+      "icon": "wrench",
+      "title": "Coder Bash",
+      "detailKeys": [
+        "command"
+      ]
+    },
+    "coder_edit": {
+      "icon": "penLine",
+      "title": "Coder Edit",
+      "detailKeys": [
+        "filePath"
+      ]
+    },
+    "coder_glob": {
+      "icon": "folder",
+      "title": "Coder Glob",
+      "detailKeys": [
+        "pattern"
+      ]
+    },
+    "coder_grep": {
+      "icon": "search",
+      "title": "Coder Grep",
+      "detailKeys": [
+        "pattern"
+      ]
+    },
+    "coder_read": {
+      "icon": "fileText",
+      "title": "Coder Read",
+      "detailKeys": [
+        "filePath"
+      ]
+    },
+    "coder_write": {
+      "icon": "edit",
+      "title": "Coder Write",
+      "detailKeys": [
+        "filePath"
+      ]
     },
     "cron": {
       "icon": "loader",
       "title": "Cron",
       "actions": {
-        "status": { "label": "status" },
-        "list": { "label": "list" },
         "add": {
           "label": "add",
-          "detailKeys": ["job.name", "job.id", "job.schedule", "job.cron"]
+          "detailKeys": [
+            "job.name",
+            "job.id",
+            "job.schedule",
+            "job.cron"
+          ]
         },
-        "update": { "label": "update", "detailKeys": ["id"] },
-        "remove": { "label": "remove", "detailKeys": ["id"] },
-        "run": { "label": "run", "detailKeys": ["id"] },
-        "runs": { "label": "runs", "detailKeys": ["id"] },
-        "wake": { "label": "wake", "detailKeys": ["text", "mode"] }
-      }
-    },
-    "gateway": {
-      "icon": "plug",
-      "title": "Gateway",
-      "actions": {
-        "restart": { "label": "restart", "detailKeys": ["reason", "delayMs"] },
-        "config.get": { "label": "config get" },
-        "config.schema": { "label": "config schema" },
-        "config.apply": {
-          "label": "config apply",
-          "detailKeys": ["restartDelayMs"]
+        "list": {
+          "label": "list"
         },
-        "update.run": {
-          "label": "update run",
-          "detailKeys": ["restartDelayMs"]
+        "remove": {
+          "label": "remove",
+          "detailKeys": [
+            "id"
+          ]
+        },
+        "run": {
+          "label": "run",
+          "detailKeys": [
+            "id"
+          ]
+        },
+        "runs": {
+          "label": "runs",
+          "detailKeys": [
+            "id"
+          ]
+        },
+        "status": {
+          "label": "status"
+        },
+        "update": {
+          "label": "update",
+          "detailKeys": [
+            "id"
+          ]
+        },
+        "wake": {
+          "label": "wake",
+          "detailKeys": [
+            "text",
+            "mode"
+          ]
         }
-      }
-    },
-    "whatsapp_login": {
-      "icon": "circle",
-      "title": "WhatsApp Login",
-      "actions": {
-        "start": { "label": "start" },
-        "wait": { "label": "wait" }
       }
     },
     "discord": {
       "icon": "messageSquare",
       "title": "Discord",
       "actions": {
-        "react": { "label": "react", "detailKeys": ["channelId", "messageId", "emoji"] },
-        "reactions": { "label": "reactions", "detailKeys": ["channelId", "messageId"] },
-        "sticker": { "label": "sticker", "detailKeys": ["to", "stickerIds"] },
-        "poll": { "label": "poll", "detailKeys": ["question", "to"] },
-        "permissions": { "label": "permissions", "detailKeys": ["channelId"] },
-        "readMessages": { "label": "read messages", "detailKeys": ["channelId", "limit"] },
-        "sendMessage": { "label": "send", "detailKeys": ["to", "content"] },
-        "editMessage": { "label": "edit", "detailKeys": ["channelId", "messageId"] },
-        "deleteMessage": { "label": "delete", "detailKeys": ["channelId", "messageId"] },
-        "threadCreate": { "label": "thread create", "detailKeys": ["channelId", "name"] },
-        "threadList": { "label": "thread list", "detailKeys": ["guildId", "channelId"] },
-        "threadReply": { "label": "thread reply", "detailKeys": ["channelId", "content"] },
-        "pinMessage": { "label": "pin", "detailKeys": ["channelId", "messageId"] },
-        "unpinMessage": { "label": "unpin", "detailKeys": ["channelId", "messageId"] },
-        "listPins": { "label": "list pins", "detailKeys": ["channelId"] },
-        "searchMessages": { "label": "search", "detailKeys": ["guildId", "content"] },
-        "memberInfo": { "label": "member", "detailKeys": ["guildId", "userId"] },
-        "roleInfo": { "label": "roles", "detailKeys": ["guildId"] },
-        "emojiList": { "label": "emoji list", "detailKeys": ["guildId"] },
-        "roleAdd": { "label": "role add", "detailKeys": ["guildId", "userId", "roleId"] },
-        "roleRemove": { "label": "role remove", "detailKeys": ["guildId", "userId", "roleId"] },
-        "channelInfo": { "label": "channel", "detailKeys": ["channelId"] },
-        "channelList": { "label": "channels", "detailKeys": ["guildId"] },
-        "voiceStatus": { "label": "voice", "detailKeys": ["guildId", "userId"] },
-        "eventList": { "label": "events", "detailKeys": ["guildId"] },
-        "eventCreate": { "label": "event create", "detailKeys": ["guildId", "name"] },
-        "timeout": { "label": "timeout", "detailKeys": ["guildId", "userId"] },
-        "kick": { "label": "kick", "detailKeys": ["guildId", "userId"] },
-        "ban": { "label": "ban", "detailKeys": ["guildId", "userId"] }
+        "ban": {
+          "label": "ban",
+          "detailKeys": [
+            "guildId",
+            "userId"
+          ]
+        },
+        "channelInfo": {
+          "label": "channel",
+          "detailKeys": [
+            "channelId"
+          ]
+        },
+        "channelList": {
+          "label": "channels",
+          "detailKeys": [
+            "guildId"
+          ]
+        },
+        "deleteMessage": {
+          "label": "delete",
+          "detailKeys": [
+            "channelId",
+            "messageId"
+          ]
+        },
+        "editMessage": {
+          "label": "edit",
+          "detailKeys": [
+            "channelId",
+            "messageId"
+          ]
+        },
+        "emojiList": {
+          "label": "emoji list",
+          "detailKeys": [
+            "guildId"
+          ]
+        },
+        "eventCreate": {
+          "label": "event create",
+          "detailKeys": [
+            "guildId",
+            "name"
+          ]
+        },
+        "eventList": {
+          "label": "events",
+          "detailKeys": [
+            "guildId"
+          ]
+        },
+        "kick": {
+          "label": "kick",
+          "detailKeys": [
+            "guildId",
+            "userId"
+          ]
+        },
+        "listPins": {
+          "label": "list pins",
+          "detailKeys": [
+            "channelId"
+          ]
+        },
+        "memberInfo": {
+          "label": "member",
+          "detailKeys": [
+            "guildId",
+            "userId"
+          ]
+        },
+        "permissions": {
+          "label": "permissions",
+          "detailKeys": [
+            "channelId"
+          ]
+        },
+        "pinMessage": {
+          "label": "pin",
+          "detailKeys": [
+            "channelId",
+            "messageId"
+          ]
+        },
+        "poll": {
+          "label": "poll",
+          "detailKeys": [
+            "question",
+            "to"
+          ]
+        },
+        "react": {
+          "label": "react",
+          "detailKeys": [
+            "channelId",
+            "messageId",
+            "emoji"
+          ]
+        },
+        "reactions": {
+          "label": "reactions",
+          "detailKeys": [
+            "channelId",
+            "messageId"
+          ]
+        },
+        "readMessages": {
+          "label": "read messages",
+          "detailKeys": [
+            "channelId",
+            "limit"
+          ]
+        },
+        "roleAdd": {
+          "label": "role add",
+          "detailKeys": [
+            "guildId",
+            "userId",
+            "roleId"
+          ]
+        },
+        "roleInfo": {
+          "label": "roles",
+          "detailKeys": [
+            "guildId"
+          ]
+        },
+        "roleRemove": {
+          "label": "role remove",
+          "detailKeys": [
+            "guildId",
+            "userId",
+            "roleId"
+          ]
+        },
+        "searchMessages": {
+          "label": "search",
+          "detailKeys": [
+            "guildId",
+            "content"
+          ]
+        },
+        "sendMessage": {
+          "label": "send",
+          "detailKeys": [
+            "to",
+            "content"
+          ]
+        },
+        "sticker": {
+          "label": "sticker",
+          "detailKeys": [
+            "to",
+            "stickerIds"
+          ]
+        },
+        "threadCreate": {
+          "label": "thread create",
+          "detailKeys": [
+            "channelId",
+            "name"
+          ]
+        },
+        "threadList": {
+          "label": "thread list",
+          "detailKeys": [
+            "guildId",
+            "channelId"
+          ]
+        },
+        "threadReply": {
+          "label": "thread reply",
+          "detailKeys": [
+            "channelId",
+            "content"
+          ]
+        },
+        "timeout": {
+          "label": "timeout",
+          "detailKeys": [
+            "guildId",
+            "userId"
+          ]
+        },
+        "unpinMessage": {
+          "label": "unpin",
+          "detailKeys": [
+            "channelId",
+            "messageId"
+          ]
+        },
+        "voiceStatus": {
+          "label": "voice",
+          "detailKeys": [
+            "guildId",
+            "userId"
+          ]
+        }
       }
+    },
+    "edit": {
+      "icon": "penLine",
+      "title": "Edit",
+      "detailKeys": [
+        "path"
+      ]
+    },
+    "exec": {
+      "icon": "wrench",
+      "title": "Bash",
+      "detailKeys": [
+        "command"
+      ]
+    },
+    "gateway": {
+      "icon": "plug",
+      "title": "Gateway",
+      "actions": {
+        "config.apply": {
+          "label": "config apply",
+          "detailKeys": [
+            "restartDelayMs"
+          ]
+        },
+        "config.get": {
+          "label": "config get"
+        },
+        "config.schema": {
+          "label": "config schema"
+        },
+        "restart": {
+          "label": "restart",
+          "detailKeys": [
+            "reason",
+            "delayMs"
+          ]
+        },
+        "update.run": {
+          "label": "update run",
+          "detailKeys": [
+            "restartDelayMs"
+          ]
+        }
+      }
+    },
+    "list_dir": {
+      "icon": "folder",
+      "title": "List Dir",
+      "detailKeys": [
+        "path"
+      ]
+    },
+    "memory_get": {
+      "icon": "fileText",
+      "title": "Memory Get",
+      "detailKeys": [
+        "path",
+        "from",
+        "lines"
+      ]
+    },
+    "memory_search": {
+      "icon": "search",
+      "title": "Memory Search",
+      "detailKeys": [
+        "query"
+      ]
+    },
+    "nodes": {
+      "icon": "smartphone",
+      "title": "Nodes",
+      "actions": {
+        "approve": {
+          "label": "approve",
+          "detailKeys": [
+            "requestId"
+          ]
+        },
+        "camera_clip": {
+          "label": "camera clip",
+          "detailKeys": [
+            "node",
+            "nodeId",
+            "facing",
+            "duration",
+            "durationMs"
+          ]
+        },
+        "camera_list": {
+          "label": "camera list",
+          "detailKeys": [
+            "node",
+            "nodeId"
+          ]
+        },
+        "camera_snap": {
+          "label": "camera snap",
+          "detailKeys": [
+            "node",
+            "nodeId",
+            "facing",
+            "deviceId"
+          ]
+        },
+        "describe": {
+          "label": "describe",
+          "detailKeys": [
+            "node",
+            "nodeId"
+          ]
+        },
+        "notify": {
+          "label": "notify",
+          "detailKeys": [
+            "node",
+            "nodeId",
+            "title",
+            "body"
+          ]
+        },
+        "pending": {
+          "label": "pending"
+        },
+        "reject": {
+          "label": "reject",
+          "detailKeys": [
+            "requestId"
+          ]
+        },
+        "screen_record": {
+          "label": "screen record",
+          "detailKeys": [
+            "node",
+            "nodeId",
+            "duration",
+            "durationMs",
+            "fps",
+            "screenIndex"
+          ]
+        },
+        "status": {
+          "label": "status"
+        }
+      }
+    },
+    "process": {
+      "icon": "wrench",
+      "title": "Process",
+      "detailKeys": [
+        "sessionId"
+      ]
+    },
+    "read": {
+      "icon": "fileText",
+      "title": "Read File",
+      "detailKeys": [
+        "path"
+      ]
+    },
+    "send_email": {
+      "icon": "mail",
+      "title": "Send Email",
+      "detailKeys": [
+        "to",
+        "subject"
+      ]
+    },
+    "send_media": {
+      "icon": "paperclip",
+      "title": "Send Media",
+      "detailKeys": [
+        "path",
+        "channel"
+      ]
     },
     "slack": {
       "icon": "messageSquare",
       "title": "Slack",
       "actions": {
-        "react": { "label": "react", "detailKeys": ["channelId", "messageId", "emoji"] },
-        "reactions": { "label": "reactions", "detailKeys": ["channelId", "messageId"] },
-        "sendMessage": { "label": "send", "detailKeys": ["to", "content"] },
-        "editMessage": { "label": "edit", "detailKeys": ["channelId", "messageId"] },
-        "deleteMessage": { "label": "delete", "detailKeys": ["channelId", "messageId"] },
-        "readMessages": { "label": "read messages", "detailKeys": ["channelId", "limit"] },
-        "pinMessage": { "label": "pin", "detailKeys": ["channelId", "messageId"] },
-        "unpinMessage": { "label": "unpin", "detailKeys": ["channelId", "messageId"] },
-        "listPins": { "label": "list pins", "detailKeys": ["channelId"] },
-        "memberInfo": { "label": "member", "detailKeys": ["userId"] },
-        "emojiList": { "label": "emoji list" }
+        "deleteMessage": {
+          "label": "delete",
+          "detailKeys": [
+            "channelId",
+            "messageId"
+          ]
+        },
+        "editMessage": {
+          "label": "edit",
+          "detailKeys": [
+            "channelId",
+            "messageId"
+          ]
+        },
+        "emojiList": {
+          "label": "emoji list"
+        },
+        "listPins": {
+          "label": "list pins",
+          "detailKeys": [
+            "channelId"
+          ]
+        },
+        "memberInfo": {
+          "label": "member",
+          "detailKeys": [
+            "userId"
+          ]
+        },
+        "pinMessage": {
+          "label": "pin",
+          "detailKeys": [
+            "channelId",
+            "messageId"
+          ]
+        },
+        "react": {
+          "label": "react",
+          "detailKeys": [
+            "channelId",
+            "messageId",
+            "emoji"
+          ]
+        },
+        "reactions": {
+          "label": "reactions",
+          "detailKeys": [
+            "channelId",
+            "messageId"
+          ]
+        },
+        "readMessages": {
+          "label": "read messages",
+          "detailKeys": [
+            "channelId",
+            "limit"
+          ]
+        },
+        "sendMessage": {
+          "label": "send",
+          "detailKeys": [
+            "to",
+            "content"
+          ]
+        },
+        "unpinMessage": {
+          "label": "unpin",
+          "detailKeys": [
+            "channelId",
+            "messageId"
+          ]
+        }
       }
+    },
+    "web_fetch": {
+      "icon": "fileText",
+      "title": "Web Fetch",
+      "detailKeys": [
+        "url",
+        "extractMode",
+        "maxChars"
+      ]
+    },
+    "web_search": {
+      "icon": "search",
+      "title": "Web Search",
+      "detailKeys": [
+        "query",
+        "count"
+      ]
+    },
+    "whatsapp_login": {
+      "icon": "circle",
+      "title": "WhatsApp Login",
+      "actions": {
+        "start": {
+          "label": "start"
+        },
+        "wait": {
+          "label": "wait"
+        }
+      }
+    },
+    "write": {
+      "icon": "edit",
+      "title": "Write File",
+      "detailKeys": [
+        "path"
+      ]
     }
   }
 }

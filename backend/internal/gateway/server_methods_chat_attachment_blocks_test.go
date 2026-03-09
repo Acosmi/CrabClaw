@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -127,6 +128,77 @@ func TestProcessAttachmentsForChat_AudioBlockWithSTT(t *testing.T) {
 	}
 }
 
+func TestProcessAttachmentsForChat_AudioWithoutConfigLoaderFallsBackToMarker(t *testing.T) {
+	cache := newChatAttachmentProviderCache(3 * time.Second)
+	audioData := base64.StdEncoding.EncodeToString([]byte("fake-audio"))
+	attachments := []map[string]interface{}{
+		{
+			"type":     "audio",
+			"content":  audioData,
+			"mimeType": "audio/webm",
+			"fileName": "recording.webm",
+		},
+	}
+
+	text, blocks := processAttachmentsForChatWithCache(context.Background(), "", attachments, nil, cache)
+
+	if text != "[语音附件: 配置不可用，未执行语音转录]" {
+		t.Fatalf("expected deterministic fallback marker, got %q", text)
+	}
+	if len(blocks) != 1 || blocks[0].Type != "audio" {
+		t.Fatalf("expected preserved audio block, got %+v", blocks)
+	}
+}
+
+func TestProcessAttachmentsForChat_AudioOnConfigLoadErrorFallsBackToMarker(t *testing.T) {
+	cache := newChatAttachmentProviderCache(3 * time.Second)
+	loader := &errCfgLoader{err: errors.New("boom")}
+	audioData := base64.StdEncoding.EncodeToString([]byte("fake-audio"))
+	attachments := []map[string]interface{}{
+		{
+			"type":     "audio",
+			"content":  audioData,
+			"mimeType": "audio/webm",
+			"fileName": "recording.webm",
+		},
+	}
+
+	text, blocks := processAttachmentsForChatWithCache(context.Background(), "listen", attachments, loader, cache)
+
+	if text != "listen\n[语音附件: 配置不可用，未执行语音转录]" {
+		t.Fatalf("expected text plus deterministic fallback marker, got %q", text)
+	}
+	if len(blocks) != 1 || blocks[0].Type != "audio" {
+		t.Fatalf("expected preserved audio block, got %+v", blocks)
+	}
+}
+
+func TestProcessAttachmentsForChat_AudioEmptyTranscriptUsesExplicitMarker(t *testing.T) {
+	cache := newChatAttachmentProviderCache(3 * time.Second)
+	cache.newSTTProvider = func(cfg *types.STTConfig) (media.STTProvider, error) {
+		return &fakeSTTProvider{transcript: ""}, nil
+	}
+	loader := &staticCfgLoader{cfg: testChatAttachmentConfig("openai")}
+	audioData := base64.StdEncoding.EncodeToString([]byte("fake-audio"))
+	attachments := []map[string]interface{}{
+		{
+			"type":     "audio",
+			"content":  audioData,
+			"mimeType": "audio/webm",
+			"fileName": "recording.webm",
+		},
+	}
+
+	text, blocks := processAttachmentsForChatWithCache(context.Background(), "", attachments, loader, cache)
+
+	if text != "[语音附件: 转录结果为空]" {
+		t.Fatalf("expected explicit empty transcript marker, got %q", text)
+	}
+	if len(blocks) != 1 || blocks[0].Type != "audio" {
+		t.Fatalf("expected preserved audio block, got %+v", blocks)
+	}
+}
+
 // TestProcessAttachmentsForChat_DocumentBlock 验证 document 附件产生 metadata block。
 func TestProcessAttachmentsForChat_DocumentBlock(t *testing.T) {
 	cache := newChatAttachmentProviderCache(3 * time.Second)
@@ -142,8 +214,8 @@ func TestProcessAttachmentsForChat_DocumentBlock(t *testing.T) {
 		{
 			"type":     "document",
 			"content":  docData,
-			"mimeType": "text/plain",
-			"fileName": "readme.txt",
+			"mimeType": "application/pdf",
+			"fileName": "report.pdf",
 			"fileSize": float64(512),
 		},
 	}
@@ -151,7 +223,7 @@ func TestProcessAttachmentsForChat_DocumentBlock(t *testing.T) {
 	text, blocks := processAttachmentsForChatWithCache(context.Background(), "read this", attachments, loader, cache)
 
 	// 增强文本应包含 DocConv 结果
-	if !strings.Contains(text, "[文件: readme.txt]") {
+	if !strings.Contains(text, "[文件: report.pdf]") {
 		t.Fatalf("expected doc conv in text, got %q", text)
 	}
 
@@ -163,8 +235,8 @@ func TestProcessAttachmentsForChat_DocumentBlock(t *testing.T) {
 	if b.Type != "document" {
 		t.Fatalf("expected type=document, got %q", b.Type)
 	}
-	if b.FileName != "readme.txt" {
-		t.Fatalf("expected fileName=readme.txt, got %q", b.FileName)
+	if b.FileName != "report.pdf" {
+		t.Fatalf("expected fileName=report.pdf, got %q", b.FileName)
 	}
 	if b.FileSize != 512 {
 		t.Fatalf("expected fileSize=512, got %d", b.FileSize)
@@ -172,6 +244,66 @@ func TestProcessAttachmentsForChat_DocumentBlock(t *testing.T) {
 	// document block 不存储原始数据（仅 metadata）
 	if b.Source != nil {
 		t.Fatalf("expected no source for document block")
+	}
+}
+
+func TestProcessAttachmentsForChat_TextDocumentInlineWithoutDocConv(t *testing.T) {
+	cache := newChatAttachmentProviderCache(3 * time.Second)
+	docConverterUsed := false
+	cache.newDocConverter = func(cfg *types.DocConvConfig) (media.DocConverter, error) {
+		return &fakeDocConverter{
+			markdown: "should not be used",
+			onConvert: func() {
+				docConverterUsed = true
+			},
+		}, nil
+	}
+	loader := &staticCfgLoader{cfg: testChatAttachmentConfig("openai")}
+	docData := base64.StdEncoding.EncodeToString([]byte("# Title\nhello"))
+	attachments := []map[string]interface{}{
+		{
+			"type":     "document",
+			"content":  docData,
+			"mimeType": "text/markdown",
+			"fileName": "readme.md",
+		},
+	}
+
+	text, blocks := processAttachmentsForChatWithCache(context.Background(), "", attachments, loader, cache)
+
+	if docConverterUsed {
+		t.Fatalf("expected inline text document path to bypass doc converter")
+	}
+	if !strings.Contains(text, "[文件: readme.md]") || !strings.Contains(text, "# Title") || !strings.Contains(text, "hello") {
+		t.Fatalf("expected inline markdown content, got %q", text)
+	}
+	if strings.Contains(text, "should not be used") {
+		t.Fatalf("unexpected doc converter output in text: %q", text)
+	}
+	if len(blocks) != 1 || blocks[0].Type != "document" {
+		t.Fatalf("expected 1 document block, got %+v", blocks)
+	}
+}
+
+func TestProcessAttachmentsForChat_BinaryDocumentWithoutConfigFallsBackToFileMarker(t *testing.T) {
+	cache := newChatAttachmentProviderCache(3 * time.Second)
+	docData := base64.StdEncoding.EncodeToString([]byte("pdf"))
+	attachments := []map[string]interface{}{
+		{
+			"type":     "document",
+			"content":  docData,
+			"mimeType": "application/pdf",
+			"fileName": "manual.pdf",
+		},
+	}
+
+	text, blocks := processAttachmentsForChatWithCache(context.Background(), "", attachments, nil, cache)
+
+	if text != "[文件: manual.pdf]" {
+		t.Fatalf("expected file marker fallback, got %q", text)
+	}
+	if len(blocks) != 1 || blocks[0].Type != "document" || blocks[0].FileName != "manual.pdf" {
+		t.Fatalf("expected preserved document block, got %+v", blocks)
 	}
 }
 
@@ -202,6 +334,57 @@ func TestProcessAttachmentsForChat_ImageOnlyNoText(t *testing.T) {
 	}
 }
 
+func TestProcessAttachmentsForChat_ImagePreservedWithoutConfigLoader(t *testing.T) {
+	cache := newChatAttachmentProviderCache(3 * time.Second)
+	imgData := base64.StdEncoding.EncodeToString([]byte("png"))
+	attachments := []map[string]interface{}{
+		{
+			"type":     "image",
+			"content":  imgData,
+			"mimeType": "image/png",
+			"fileName": "raw.png",
+		},
+	}
+
+	text, blocks := processAttachmentsForChatWithCache(context.Background(), "", attachments, nil, cache)
+
+	if text != "" {
+		t.Fatalf("expected empty text, got %q", text)
+	}
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 image block, got %d", len(blocks))
+	}
+	if blocks[0].Type != "image" || blocks[0].Source == nil || blocks[0].Source.Data != imgData {
+		t.Fatalf("expected preserved image block, got %+v", blocks[0])
+	}
+}
+
+func TestProcessAttachmentsForChat_ImagePreservedOnConfigLoadError(t *testing.T) {
+	cache := newChatAttachmentProviderCache(3 * time.Second)
+	loader := &errCfgLoader{err: errors.New("boom")}
+	imgData := base64.StdEncoding.EncodeToString([]byte("png"))
+	attachments := []map[string]interface{}{
+		{
+			"type":     "image",
+			"content":  imgData,
+			"mimeType": "image/png",
+			"fileName": "broken.png",
+		},
+	}
+
+	text, blocks := processAttachmentsForChatWithCache(context.Background(), "look", attachments, loader, cache)
+
+	if text != "look" {
+		t.Fatalf("expected unchanged text, got %q", text)
+	}
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 image block, got %d", len(blocks))
+	}
+	if blocks[0].Type != "image" || blocks[0].Source == nil || blocks[0].Source.Data != imgData {
+		t.Fatalf("expected preserved image block, got %+v", blocks[0])
+	}
+}
+
 // TestProcessAttachmentsForChat_MixedAttachments 验证混合附件场景。
 func TestProcessAttachmentsForChat_MixedAttachments(t *testing.T) {
 	cache := newChatAttachmentProviderCache(3 * time.Second)
@@ -215,7 +398,7 @@ func TestProcessAttachmentsForChat_MixedAttachments(t *testing.T) {
 	attachments := []map[string]interface{}{
 		{"type": "image", "content": base64.StdEncoding.EncodeToString([]byte("img")), "mimeType": "image/jpeg"},
 		{"type": "audio", "content": base64.StdEncoding.EncodeToString([]byte("aud")), "mimeType": "audio/webm"},
-		{"type": "document", "content": base64.StdEncoding.EncodeToString([]byte("doc")), "mimeType": "text/plain", "fileName": "f.txt"},
+		{"type": "document", "content": base64.StdEncoding.EncodeToString([]byte("doc")), "mimeType": "application/pdf", "fileName": "f.pdf"},
 		{"type": "video", "content": base64.StdEncoding.EncodeToString([]byte("vid")), "mimeType": "video/mp4"},
 	}
 
@@ -239,7 +422,7 @@ func TestProcessAttachmentsForChat_MixedAttachments(t *testing.T) {
 	if !strings.Contains(text, "[语音转录]: stt result") {
 		t.Fatalf("expected STT in text, got %q", text)
 	}
-	if !strings.Contains(text, "[文件: f.txt]") {
+	if !strings.Contains(text, "[文件: f.pdf]") {
 		t.Fatalf("expected doc in text, got %q", text)
 	}
 }

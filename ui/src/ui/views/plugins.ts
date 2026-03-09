@@ -310,14 +310,33 @@ function renderToolsPanel(props: PluginsProps) {
 
 // ---------- Browser Automation Card ----------
 
-function browserStatusBadge(cfg: BrowserToolConfig | null) {
-  if (!cfg) {
-    return html`<span class="chip" style="font-size: 11px; opacity: 0.5;">${t("plugins.status.notConfigured")}</span>`;
-  }
-  if (cfg.configured) {
+function browserStatusBadge(configured: boolean) {
+  if (configured) {
     return html`<span class="chip chip-ok" style="font-size: 11px;">${t("plugins.status.configured")}</span>`;
   }
   return html`<span class="chip" style="font-size: 11px; opacity: 0.5;">${t("plugins.status.notConfigured")}</span>`;
+}
+
+function getEffectiveBrowserBool(
+  cfg: BrowserToolConfig | null,
+  edits: Record<string, string | boolean>,
+  key: string,
+  fallback: boolean,
+): boolean {
+  if (key in edits) return edits[key] as boolean;
+  if (!cfg) return fallback;
+  return (cfg as Record<string, unknown>)[key] as boolean ?? fallback;
+}
+
+function getEffectiveBrowserString(
+  cfg: BrowserToolConfig | null,
+  edits: Record<string, string | boolean>,
+  key: string,
+  fallback: string,
+): string {
+  if (key in edits) return edits[key] as string;
+  if (!cfg) return fallback;
+  return (cfg as Record<string, unknown>)[key] as string ?? fallback;
 }
 
 /** Derive HTTP base URL from gateway WS URL (ws://host:port → http://host:port) */
@@ -368,16 +387,17 @@ function renderBrowserToolCard(props: PluginsProps) {
 
   const cfg = props.browserConfig;
   const edits = props.browserEdits;
+  const browserConfigured = getEffectiveBrowserBool(cfg, edits, "enabled", true) && (
+    cfg?.configured === true ||
+    getEffectiveBrowserString(cfg, edits, "cdpUrl", "").trim() !== "" ||
+    _extStatusCache.status === "ok"
+  );
 
   const getBool = (key: string, fallback: boolean): boolean => {
-    if (key in edits) return edits[key] as boolean;
-    if (!cfg) return fallback;
-    return (cfg as Record<string, unknown>)[key] as boolean ?? fallback;
+    return getEffectiveBrowserBool(cfg, edits, key, fallback);
   };
   const getString = (key: string, fallback: string): string => {
-    if (key in edits) return edits[key] as string;
-    if (!cfg) return fallback;
-    return (cfg as Record<string, unknown>)[key] as string ?? fallback;
+    return getEffectiveBrowserString(cfg, edits, key, fallback);
   };
 
   return html`
@@ -400,7 +420,7 @@ function renderBrowserToolCard(props: PluginsProps) {
             ">browser</code>
             <span style="font-weight: 600; font-size: 15px;">${t("tools.browser.title")}</span>
           </div>
-          ${browserStatusBadge(cfg)}
+          ${browserStatusBadge(browserConfigured)}
         </div>
 
         <div style="font-size: 12px; opacity: 0.55; line-height: 1.5;">
@@ -437,7 +457,7 @@ function renderBrowserToolCard(props: PluginsProps) {
                 <input
                   class="input"
                   type="text"
-                  placeholder="ws://127.0.0.1:9222"
+                  placeholder="http://127.0.0.1:9222"
                   .value=${getString("cdpUrl", "")}
                   @input=${(e: Event) => {
           props.onBrowserEditChange("cdpUrl", (e.target as HTMLInputElement).value);

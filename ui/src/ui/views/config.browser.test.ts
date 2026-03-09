@@ -1,6 +1,9 @@
 import { render } from "lit";
 import { describe, expect, it, vi } from "vitest";
+import { initLocale } from "../i18n.ts";
 import { renderConfig } from "./config.ts";
+
+initLocale("en");
 
 describe("config view", () => {
   const baseProps = () => ({
@@ -12,6 +15,8 @@ describe("config view", () => {
     saving: false,
     applying: false,
     updating: false,
+    rollingBack: false,
+    updateStatus: null,
     connected: true,
     schema: {
       type: "object",
@@ -34,6 +39,7 @@ describe("config view", () => {
     onSave: vi.fn(),
     onApply: vi.fn(),
     onUpdate: vi.fn(),
+    onRollback: vi.fn(),
     onSubsectionChange: vi.fn(),
   });
 
@@ -197,5 +203,32 @@ describe("config view", () => {
     (input as HTMLInputElement).value = "gateway";
     input.dispatchEvent(new Event("input", { bubbles: true }));
     expect(onSearchChange).toHaveBeenCalledWith("gateway");
+  });
+
+  it("renders rollback as a separate action area", () => {
+    const container = document.createElement("div");
+    const onRollback = vi.fn();
+    render(
+      renderConfig({
+        ...baseProps(),
+        updateStatus: {
+          installKind: "linux-appimage",
+          rollbackAvailable: true,
+          rollbackVersion: "1.0.0",
+        },
+        onRollback,
+      }),
+      container,
+    );
+
+    const rollbackButton = Array.from(container.querySelectorAll("button")).find(
+      (btn) => btn.textContent?.trim() === "Roll Back",
+    );
+    expect(rollbackButton).toBeTruthy();
+    expect(container.querySelector(".config-update-secondary")?.contains(rollbackButton ?? null)).toBe(true);
+    expect(container.querySelector(".config-actions")?.contains(rollbackButton ?? null)).toBe(false);
+
+    rollbackButton?.click();
+    expect(onRollback).toHaveBeenCalled();
   });
 });

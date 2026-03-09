@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Acosmi/ClawAcosmi/internal/agents/capabilities"
 	"github.com/Acosmi/ClawAcosmi/internal/browser"
 	"github.com/Acosmi/ClawAcosmi/internal/infra"
 	"github.com/Acosmi/ClawAcosmi/internal/sandbox"
@@ -83,7 +84,9 @@ type ToolExecParams struct {
 	Rules []infra.CommandRule // Allow/Ask/Deny 规则集
 	// 权限拒绝事件回调
 	OnPermissionDenied func(tool, detail string) // 通知网关广播 WebSocket 事件
-	SecurityLevel      string                    // 当前安全级别 ("deny"/"allowlist"/"sandboxed"/"full")
+	// OnPermissionDeniedWithContext 回传带审批工作流的权限拒绝上下文。
+	OnPermissionDeniedWithContext func(notice PermissionDeniedNotice)
+	SecurityLevel                 string // 当前安全级别 ("deny"/"allowlist"/"sandboxed"/"full")
 	// Argus 视觉子智能体（可选，nil = 不可用）
 	ArgusBridge ArgusBridgeForAgent
 	// Argus 审批模式: "none" / "medium_and_above" / "all"（默认 medium_and_above）
@@ -145,6 +148,23 @@ type ToolExecParams struct {
 	MediaSubsystem MediaSubsystemForAgent
 	// OnProgress 中间进度回调（可选，nil = 仅本地实时事件）。
 	OnProgress func(ctx context.Context, update ProgressUpdate) ProgressReportStatus
+	// ApprovalWorkflow 当前 Attempt 的审批工作流快照。
+	ApprovalWorkflow ApprovalWorkflow
+}
+
+func emitPermissionDenied(params ToolExecParams, tool, detail string) {
+	if params.OnPermissionDenied != nil {
+		params.OnPermissionDenied(tool, detail)
+	}
+	if params.OnPermissionDeniedWithContext != nil {
+		params.OnPermissionDeniedWithContext(PermissionDeniedNotice{
+			Tool:             tool,
+			Detail:           detail,
+			RunID:            params.RunID,
+			SessionID:        params.SessionID,
+			ApprovalWorkflow: params.ApprovalWorkflow,
+		})
+	}
 }
 
 // ExecuteToolCall 执行工具调用并返回文本结果。
@@ -159,9 +179,7 @@ func ExecuteToolCall(ctx context.Context, name string, inputJSON json.RawMessage
 			if err := json.Unmarshal(inputJSON, &bi); err == nil && bi.Command != "" {
 				cmdStr = bi.Command
 			}
-			if params.OnPermissionDenied != nil {
-				params.OnPermissionDenied("bash", cmdStr)
-			}
+			emitPermissionDenied(params, "bash", cmdStr)
 			return formatPermissionDenied("bash", cmdStr, params.SecurityLevel), nil
 		}
 		// Phase 8: 资源预算检查
@@ -262,9 +280,7 @@ func ExecuteToolCall(ctx context.Context, name string, inputJSON json.RawMessage
 			if err := json.Unmarshal(inputJSON, &wi); err == nil && wi.Path != "" {
 				pathStr = wi.Path
 			}
-			if params.OnPermissionDenied != nil {
-				params.OnPermissionDenied("write_file", pathStr)
-			}
+			emitPermissionDenied(params, "write_file", pathStr)
 			return formatPermissionDenied("write_file", pathStr, params.SecurityLevel), nil
 		}
 		return executeWriteFile(inputJSON, params)
@@ -305,6 +321,8 @@ func ExecuteToolCall(ctx context.Context, name string, inputJSON json.RawMessage
 			return params.MediaSubsystem.ExecuteTool(ctx, name, inputJSON)
 		}
 		return fmt.Sprintf("[Tool %s requires media subsystem]", name), nil
+	case "capability_manage":
+		return capabilities.ExecuteManageTool(inputJSON)
 	case "notebook_edit":
 		return "[Tool notebook_edit is not yet implemented in Go runtime]", nil
 	case "mcp":
@@ -783,9 +801,7 @@ func executeWriteFile(inputJSON json.RawMessage, params ToolExecParams) (string,
 
 	// 路径安全验证（合约 scope 优先，fallback 到 workspace 单根）
 	if err := validateToolPathScoped(path, params.ScopePaths, params.WorkspaceDir, params.MountRequests, true); err != nil {
-		if params.OnPermissionDenied != nil {
-			params.OnPermissionDenied("write_file", path)
-		}
+		emitPermissionDenied(params, "write_file", path)
 		return formatPermissionDenied("write_file", input.Path, params.SecurityLevel), nil
 	}
 
@@ -1939,6 +1955,20 @@ func executeSendMedia(ctx context.Context, inputJSON json.RawMessage, params Too
 		return "[send_media] No target specified and no session channel available. Tip: omit 'target' entirely to use the current conversation channel. Do NOT fabricate channel IDs.", nil
 	}
 
+	requestConfirmation := func() (string, bool) {
+		if params.CoderConfirmation == nil {
+			return "", true
+		}
+		approved, err := params.CoderConfirmation.RequestConfirmationWithMetadata(ctx, "send_media", inputJSON, params.SessionKey, params.ApprovalWorkflow)
+		if err != nil {
+			return fmt.Sprintf("[send_media] approval error: %v", err), false
+		}
+		if !approved {
+			return "[send_media] User denied send operation.", false
+		}
+		return "", true
+	}
+
 	var data []byte
 	fileName := strings.TrimSpace(input.FileName)
 	mimeType := input.MimeType
@@ -1951,9 +1981,7 @@ func executeSendMedia(ctx context.Context, inputJSON json.RawMessage, params Too
 			if absPath, absErr := filepath.Abs(detail); absErr == nil {
 				detail = absPath
 			}
-			if params.OnPermissionDenied != nil {
-				params.OnPermissionDenied("send_media", detail)
-			}
+			emitPermissionDenied(params, "send_media", detail)
 			return formatPermissionDenied("send_media", input.FilePath, params.SecurityLevel), nil
 		}
 
@@ -1964,6 +1992,10 @@ func executeSendMedia(ctx context.Context, inputJSON json.RawMessage, params Too
 		}
 		if fi.Size() > maxMediaFileSize {
 			return fmt.Sprintf("[send_media] File too large: %d bytes (max %d bytes / 30MB)", fi.Size(), maxMediaFileSize), nil
+		}
+
+		if result, ok := requestConfirmation(); !ok {
+			return result, nil
 		}
 
 		fileData, err := os.ReadFile(input.FilePath)
@@ -1987,6 +2019,9 @@ func executeSendMedia(ctx context.Context, inputJSON json.RawMessage, params Too
 		}
 		if len(decoded) > maxMediaFileSize {
 			return fmt.Sprintf("[send_media] Data too large: %d bytes (max %d bytes / 30MB)", len(decoded), maxMediaFileSize), nil
+		}
+		if result, ok := requestConfirmation(); !ok {
+			return result, nil
 		}
 		data = decoded
 

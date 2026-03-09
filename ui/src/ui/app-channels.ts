@@ -4,10 +4,16 @@ import {
   loadChannels,
   logoutWhatsApp,
   startWhatsAppLogin,
+  testEmailConnection,
   waitWhatsAppLogin,
 } from "./controllers/channels.ts";
 import { loadConfig, saveConfig } from "./controllers/config.ts";
 import { createNostrProfileFormState } from "./views/channels.nostr-profile-form.ts";
+
+export async function handleEmailTest(host: OpenAcosmiApp, accountId: string) {
+  await testEmailConnection(host, accountId);
+}
+
 
 export async function handleWhatsAppStart(host: OpenAcosmiApp, force: boolean) {
   await startWhatsAppLogin(host, force);

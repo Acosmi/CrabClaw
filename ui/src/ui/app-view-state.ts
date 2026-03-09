@@ -2,6 +2,7 @@ import type { EventLogEntry } from "./app-events.ts";
 import type { AgentProgress, CompactionStatus } from "./app-tool-stream.ts";
 import type { ChatReadonlyRunState, ChatUxMode } from "./chat/readonly-run-state.ts";
 import type { DevicePairingList } from "./controllers/devices.ts";
+import type { DesktopUpdateStatus } from "./controllers/config.ts";
 import type { CoderConfirmRequest } from "./controllers/coder-confirmation.ts";
 import type { EscalationState } from "./controllers/escalation.ts";
 import type { PlanConfirmRequest } from "./controllers/plan-confirmation.ts";
@@ -41,6 +42,7 @@ import type {
 } from "./types.ts";
 import type { ChatAttachment, ChatQueueItem, CronFormState } from "./ui-types.ts";
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form.ts";
+import type { EmailTestResult } from "./views/channels.email.ts";
 import type { SessionLogEntry } from "./views/usage.ts";
 
 
@@ -82,6 +84,7 @@ export type AppViewState = {
   chatToolMessages: unknown[];
   chatUxMode: ChatUxMode;
   chatReadonlyRun: ChatReadonlyRunState;
+  chatReadonlyRunHistory: ChatReadonlyRunState[];
   chatStream: string | null;
   chatStreamStartedAt: number | null;
   chatRunId: string | null;
@@ -159,6 +162,8 @@ export type AppViewState = {
   configSaving: boolean;
   configApplying: boolean;
   updateRunning: boolean;
+  updateRollbackRunning: boolean;
+  desktopUpdateStatus: DesktopUpdateStatus | null;
   applySessionKey: string;
   configSnapshot: ConfigSnapshot | null;
   configSchema: unknown;
@@ -179,6 +184,8 @@ export type AppViewState = {
   whatsappLoginQrDataUrl: string | null;
   whatsappLoginConnected: boolean | null;
   whatsappBusy: boolean;
+  emailTestLoading: boolean;
+  emailTestResult: EmailTestResult | null;
   nostrProfileFormState: NostrProfileFormState | null;
   nostrProfileAccountId: string | null;
   configFormDirty: boolean;
@@ -294,6 +301,14 @@ export type AppViewState = {
   subagentsBusyKey: string | null;
   /** @deprecated 子智能体选择已由 agentsSelectedId 管理，保留用于向后兼容 */
   subagentsActiveTab: string;
+  // Argus 故障弹窗状态
+  argusFailureAlert: {
+    visible: boolean;
+    reason: string;
+    recovery: string;
+    restarting: boolean;
+    error: string | null;
+  } | null;
   // Chat model selector — loaded on connect for composer dropdown
   chatModels: Array<{ id: string; name: string; provider: string; source: string }>;
   chatCurrentModel: string | null;
@@ -351,6 +366,7 @@ export type AppViewState = {
   handleWhatsAppStart: (force: boolean) => Promise<void>;
   handleWhatsAppWait: () => Promise<void>;
   handleWhatsAppLogout: () => Promise<void>;
+  handleEmailTest: (accountId: string) => Promise<void>;
   handleChannelConfigSave: () => Promise<boolean>;
   handleChannelConfigReload: () => Promise<void>;
   handleNostrProfileEdit: (accountId: string, profile: NostrProfile | null) => void;

@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Acosmi/ClawAcosmi/internal/agents/runner"
 	"github.com/Acosmi/ClawAcosmi/internal/infra"
 )
 
@@ -67,14 +68,29 @@ func mergeMountRequests(base, extra []MountRequest) []MountRequest {
 
 // PendingEscalationRequest 等待审批的提权请求。
 type PendingEscalationRequest struct {
-	ID             string         `json:"id"`
-	RequestedLevel string         `json:"requestedLevel"` // "allowlist" | "sandboxed" | "full"
-	Reason         string         `json:"reason"`
-	RunID          string         `json:"runId,omitempty"`
-	SessionID      string         `json:"sessionId,omitempty"`
-	RequestedAt    time.Time      `json:"requestedAt"`
-	TTLMinutes     int            `json:"ttlMinutes"`              // 建议的 TTL
-	MountRequests  []MountRequest `json:"mountRequests,omitempty"` // 临时路径放行
+	ID             string                  `json:"id"`
+	RequestedLevel string                  `json:"requestedLevel"` // "allowlist" | "sandboxed" | "full"
+	ApprovalType   string                  `json:"approvalType,omitempty"`
+	Reason         string                  `json:"reason"`
+	RunID          string                  `json:"runId,omitempty"`
+	SessionID      string                  `json:"sessionId,omitempty"`
+	RequestedAt    time.Time               `json:"requestedAt"`
+	TTLMinutes     int                     `json:"ttlMinutes"`              // 建议的 TTL
+	MountRequests  []MountRequest          `json:"mountRequests,omitempty"` // 临时路径放行
+	Workflow       runner.ApprovalWorkflow `json:"workflow,omitempty"`
+}
+
+type EscalationRequestOptions struct {
+	ID               string
+	Level            string
+	Reason           string
+	RunID            string
+	SessionID        string
+	OriginatorChatID string
+	OriginatorUserID string
+	TTLMinutes       int
+	MountRequests    []MountRequest
+	Workflow         runner.ApprovalWorkflow
 }
 
 // ActiveEscalationGrant 当前活跃的临时提权。
@@ -96,6 +112,52 @@ type EscalationStatus struct {
 	Active      *ActiveEscalationGrant    `json:"active,omitempty"`
 	BaseLevel   string                    `json:"baseLevel"`   // exec-approvals 持久化级别
 	ActiveLevel string                    `json:"activeLevel"` // 有效级别（含临时提权）
+}
+
+func buildTypedMountAccessResult(req *PendingEscalationRequest, result ApprovalResultNotification) *TypedApprovalResultNotification {
+	if req == nil || req.ApprovalType != ApprovalTypeMountAccess || len(req.MountRequests) != 1 {
+		return nil
+	}
+	return &TypedApprovalResultNotification{
+		Type:       ApprovalTypeMountAccess,
+		ID:         req.ID,
+		Approved:   result.Approved,
+		Reason:     result.Reason,
+		TTLMinutes: result.TTLMinutes,
+		MountPath:  req.MountRequests[0].HostPath,
+		MountMode:  req.MountRequests[0].MountMode,
+		Workflow:   req.Workflow,
+	}
+}
+
+func buildTypedExecEscalationResult(req *PendingEscalationRequest, result ApprovalResultNotification) *TypedApprovalResultNotification {
+	if req == nil || req.ApprovalType != ApprovalTypeExecEscalation {
+		return nil
+	}
+	return &TypedApprovalResultNotification{
+		Type:           ApprovalTypeExecEscalation,
+		ID:             req.ID,
+		Approved:       result.Approved,
+		Reason:         result.Reason,
+		TTLMinutes:     result.TTLMinutes,
+		RequestedLevel: result.RequestedLevel,
+		Workflow:       req.Workflow,
+	}
+}
+
+func notifyEscalationResult(remote *RemoteApprovalNotifier, req *PendingEscalationRequest, result ApprovalResultNotification) {
+	if remote == nil {
+		return
+	}
+	if typed := buildTypedMountAccessResult(req, result); typed != nil {
+		remote.NotifyTypedOrApprovalResult(typed, result)
+		return
+	}
+	if typed := buildTypedExecEscalationResult(req, result); typed != nil {
+		remote.NotifyTypedOrApprovalResult(typed, result)
+		return
+	}
+	remote.NotifyResult(result)
 }
 
 // ---------- 管理器 ----------
@@ -140,63 +202,85 @@ func (m *EscalationManager) SetMaxAllowedLevel(level string) {
 // originatorUserID: 触发权限请求的远程用户 ID（如飞书 open_id），用于审批卡片私聊。
 // mountRequests: 临时路径放行审批请求（可选）。
 func (m *EscalationManager) RequestEscalation(id, level, reason, runID, sessionID, originatorChatID, originatorUserID string, ttlMinutes int, mountRequests ...MountRequest) error {
+	return m.RequestEscalationWithMetadata(EscalationRequestOptions{
+		ID:               id,
+		Level:            level,
+		Reason:           reason,
+		RunID:            runID,
+		SessionID:        sessionID,
+		OriginatorChatID: originatorChatID,
+		OriginatorUserID: originatorUserID,
+		TTLMinutes:       ttlMinutes,
+		MountRequests:    mountRequests,
+	})
+}
+
+func (m *EscalationManager) RequestEscalationWithMetadata(opts EscalationRequestOptions) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	sanitizedMounts := sanitizeMountRequests(mountRequests)
+	sanitizedMounts := sanitizeMountRequests(opts.MountRequests)
 
 	if m.pending != nil {
 		return fmt.Errorf("already have a pending escalation request (id=%s)", m.pending.ID)
 	}
 
 	allowMountExtensionOnActive := m.active != nil &&
-		m.active.Level == level &&
+		m.active.Level == opts.Level &&
 		len(sanitizedMounts) > 0
 	if m.active != nil && !allowMountExtensionOnActive {
 		return fmt.Errorf("already have an active escalation grant (level=%s, expires=%s)", m.active.Level, m.active.ExpiresAt.Format(time.RFC3339))
 	}
 
 	// 验证 level（支持 L1/L2/L3 提权）
-	if level != string(infra.ExecSecurityAllowlist) &&
-		level != string(infra.ExecSecuritySandboxed) &&
-		level != string(infra.ExecSecurityFull) {
-		return fmt.Errorf("invalid escalation level %q, must be \"allowlist\", \"sandboxed\", or \"full\"", level)
+	if opts.Level != string(infra.ExecSecurityAllowlist) &&
+		opts.Level != string(infra.ExecSecuritySandboxed) &&
+		opts.Level != string(infra.ExecSecurityFull) {
+		return fmt.Errorf("invalid escalation level %q, must be \"allowlist\", \"sandboxed\", or \"full\"", opts.Level)
 	}
 
 	// Design Fix 3: base level 已满足请求级别时不创建 pending。
 	// 例外: 同级路径放行扩展（mountRequests 非空）允许继续走审批。
 	baseLevel := readBaseSecurityLevel()
-	baseSatisfied := infra.LevelOrder(infra.ExecSecurity(baseLevel)) >= infra.LevelOrder(infra.ExecSecurity(level))
+	baseSatisfied := infra.LevelOrder(infra.ExecSecurity(baseLevel)) >= infra.LevelOrder(infra.ExecSecurity(opts.Level))
 	if baseSatisfied && len(sanitizedMounts) == 0 {
-		return fmt.Errorf("base level %q already satisfies requested level %q", baseLevel, level)
+		return fmt.Errorf("base level %q already satisfies requested level %q", baseLevel, opts.Level)
 	}
 
 	// 权限边界检查：requestedLevel 不得超过 maxAllowedLevel
-	if m.maxAllowedLevel != "" && infra.LevelOrder(infra.ExecSecurity(level)) > infra.LevelOrder(infra.ExecSecurity(m.maxAllowedLevel)) {
-		return fmt.Errorf("requested level %q exceeds max allowed level %q", level, m.maxAllowedLevel)
+	if m.maxAllowedLevel != "" && infra.LevelOrder(infra.ExecSecurity(opts.Level)) > infra.LevelOrder(infra.ExecSecurity(m.maxAllowedLevel)) {
+		return fmt.Errorf("requested level %q exceeds max allowed level %q", opts.Level, m.maxAllowedLevel)
 	}
 
-	if ttlMinutes <= 0 {
-		ttlMinutes = 30 // 默认 30 分钟
+	if opts.TTLMinutes <= 0 && !isPermanentEscalationLevel(opts.Level) {
+		opts.TTLMinutes = 30 // 默认 30 分钟
 	}
 
 	m.pending = &PendingEscalationRequest{
-		ID:             id,
-		RequestedLevel: level,
-		Reason:         reason,
-		RunID:          runID,
-		SessionID:      sessionID,
+		ID:             opts.ID,
+		RequestedLevel: opts.Level,
+		ApprovalType:   ApprovalTypeExecEscalation,
+		Reason:         opts.Reason,
+		RunID:          opts.RunID,
+		SessionID:      opts.SessionID,
 		RequestedAt:    time.Now(),
-		TTLMinutes:     ttlMinutes,
+		TTLMinutes:     opts.TTLMinutes,
 		MountRequests:  sanitizedMounts,
+		Workflow:       opts.Workflow,
+	}
+	if len(sanitizedMounts) == 1 {
+		m.pending.ApprovalType = ApprovalTypeMountAccess
+		if m.pending.Workflow.ID != "" {
+			m.pending.Workflow = m.pending.Workflow.MarkStagePending(ApprovalTypeMountAccess, opts.ID)
+		}
 	}
 
 	m.log.Info("escalation requested",
-		"id", id,
-		"level", level,
-		"reason", reason,
-		"runId", runID,
-		"ttlMinutes", ttlMinutes,
+		"id", opts.ID,
+		"level", opts.Level,
+		"reason", opts.Reason,
+		"runId", opts.RunID,
+		"ttlMinutes", opts.TTLMinutes,
 	)
 
 	// 审计日志
@@ -204,42 +288,70 @@ func (m *EscalationManager) RequestEscalation(id, level, reason, runID, sessionI
 		m.auditLogger.Log(EscalationAuditEntry{
 			Timestamp:      time.Now(),
 			Event:          AuditEventRequest,
-			RequestID:      id,
-			RequestedLevel: level,
-			Reason:         reason,
-			RunID:          runID,
-			SessionID:      sessionID,
-			TTLMinutes:     ttlMinutes,
+			RequestID:      opts.ID,
+			RequestedLevel: opts.Level,
+			Reason:         opts.Reason,
+			RunID:          opts.RunID,
+			SessionID:      opts.SessionID,
+			TTLMinutes:     opts.TTLMinutes,
 		})
 	}
 
 	// 广播给前端
 	if m.broadcaster != nil {
 		m.broadcaster.Broadcast("exec.approval.requested", map[string]interface{}{
-			"id":             id,
-			"requestedLevel": level,
-			"reason":         reason,
-			"runId":          runID,
-			"sessionId":      sessionID,
+			"id":             opts.ID,
+			"requestedLevel": opts.Level,
+			"reason":         opts.Reason,
+			"runId":          opts.RunID,
+			"sessionId":      opts.SessionID,
 			"requestedAt":    m.pending.RequestedAt.UnixMilli(),
-			"ttlMinutes":     ttlMinutes,
+			"ttlMinutes":     opts.TTLMinutes,
 			"mountRequests":  sanitizedMounts,
+			"workflow":       m.pending.Workflow,
+		}, nil)
+	}
+	runnerBroadcastWorkflow := m.pending.Workflow
+	if m.broadcaster != nil && runnerBroadcastWorkflow.ID != "" {
+		m.broadcaster.Broadcast("approval.workflow.updated", map[string]interface{}{
+			"source":    "exec.approval.requested",
+			"requestId": opts.ID,
+			"workflow":  runnerBroadcastWorkflow,
+			"ts":        time.Now().UnixMilli(),
 		}, nil)
 	}
 
-	// P4: 同时推送远程审批通知（异步，不阻塞）
+	// P4: 同时推送远程审批通知（异步，不阻塞）。
+	// 单一 mount request 优先走 typed mount_access 卡片；其余 provider 回退到 legacy 审批卡片。
 	if m.remoteNotifier != nil {
-		m.remoteNotifier.NotifyAll(ApprovalCardRequest{
-			EscalationID:     id,
-			RequestedLevel:   level,
-			Reason:           reason,
-			RunID:            runID,
-			SessionID:        sessionID,
-			TTLMinutes:       ttlMinutes,
+		approvalReq := ApprovalCardRequest{
+			EscalationID:     opts.ID,
+			RequestedLevel:   opts.Level,
+			Reason:           opts.Reason,
+			RunID:            opts.RunID,
+			SessionID:        opts.SessionID,
+			TTLMinutes:       opts.TTLMinutes,
 			RequestedAt:      m.pending.RequestedAt,
-			OriginatorChatID: originatorChatID,
-			OriginatorUserID: originatorUserID,
-		})
+			OriginatorChatID: opts.OriginatorChatID,
+			OriginatorUserID: opts.OriginatorUserID,
+			Workflow:         m.pending.Workflow,
+		}
+		var typedReq *TypedApprovalRequest
+		if len(sanitizedMounts) == 1 {
+			typedReq = &TypedApprovalRequest{
+				Type:             ApprovalTypeMountAccess,
+				ID:               opts.ID,
+				Reason:           opts.Reason,
+				TTLMinutes:       opts.TTLMinutes,
+				RequestedAt:      m.pending.RequestedAt,
+				OriginatorChatID: opts.OriginatorChatID,
+				OriginatorUserID: opts.OriginatorUserID,
+				MountPath:        sanitizedMounts[0].HostPath,
+				MountMode:        sanitizedMounts[0].MountMode,
+				Workflow:         m.pending.Workflow,
+			}
+		}
+		m.remoteNotifier.NotifyEscalation(approvalReq, typedReq)
 	}
 
 	// Phase 8: 启动审批超时定时器（默认 10 分钟，与 TTL 解耦）
@@ -267,6 +379,10 @@ func (m *EscalationManager) ResolveEscalation(approve bool, ttlMinutes int) erro
 	req := m.pending
 	existingActive := m.active
 	m.pending = nil
+	stageType := ApprovalTypeExecEscalation
+	if req.ApprovalType == ApprovalTypeMountAccess {
+		stageType = ApprovalTypeMountAccess
+	}
 
 	// Phase 4.1: 清除磁盘持久化（best-effort）
 	m.clearPersistedPending()
@@ -275,6 +391,10 @@ func (m *EscalationManager) ResolveEscalation(approve bool, ttlMinutes int) erro
 	m.stopApprovalTimeoutLocked()
 
 	if !approve {
+		resolvedWorkflow := req.Workflow
+		if resolvedWorkflow.ID != "" {
+			resolvedWorkflow = resolvedWorkflow.MarkStageResolved(stageType, req.ID, "deny")
+		}
 		m.log.Info("escalation denied",
 			"id", req.ID,
 			"level", req.RequestedLevel,
@@ -296,22 +416,137 @@ func (m *EscalationManager) ResolveEscalation(approve bool, ttlMinutes int) erro
 				"id":       req.ID,
 				"approved": false,
 				"level":    string(infra.ExecSecurityDeny),
+				"workflow": resolvedWorkflow,
+			}, nil)
+			m.broadcaster.Broadcast("approval.workflow.updated", map[string]interface{}{
+				"source":    "exec.approval.resolved",
+				"requestId": req.ID,
+				"workflow":  resolvedWorkflow,
+				"ts":        time.Now().UnixMilli(),
 			}, nil)
 		}
 
 		// Phase 8: 推送拒绝结果卡片
-		if m.remoteNotifier != nil {
-			m.remoteNotifier.NotifyResult(ApprovalResultNotification{
-				EscalationID:   req.ID,
-				Approved:       false,
-				Reason:         "审批请求被拒绝 / Approval request denied",
-				RequestedLevel: req.RequestedLevel,
+		notifyEscalationResult(m.remoteNotifier, req, ApprovalResultNotification{
+			EscalationID:   req.ID,
+			Approved:       false,
+			Reason:         "审批请求被拒绝 / Approval request denied",
+			RequestedLevel: req.RequestedLevel,
+		})
+		return nil
+	}
+
+	baseLevel := readBaseSecurityLevel()
+	if infra.LevelOrder(infra.ExecSecurity(baseLevel)) >= infra.LevelOrder(infra.ExecSecurity(req.RequestedLevel)) {
+		resolvedWorkflow := req.Workflow
+		if resolvedWorkflow.ID != "" {
+			resolvedWorkflow = resolvedWorkflow.MarkStageResolved(stageType, req.ID, "approve")
+		}
+		m.log.Info("escalation satisfied by base level",
+			"id", req.ID,
+			"requestedLevel", req.RequestedLevel,
+			"baseLevel", baseLevel,
+		)
+
+		if m.auditLogger != nil {
+			m.auditLogger.Log(EscalationAuditEntry{
+				Timestamp:      time.Now(),
+				Event:          AuditEventApprove,
+				RequestID:      req.ID,
+				RequestedLevel: baseLevel,
+				RunID:          req.RunID,
+				SessionID:      req.SessionID,
 			})
 		}
+
+		if m.broadcaster != nil {
+			payload := map[string]interface{}{
+				"id":       req.ID,
+				"approved": true,
+				"level":    baseLevel,
+			}
+			if isPermanentEscalationLevel(baseLevel) {
+				payload["permanent"] = true
+			}
+			payload["workflow"] = resolvedWorkflow
+			m.broadcaster.Broadcast("exec.approval.resolved", payload, nil)
+			m.broadcaster.Broadcast("approval.workflow.updated", map[string]interface{}{
+				"source":    "exec.approval.resolved",
+				"requestId": req.ID,
+				"workflow":  resolvedWorkflow,
+				"ts":        time.Now().UnixMilli(),
+			}, nil)
+		}
+
+		notifyEscalationResult(m.remoteNotifier, req, ApprovalResultNotification{
+			EscalationID:   req.ID,
+			Approved:       true,
+			RequestedLevel: baseLevel,
+		})
+		return nil
+	}
+
+	if isPermanentEscalationLevel(req.RequestedLevel) {
+		resolvedWorkflow := req.Workflow
+		if resolvedWorkflow.ID != "" {
+			resolvedWorkflow = resolvedWorkflow.MarkStageResolved(stageType, req.ID, "approve")
+		}
+		if err := persistBaseSecurityLevel(infra.ExecSecurityFull); err != nil {
+			return fmt.Errorf("persist permanent full access: %w", err)
+		}
+		if existingActive != nil && isPermanentEscalationLevel(existingActive.Level) {
+			m.active = nil
+			if m.deescalateTimer != nil {
+				m.deescalateTimer.Stop()
+				m.deescalateTimer = nil
+			}
+		}
+
+		m.log.Info("permanent escalation approved",
+			"id", req.ID,
+			"level", req.RequestedLevel,
+		)
+
+		if m.auditLogger != nil {
+			m.auditLogger.Log(EscalationAuditEntry{
+				Timestamp:      time.Now(),
+				Event:          AuditEventApprove,
+				RequestID:      req.ID,
+				RequestedLevel: req.RequestedLevel,
+				RunID:          req.RunID,
+				SessionID:      req.SessionID,
+			})
+		}
+
+		if m.broadcaster != nil {
+			m.broadcaster.Broadcast("exec.approval.resolved", map[string]interface{}{
+				"id":        req.ID,
+				"approved":  true,
+				"level":     req.RequestedLevel,
+				"permanent": true,
+				"workflow":  resolvedWorkflow,
+			}, nil)
+			m.broadcaster.Broadcast("approval.workflow.updated", map[string]interface{}{
+				"source":    "exec.approval.resolved",
+				"requestId": req.ID,
+				"workflow":  resolvedWorkflow,
+				"ts":        time.Now().UnixMilli(),
+			}, nil)
+		}
+
+		notifyEscalationResult(m.remoteNotifier, req, ApprovalResultNotification{
+			EscalationID:   req.ID,
+			Approved:       true,
+			RequestedLevel: req.RequestedLevel,
+		})
 		return nil
 	}
 
 	// 审批通过
+	resolvedWorkflow := req.Workflow
+	if resolvedWorkflow.ID != "" {
+		resolvedWorkflow = resolvedWorkflow.MarkStageResolved(stageType, req.ID, "approve")
+	}
 	if ttlMinutes <= 0 {
 		ttlMinutes = req.TTLMinutes
 	}
@@ -319,15 +554,10 @@ func (m *EscalationManager) ResolveEscalation(approve bool, ttlMinutes int) erro
 		ttlMinutes = 30
 	}
 
-	// 分级 TTL 硬上限（参考 Vault lease 模型 + NVIDIA 安全指南）
-	// L3(full): 60 分钟（裸机权限，风险最高）
+	// 分级 TTL 硬上限（临时授权路径）
 	// L2(sandboxed): 4 小时（有沙箱保护但有网络）
 	// L1(allowlist): 8 小时（受限操作，风险较低）
 	switch req.RequestedLevel {
-	case string(infra.ExecSecurityFull):
-		if ttlMinutes > 60 {
-			ttlMinutes = 60
-		}
 	case string(infra.ExecSecuritySandboxed):
 		if ttlMinutes > 240 {
 			ttlMinutes = 240
@@ -386,6 +616,13 @@ func (m *EscalationManager) ResolveEscalation(approve bool, ttlMinutes int) erro
 			"approved":  true,
 			"level":     req.RequestedLevel,
 			"expiresAt": m.active.ExpiresAt.UnixMilli(),
+			"workflow":  resolvedWorkflow,
+		}, nil)
+		m.broadcaster.Broadcast("approval.workflow.updated", map[string]interface{}{
+			"source":    "exec.approval.resolved",
+			"requestId": req.ID,
+			"workflow":  resolvedWorkflow,
+			"ts":        time.Now().UnixMilli(),
 		}, nil)
 	}
 
@@ -393,14 +630,12 @@ func (m *EscalationManager) ResolveEscalation(approve bool, ttlMinutes int) erro
 	m.startDeescalateTimerLocked(time.Duration(ttlMinutes) * time.Minute)
 
 	// Phase 8: 推送批准结果卡片
-	if m.remoteNotifier != nil {
-		m.remoteNotifier.NotifyResult(ApprovalResultNotification{
-			EscalationID:   req.ID,
-			Approved:       true,
-			RequestedLevel: req.RequestedLevel,
-			TTLMinutes:     ttlMinutes,
-		})
-	}
+	notifyEscalationResult(m.remoteNotifier, req, ApprovalResultNotification{
+		EscalationID:   req.ID,
+		Approved:       true,
+		RequestedLevel: req.RequestedLevel,
+		TTLMinutes:     ttlMinutes,
+	})
 
 	return nil
 }
@@ -778,6 +1013,23 @@ func readBaseSecurityLevel() string {
 		return string(snapshot.File.Defaults.Security)
 	}
 	return string(infra.ExecSecurityDeny)
+}
+
+func persistBaseSecurityLevel(level infra.ExecSecurity) error {
+	snapshot := infra.ReadExecApprovalsSnapshot()
+	file := snapshot.File
+	if file == nil {
+		file = &infra.ExecApprovalsFile{Version: 1}
+	}
+	if file.Defaults == nil {
+		file.Defaults = &infra.ExecApprovalsDefaults{}
+	}
+	file.Defaults.Security = level
+	return infra.SaveExecApprovals(file)
+}
+
+func isPermanentEscalationLevel(level string) bool {
+	return strings.EqualFold(strings.TrimSpace(level), string(infra.ExecSecurityFull))
 }
 
 // applyDeescalationFallbackLocked 按制度策略应用降权回落。

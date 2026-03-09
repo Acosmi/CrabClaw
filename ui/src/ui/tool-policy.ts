@@ -1,15 +1,18 @@
 /**
- * Tool policy utilities — inlined from src/agents/tool-policy.ts
- * to decouple the frontend from the TS backend source tree.
+ * Tool policy utilities — constants derived from capability tree (D6 derivation).
+ * Source: backend/internal/agents/capabilities/gen_frontend.go
  *
- * Only the UI-used subset is included:
+ * TOOL_GROUPS and TOOL_PROFILES are generated from the capability tree via
+ * `go generate ./internal/agents/capabilities/...`
+ *
+ * Public API (hand-maintained):
  *   - normalizeToolName()
  *   - expandToolGroups()
  *   - resolveToolProfilePolicy()
  */
 
 // ---------------------------------------------------------------------------
-// Constants
+// Constants — generated from capability tree (Phase 2 D6 derivation)
 // ---------------------------------------------------------------------------
 
 const TOOL_NAME_ALIASES: Record<string, string> = {
@@ -17,41 +20,45 @@ const TOOL_NAME_ALIASES: Record<string, string> = {
   "apply-patch": "apply_patch",
 };
 
+// D6: TOOL_GROUPS derived from CapabilityTree.PolicyGroups()
 const TOOL_GROUPS: Record<string, string[]> = {
-  "group:memory": ["memory_search", "memory_get"],
-  "group:web": ["web_search", "web_fetch"],
-  "group:fs": ["read", "write", "edit", "apply_patch"],
-  "group:runtime": ["exec", "process"],
-  "group:sessions": [
-    "sessions_list",
-    "sessions_history",
-    "sessions_send",
-    "sessions_spawn",
-    "session_status",
-  ],
-  "group:ui": ["browser", "canvas"],
+  "group:ai": ["image"],
   "group:automation": ["cron", "gateway"],
+  "group:fs": ["apply_patch", "list_dir", "read", "write"],
+  "group:memory": ["memory_get", "memory_search"],
   "group:messaging": ["message"],
   "group:nodes": ["nodes"],
   "group:openacosmi": [
+    "agents_list",
     "browser",
     "canvas",
-    "nodes",
     "cron",
-    "message",
     "gateway",
-    "agents_list",
-    "sessions_list",
+    "image",
+    "memory_get",
+    "memory_search",
+    "message",
+    "nodes",
+    "session_status",
     "sessions_history",
+    "sessions_list",
     "sessions_send",
     "sessions_spawn",
-    "session_status",
-    "memory_search",
-    "memory_get",
-    "web_search",
     "web_fetch",
-    "image",
+    "web_search",
   ],
+  "group:runtime": ["exec"],
+  "group:sessions": [
+    "agents_list",
+    "session_status",
+    "sessions_history",
+    "sessions_list",
+    "sessions_send",
+    "sessions_spawn",
+  ],
+  "group:system": ["cron", "gateway", "nodes"],
+  "group:ui": ["canvas"],
+  "group:web": ["browser", "web_fetch", "web_search"],
 };
 
 type ToolProfileId = "minimal" | "coding" | "messaging" | "full";
@@ -61,6 +68,7 @@ type ToolProfilePolicy = {
   deny?: string[];
 };
 
+// D6: TOOL_PROFILES derived from CapabilityTree node Policy.Profiles
 const TOOL_PROFILES: Record<ToolProfileId, ToolProfilePolicy> = {
   minimal: {
     allow: ["session_status"],

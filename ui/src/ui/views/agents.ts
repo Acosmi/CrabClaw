@@ -103,6 +103,8 @@ export type AgentsProps = {
   isAuthenticated?: boolean;
 };
 
+// D6 derivation: Tool sections derived from capability tree WizardGroups + PolicyGroups.
+// Source: backend/internal/agents/capabilities/gen_frontend.go GenerateToolSections()
 function getToolSections() {
   return [
     {
@@ -111,7 +113,7 @@ function getToolSections() {
       tools: [
         { id: "read", label: "read", description: t("agents.tool.read") },
         { id: "write", label: "write", description: t("agents.tool.write") },
-        { id: "edit", label: "edit", description: t("agents.tool.edit") },
+        { id: "list_dir", label: "list_dir", description: t("agents.tool.list_dir") },
         { id: "apply_patch", label: "apply_patch", description: t("agents.tool.apply_patch") },
       ],
     },
@@ -120,13 +122,13 @@ function getToolSections() {
       label: t("agents.toolSection.runtime"),
       tools: [
         { id: "exec", label: "exec", description: t("agents.tool.exec") },
-        { id: "process", label: "process", description: t("agents.tool.process") },
       ],
     },
     {
       id: "web",
       label: t("agents.toolSection.web"),
       tools: [
+        { id: "browser", label: "browser", description: t("agents.tool.browser") },
         { id: "web_search", label: "web_search", description: t("agents.tool.web_search") },
         { id: "web_fetch", label: "web_fetch", description: t("agents.tool.web_fetch") },
       ],
@@ -143,6 +145,7 @@ function getToolSections() {
       id: "sessions",
       label: t("agents.toolSection.sessions"),
       tools: [
+        { id: "agents_list", label: "agents_list", description: t("agents.tool.agents_list") },
         { id: "sessions_list", label: "sessions_list", description: t("agents.tool.sessions_list") },
         { id: "sessions_history", label: "sessions_history", description: t("agents.tool.sessions_history") },
         { id: "sessions_send", label: "sessions_send", description: t("agents.tool.sessions_send") },
@@ -154,7 +157,6 @@ function getToolSections() {
       id: "ui",
       label: t("agents.toolSection.ui"),
       tools: [
-        { id: "browser", label: "browser", description: t("agents.tool.browser") },
         { id: "canvas", label: "canvas", description: t("agents.tool.canvas") },
       ],
     },
@@ -169,21 +171,12 @@ function getToolSections() {
       tools: [
         { id: "cron", label: "cron", description: t("agents.tool.cron") },
         { id: "gateway", label: "gateway", description: t("agents.tool.gateway") },
+        { id: "nodes", label: "nodes", description: t("agents.tool.nodes") },
       ],
     },
     {
-      id: "nodes",
-      label: t("agents.toolSection.nodes"),
-      tools: [{ id: "nodes", label: "nodes", description: t("agents.tool.nodes") }],
-    },
-    {
-      id: "agents",
-      label: t("agents.toolSection.agents"),
-      tools: [{ id: "agents_list", label: "agents_list", description: t("agents.tool.agents_list") }],
-    },
-    {
-      id: "media",
-      label: t("agents.toolSection.media"),
+      id: "ai",
+      label: t("agents.toolSection.ai"),
       tools: [{ id: "image", label: "image", description: t("agents.tool.image") }],
     },
   ];

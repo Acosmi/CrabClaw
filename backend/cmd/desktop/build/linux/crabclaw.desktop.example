@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=ClawAcosmi
-Comment=ClawAcosmi desktop shell
-Exec=ClawAcosmi-desktop
+Name=Crab Claw
+Comment=Crab Claw by Acosmi.ai desktop shell
+Exec=CrabClaw
 Terminal=false
 Categories=Utility;Development;

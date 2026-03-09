@@ -1,24 +1,35 @@
-// background.js — OpenAcosmi Chrome Extension Service Worker
-// Manages CDP debugging sessions and WebSocket relay connection.
+// background.js — CrabClaw Chrome Extension Service Worker
+// Manages CDP debugging sessions and relay connection.
+//
+// Connection strategy (same pattern as Claude-in-Chrome / 1Password):
+//   1. Primary: Native Messaging (connectNative) → strong keepalive, SW never suspends
+//   2. Fallback: WebSocket + heartbeat ping → resets 30s idle timer (Chrome 116+)
 
-// Relay 端口 = gateway_port + 3。开发环境 gateway=19001 → relay=19004。
+// ---- Constants ----
+const NATIVE_HOST_NAME = 'com.acosmi.crabclaw';
 const DEFAULT_RELAY_URL = 'ws://127.0.0.1:19004/ws';
-const RECONNECT_DELAY_MS = 3000;
-const MAX_RECONNECT_ATTEMPTS = 10;
+const RECONNECT_BASE_MS = 2000;
+const RECONNECT_MAX_MS = 60000;
+const WS_HEARTBEAT_MS = 20000; // 20s ping keeps SW alive (must be < 30s)
 
 // ---- State ----
+let nativePort = null;
 let relayWs = null;
 let relayToken = '';
 let relayUrl = DEFAULT_RELAY_URL;
 let attachedTabs = new Map(); // tabId -> { debuggee, attached }
 let reconnectAttempts = 0;
 let reconnectTimer = null;
+let heartbeatTimer = null;
+let lastConnectOpened = false;
+let connectionMode = 'none'; // 'native' | 'websocket' | 'none'
 
 // ---- Badge & Status ----
 const STATUS = {
   OFF: { text: '', color: '#888888' },
   CONNECTING: { text: '...', color: '#FFA500' },
   ON: { text: 'ON', color: '#00AA00' },
+  NATIVE: { text: 'N', color: '#0066CC' }, // native messaging connected
   ERROR: { text: '!', color: '#FF0000' },
 };
 
@@ -28,8 +39,13 @@ function setBadge(status) {
 }
 
 function updateBadge() {
+  const connected = connectionMode === 'native' ||
+    (relayWs && relayWs.readyState === WebSocket.OPEN);
+
   if (attachedTabs.size === 0) {
-    if (relayWs && relayWs.readyState === WebSocket.OPEN) {
+    if (connectionMode === 'native') {
+      setBadge(STATUS.NATIVE);
+    } else if (relayWs && relayWs.readyState === WebSocket.OPEN) {
       setBadge(STATUS.OFF);
     } else if (relayWs && relayWs.readyState === WebSocket.CONNECTING) {
       setBadge(STATUS.CONNECTING);
@@ -39,20 +55,17 @@ function updateBadge() {
     return;
   }
 
-  if (!relayWs || relayWs.readyState !== WebSocket.OPEN) {
+  if (!connected) {
     setBadge(STATUS.ERROR);
     return;
   }
 
-  setBadge(STATUS.ON);
+  setBadge(connectionMode === 'native' ? STATUS.NATIVE : STATUS.ON);
 }
 
 // ---- Token Auto-Discovery ----
-// Fetches the relay auth token from /json/version (loopback only).
-// The relay exposes the token in the webSocketDebuggerUrl field.
 async function fetchRelayToken(baseUrl) {
   try {
-    // Convert ws:// URL to http:// for REST call.
     const httpUrl = baseUrl
       .replace(/^ws:\/\//, 'http://')
       .replace(/^wss:\/\//, 'https://')
@@ -61,7 +74,6 @@ async function fetchRelayToken(baseUrl) {
     if (!resp.ok) return '';
     const info = await resp.json();
     const wsDebugUrl = info.webSocketDebuggerUrl || '';
-    // Extract token from ?token=XXX in the URL.
     const match = wsDebugUrl.match(/[?&]token=([^&]+)/);
     return match ? match[1] : '';
   } catch {
@@ -69,148 +81,251 @@ async function fetchRelayToken(baseUrl) {
   }
 }
 
-// ---- Relay Connection ----
-async function connectRelay() {
+async function isRelayReachable(baseUrl) {
+  try {
+    const httpUrl = baseUrl
+      .replace(/^ws:\/\//, 'http://')
+      .replace(/^wss:\/\//, 'https://')
+      .replace(/\/ws\/?$/, '/health');
+    const resp = await fetch(httpUrl, { signal: AbortSignal.timeout(1500) });
+    return resp.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ---- Native Messaging (Primary Path) ----
+
+function connectNative() {
+  try {
+    nativePort = chrome.runtime.connectNative(NATIVE_HOST_NAME);
+  } catch (e) {
+    console.log('[CrabClaw] connectNative() threw:', e.message);
+    return false;
+  }
+
+  nativePort.onMessage.addListener((msg) => {
+    // Native messaging delivers parsed JSON objects directly.
+    handleRelayMessage(msg);
+  });
+
+  nativePort.onDisconnect.addListener(() => {
+    const err = chrome.runtime.lastError;
+    console.log('[CrabClaw] Native port disconnected:', err?.message || 'unknown');
+    nativePort = null;
+    connectionMode = 'none';
+    updateBadge();
+    // Fall back to WebSocket.
+    console.log('[CrabClaw] Falling back to WebSocket connection');
+    connectWebSocket();
+  });
+
+  connectionMode = 'native';
+  reconnectAttempts = 0;
+  updateBadge();
+  sendTabList();
+  console.log('[CrabClaw] Connected via native messaging (strong keepalive)');
+  return true;
+}
+
+// ---- WebSocket Connection (Fallback Path) ----
+
+async function connectWebSocket() {
+  if (connectionMode === 'native') return; // native is active, skip
   if (relayWs && (relayWs.readyState === WebSocket.OPEN || relayWs.readyState === WebSocket.CONNECTING)) {
     return;
   }
 
   setBadge(STATUS.CONNECTING);
 
-  // Auto-discover token if not manually configured.
-  if (!relayToken) {
+  // Auto-discover token if needed.
+  if (!relayToken || !lastConnectOpened) {
+    if (relayToken && !lastConnectOpened) {
+      console.log('[CrabClaw] Previous WS connection failed before open — clearing stale token');
+      relayToken = '';
+      chrome.storage.local.remove('relayToken');
+    }
     const discovered = await fetchRelayToken(relayUrl);
     if (discovered) {
       relayToken = discovered;
       chrome.storage.local.set({ relayToken });
-      console.log('[OpenAcosmi] Auto-discovered relay token');
+      console.log('[CrabClaw] Auto-discovered relay token');
     }
   }
 
+  if (!(await isRelayReachable(relayUrl))) {
+    relayWs = null;
+    updateBadge();
+    scheduleReconnect();
+    return;
+  }
+
+  lastConnectOpened = false;
   const url = relayToken ? `${relayUrl}?token=${relayToken}` : relayUrl;
   relayWs = new WebSocket(url);
 
   relayWs.onopen = () => {
-    console.log('[OpenAcosmi] Relay connected');
+    console.log('[CrabClaw] Relay connected (WebSocket fallback)');
+    lastConnectOpened = true;
     reconnectAttempts = 0;
+    connectionMode = 'websocket';
     updateBadge();
-
-    // Send initial tab list to relay.
     sendTabList();
+
+    // Start heartbeat to keep Service Worker alive (must be < 30s).
+    stopHeartbeat();
+    heartbeatTimer = setInterval(() => {
+      if (relayWs && relayWs.readyState === WebSocket.OPEN) {
+        relayWs.send(JSON.stringify({ type: 'ping' }));
+      } else {
+        stopHeartbeat();
+      }
+    }, WS_HEARTBEAT_MS);
   };
 
   relayWs.onmessage = (event) => {
-    handleRelayMessage(event.data);
+    try {
+      const msg = JSON.parse(event.data);
+      handleRelayMessage(msg);
+    } catch {
+      console.warn('[CrabClaw] Non-JSON relay message:', event.data);
+    }
   };
 
   relayWs.onclose = (event) => {
-    console.log('[OpenAcosmi] Relay disconnected', event.code, event.reason);
+    console.log('[CrabClaw] Relay disconnected', event.code, event.reason);
     relayWs = null;
+    connectionMode = 'none';
+    stopHeartbeat();
     updateBadge();
     scheduleReconnect();
   };
 
-  relayWs.onerror = (error) => {
-    console.error('[OpenAcosmi] Relay error', error);
+  relayWs.onerror = () => {
+    console.warn('[CrabClaw] Relay connection failed, will retry');
     updateBadge();
   };
 }
 
-function scheduleReconnect() {
-  if (reconnectTimer) return;
-  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-    console.log('[OpenAcosmi] Max reconnect attempts reached');
-    setBadge(STATUS.ERROR);
-    return;
+function stopHeartbeat() {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
   }
+}
+
+function scheduleReconnect() {
+  if (connectionMode === 'native') return; // native is handling it
+  if (reconnectTimer) return;
 
   reconnectAttempts++;
-  const delay = RECONNECT_DELAY_MS * Math.min(reconnectAttempts, 5);
+  const base = Math.min(RECONNECT_BASE_MS * Math.pow(2, reconnectAttempts - 1), RECONNECT_MAX_MS);
+  const jitter = Math.random() * base * 0.3;
+  const delay = Math.round(base + jitter);
+  console.log(`[CrabClaw] Reconnect #${reconnectAttempts} in ${delay}ms`);
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
     connectRelay();
   }, delay);
 }
 
+// ---- Unified Connection Entry Point ----
+
+async function connectRelay() {
+  // Already connected?
+  if (connectionMode === 'native' && nativePort) return;
+  if (connectionMode === 'websocket' && relayWs && relayWs.readyState === WebSocket.OPEN) return;
+
+  // Try native messaging first.
+  if (!nativePort) {
+    if (connectNative()) return;
+  }
+
+  // Fall back to WebSocket.
+  await connectWebSocket();
+}
+
+// ---- Send to Relay (unified) ----
+
 function sendToRelay(data) {
+  const payload = typeof data === 'object' ? data : JSON.parse(data);
+
+  // Prefer native messaging.
+  if (connectionMode === 'native' && nativePort) {
+    try {
+      nativePort.postMessage(payload);
+      return true;
+    } catch (e) {
+      console.warn('[CrabClaw] Native send failed:', e.message);
+      nativePort = null;
+      connectionMode = 'none';
+    }
+  }
+
+  // WebSocket fallback.
   if (relayWs && relayWs.readyState === WebSocket.OPEN) {
-    relayWs.send(typeof data === 'string' ? data : JSON.stringify(data));
+    relayWs.send(JSON.stringify(payload));
     return true;
   }
+
   return false;
 }
 
 // ---- Relay Message Handling ----
-function handleRelayMessage(raw) {
-  let msg;
-  try {
-    msg = JSON.parse(raw);
-  } catch {
-    console.warn('[OpenAcosmi] Non-JSON relay message:', raw);
-    return;
-  }
-
-  // Relay commands from the agent.
+function handleRelayMessage(msg) {
+  // msg is already a parsed object (from native messaging or JSON.parse).
   const { type, tabId, method, params, id } = msg;
 
   switch (type) {
     case 'cdp':
-      // Forward CDP command to attached tab.
       forwardCdpToTab(tabId, method, params, id);
       break;
-
     case 'list_tabs':
       sendTabList();
       break;
-
     case 'attach':
       attachTab(tabId);
       break;
-
     case 'detach':
       detachTab(tabId);
       break;
-
     case 'navigate':
       if (tabId && msg.url) {
         chrome.tabs.update(tabId, { url: msg.url });
       }
       break;
-
     case 'create_tab':
       chrome.tabs.create({ url: msg.url || 'about:blank' }, (tab) => {
         sendToRelay({ type: 'tab_created', tabId: tab.id, url: tab.url });
       });
       break;
-
     case 'close_tab':
       if (tabId) {
         detachTab(tabId);
         chrome.tabs.remove(tabId);
       }
       break;
-
     case 'switch_tab':
       if (tabId) {
         chrome.tabs.update(tabId, { active: true });
       }
       break;
-
     case 'config':
-      // Update relay configuration.
       if (msg.relayUrl) relayUrl = msg.relayUrl;
       if (msg.token) relayToken = msg.token;
       break;
-
+    case 'pong':
+      // Heartbeat response from relay — no action needed.
+      break;
     default:
-      console.warn('[OpenAcosmi] Unknown relay message type:', type);
+      console.warn('[CrabClaw] Unknown relay message type:', type);
   }
 }
 
 // ---- CDP Debugger ----
 async function attachTab(tabId) {
   if (attachedTabs.has(tabId)) {
-    console.log('[OpenAcosmi] Tab already attached:', tabId);
+    console.log('[CrabClaw] Tab already attached:', tabId);
     return true;
   }
 
@@ -218,9 +333,8 @@ async function attachTab(tabId) {
   try {
     await chrome.debugger.attach(debuggee, '1.3');
     attachedTabs.set(tabId, { debuggee, attached: true });
-    console.log('[OpenAcosmi] Attached to tab:', tabId);
+    console.log('[CrabClaw] Attached to tab:', tabId);
 
-    // Enable required CDP domains.
     await chrome.debugger.sendCommand(debuggee, 'Page.enable');
     await chrome.debugger.sendCommand(debuggee, 'Runtime.enable');
     await chrome.debugger.sendCommand(debuggee, 'DOM.enable');
@@ -230,7 +344,7 @@ async function attachTab(tabId) {
     sendToRelay({ type: 'tab_attached', tabId });
     return true;
   } catch (err) {
-    console.error('[OpenAcosmi] Attach failed:', tabId, err.message);
+    console.error('[CrabClaw] Attach failed:', tabId, err.message);
     sendToRelay({ type: 'error', tabId, error: err.message });
     return false;
   }
@@ -248,11 +362,10 @@ async function detachTab(tabId) {
   attachedTabs.delete(tabId);
   updateBadge();
   sendToRelay({ type: 'tab_detached', tabId });
-  console.log('[OpenAcosmi] Detached from tab:', tabId);
+  console.log('[CrabClaw] Detached from tab:', tabId);
 }
 
 async function forwardCdpToTab(tabId, method, params, requestId) {
-  // If no specific tab, use first attached tab.
   let targetTabId = tabId;
   if (!targetTabId && attachedTabs.size > 0) {
     targetTabId = attachedTabs.keys().next().value;
@@ -300,7 +413,7 @@ async function sendTabList() {
     }));
     sendToRelay({ type: 'tab_list', tabs: tabList });
   } catch (err) {
-    console.error('[OpenAcosmi] Failed to query tabs:', err);
+    console.error('[CrabClaw] Failed to query tabs:', err);
   }
 }
 
@@ -321,11 +434,10 @@ chrome.debugger.onDetach.addListener((source, reason) => {
     attachedTabs.delete(source.tabId);
     updateBadge();
     sendToRelay({ type: 'tab_detached', tabId: source.tabId, reason });
-    console.log('[OpenAcosmi] Debugger detached:', source.tabId, reason);
+    console.log('[CrabClaw] Debugger detached:', source.tabId, reason);
   }
 });
 
-// Listen for tab close events.
 chrome.tabs.onRemoved.addListener((tabId) => {
   if (attachedTabs.has(tabId)) {
     attachedTabs.delete(tabId);
@@ -339,7 +451,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   switch (msg.action) {
     case 'getStatus':
       sendResponse({
-        connected: relayWs && relayWs.readyState === WebSocket.OPEN,
+        connected: connectionMode !== 'none',
+        connectionMode,
         attachedTabs: Array.from(attachedTabs.keys()),
         relayUrl,
         hasToken: !!relayToken,
@@ -353,30 +466,40 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       } else {
         attachTab(tabId).then((ok) => sendResponse({ attached: ok }));
       }
-      return true; // async response
+      return true;
     }
 
     case 'connect':
       if (msg.relayUrl) relayUrl = msg.relayUrl;
-      // Token: use manual value if provided, else clear for auto-discovery.
       relayToken = msg.token || '';
-      // Save config.
       chrome.storage.local.set({ relayUrl, relayToken });
       reconnectAttempts = 0;
+      // Disconnect existing connections.
+      if (nativePort) {
+        nativePort.disconnect();
+        nativePort = null;
+      }
       if (relayWs) {
         relayWs.close();
         relayWs = null;
       }
+      connectionMode = 'none';
+      stopHeartbeat();
       connectRelay();
       sendResponse({ ok: true });
       return true;
 
     case 'disconnect':
+      if (nativePort) {
+        nativePort.disconnect();
+        nativePort = null;
+      }
       if (relayWs) {
         relayWs.close();
         relayWs = null;
       }
-      // Detach all tabs.
+      connectionMode = 'none';
+      stopHeartbeat();
       for (const tabId of attachedTabs.keys()) {
         detachTab(tabId);
       }
@@ -395,8 +518,8 @@ chrome.storage.local.get(['relayUrl', 'relayToken'], (items) => {
   if (items.relayUrl) relayUrl = items.relayUrl;
   if (items.relayToken) relayToken = items.relayToken;
 
-  // Auto-connect on startup.
+  // Connect: tries native messaging first, falls back to WebSocket.
   connectRelay();
 });
 
-console.log('[OpenAcosmi] Service worker initialized');
+console.log('[CrabClaw] Service worker initialized (native messaging + WebSocket fallback)');

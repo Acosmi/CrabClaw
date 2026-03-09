@@ -1,25 +1,24 @@
-# Linux Artifact Plan
+# Linux 产物规划
 
-This document records the intended Linux desktop outputs for future build
-activation.
+本文档记录 Linux 桌面产物的规划命名。
 
-## Planned outputs
+## 规划输出
 
-- raw desktop binary
-- tarball for inspection
-- AppImage if packaging is approved
-- optional deb/rpm later
+- 原始桌面二进制
+- 调试或核查用归档
+- 正式 AppImage 产物
+- 之后可选 `deb/rpm`
 
-## Suggested naming
+## 建议命名
 
-- `ClawAcosmi-desktop-linux-x64`
-- `ClawAcosmi-linux-x64.tar.gz`
-- `ClawAcosmi-desktop-linux-x64.AppImage`
+- `CrabClaw`
+- `CrabClaw-linux-amd64.AppImage`
+- `CrabClaw-linux-amd64.deb`
 
-## Open questions
+## 待确认事项
 
-- whether AppImage is mandatory for the first active workflow
-- whether `.deb` is required in the first milestone
-- whether Linux artifacts should embed version in the filename
+- 第一阶段是否强制以 AppImage 为唯一自更新产物
+- 第一里程碑是否需要 `.deb`
+- Linux 产物文件名是否需要直接携带版本号
 
-This is a planning artifact only.
+此文件仅作为规划说明。

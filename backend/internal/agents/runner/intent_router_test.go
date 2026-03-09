@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/Acosmi/ClawAcosmi/internal/agents/llmclient"
@@ -243,6 +244,91 @@ func TestFilterToolsByIntent_GreetingNoTools(t *testing.T) {
 	filtered := filterToolsByIntent(tools, intentGreeting)
 	if len(filtered) != 0 {
 		t.Errorf("intentGreeting should have 0 tools, got %d", len(filtered))
+	}
+}
+
+// ---------- P3-9: send_media 路由验证 ----------
+
+// TestSendMedia_RoutedToTierWithTool verifies that "桌面上的 logo.png 发给我"
+// is classified to a tier where send_media is available.
+// P3-4 changed send_media MinTier from task_write to task_light.
+// P3-6 moved "发给" from writeKeywords (send_media's IntentKeywords are not
+// used for tier classification — IntentPriority=0). The prompt falls through
+// to task_light default, where send_media IS available.
+func TestSendMedia_RoutedToTierWithTool(t *testing.T) {
+	prompts := []string{
+		"桌面上的 logo.png 发给我",
+		"把这个文件发给我",
+		"发送 report.pdf 到飞书群",
+	}
+
+	for _, p := range prompts {
+		tier := classifyIntent(p)
+
+		// Build a tool set that includes send_media
+		tools := mockToolDefs("bash", "read_file", "write_file", "send_media", "search_skills", "lookup_skill")
+		filtered := filterToolsByIntent(tools, tier)
+		names := toolNames(filtered)
+
+		if !contains(names, "send_media") {
+			t.Errorf("classifyIntent(%q) = %q, but send_media is NOT in filtered tools %v",
+				p, tier, names)
+		}
+	}
+}
+
+// TestSendMedia_AvailableAtTaskLight verifies send_media is in the tree's
+// task_light allowlist after P3-4 MinTier correction.
+func TestSendMedia_AvailableAtTaskLight(t *testing.T) {
+	tools := mockToolDefs("send_media", "bash", "read_file")
+	filtered := filterToolsByIntent(tools, intentTaskLight)
+	names := toolNames(filtered)
+
+	if !contains(names, "send_media") {
+		t.Errorf("send_media should be available at task_light after P3-4, got tools: %v", names)
+	}
+}
+
+func TestIntentGuidance_TaskLightPrefersSendMediaForKnownFiles(t *testing.T) {
+	guidance := intentGuidanceText(intentTaskLight)
+	if !strings.Contains(guidance, "use 'send_media' directly") {
+		t.Fatalf("task_light guidance should prefer send_media for known files, got: %q", guidance)
+	}
+	if !strings.Contains(guidance, "Do NOT delegate to 'spawn_argus_agent'") {
+		t.Fatalf("task_light guidance should forbid argus detours for known files, got: %q", guidance)
+	}
+}
+
+func TestIntentGuidance_MultimodalKeepsKnownFileSendOnSendMedia(t *testing.T) {
+	guidance := intentGuidanceText(intentTaskMultimodal)
+	if !strings.Contains(guidance, "use 'send_media'") {
+		t.Fatalf("multimodal guidance should reference send_media for existing files, got: %q", guidance)
+	}
+	if !strings.Contains(guidance, "Only use 'spawn_argus_agent' if the file must first be discovered") {
+		t.Fatalf("multimodal guidance should scope argus to discovery/native interaction, got: %q", guidance)
+	}
+}
+
+// TestSendEmail_RoutedToTierWithTool verifies that email-related prompts
+// route to a tier where send_email is available (task_write).
+// F-01 regression fix: send_email IntentPriority=10 ensures "邮件" routes to task_write.
+func TestSendEmail_RoutedToTierWithTool(t *testing.T) {
+	prompts := []struct {
+		input string
+		want  intentTier
+	}{
+		{"发送邮件给小明", intentTaskWrite},             // "邮件" → task_write
+		{"邮件", intentTaskWrite},                  // "邮件" → task_write
+		{"发邮件", intentTaskWrite},                 // "邮件" substring → task_write
+		{"帮我写封邮件", intentTaskWrite},              // "写" + "邮件" → task_write
+		{"reply email to John", intentTaskWrite}, // "reply email" → task_write
+	}
+
+	for _, c := range prompts {
+		tier := classifyIntent(c.input)
+		if tier != c.want {
+			t.Errorf("classifyIntent(%q) = %q, want %q", c.input, tier, c.want)
+		}
 	}
 }
 

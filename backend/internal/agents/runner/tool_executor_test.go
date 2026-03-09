@@ -1342,6 +1342,34 @@ func sendMediaTestParams(sessionKey string) ToolExecParams {
 	}
 }
 
+func newTestCoderConfirmationManager(
+	t *testing.T,
+	decision string,
+	capture func(CoderConfirmationRequest),
+) *CoderConfirmationManager {
+	t.Helper()
+
+	var mgr *CoderConfirmationManager
+	mgr = NewCoderConfirmationManager(func(event string, payload interface{}) {
+		if event != "coder.confirm.requested" {
+			return
+		}
+		req, ok := payload.(CoderConfirmationRequest)
+		if !ok {
+			t.Fatalf("unexpected coder confirmation payload type: %T", payload)
+		}
+		if capture != nil {
+			capture(req)
+		}
+		go func() {
+			if err := mgr.ResolveConfirmation(req.ID, decision); err != nil {
+				t.Errorf("ResolveConfirmation: %v", err)
+			}
+		}()
+	}, nil, time.Second)
+	return mgr
+}
+
 func TestSendMedia_NoTarget_HelpfulError(t *testing.T) {
 	// SessionKey 为空 + target 为空 → 应返回带指导的错误
 	result, err := ExecuteToolCall(context.Background(), "send_media",
@@ -1573,6 +1601,84 @@ func TestSendMedia_PathGrantAllowsOutsideWorkspace(t *testing.T) {
 	}
 	if !strings.Contains(result, `"status":"sent"`) {
 		t.Fatalf("expected success json, got %q", result)
+	}
+}
+
+func TestSendMedia_FilePathRequiresConfirmationBeforeSending(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "report.png")
+	if err := os.WriteFile(testFile, []byte("fake-png-data"), 0o644); err != nil {
+		t.Fatalf("write test file: %v", err)
+	}
+
+	sender := &mockMediaSender{}
+	var captured CoderConfirmationRequest
+	mgr := newTestCoderConfirmationManager(t, "allow", func(req CoderConfirmationRequest) {
+		captured = req
+	})
+
+	result, err := ExecuteToolCall(context.Background(), "send_media",
+		json.RawMessage(fmt.Sprintf(`{"target":"feishu:oc_target123","file_path":%q,"message":"请查收附件"}`, testFile)),
+		ToolExecParams{
+			SessionKey:        "feishu:oc_test123",
+			MediaSender:       sender,
+			WorkspaceDir:      tmpDir,
+			ScopePaths:        []string{tmpDir},
+			CoderConfirmation: mgr,
+		})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if sender.lastFileName != "report.png" {
+		t.Fatalf("fileName=%q, want report.png", sender.lastFileName)
+	}
+	if !strings.Contains(result, `"status\":\"sent\"`) {
+		t.Fatalf("expected sent status in result, got %q", result)
+	}
+	if captured.ToolName != "send_media" {
+		t.Fatalf("toolName=%q, want send_media", captured.ToolName)
+	}
+	if captured.Preview == nil {
+		t.Fatal("expected preview to be populated")
+	}
+	if captured.Preview.FilePath != testFile {
+		t.Fatalf("preview.FilePath=%q, want %q", captured.Preview.FilePath, testFile)
+	}
+	if captured.Preview.Command != "send "+testFile+" to feishu:oc_target123" {
+		t.Fatalf("preview.Command=%q", captured.Preview.Command)
+	}
+	if captured.Preview.Content != "请查收附件" {
+		t.Fatalf("preview.Content=%q, want 请查收附件", captured.Preview.Content)
+	}
+}
+
+func TestSendMedia_DeniedConfirmationDoesNotSend(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "report.md")
+	if err := os.WriteFile(testFile, []byte("# report\n"), 0o644); err != nil {
+		t.Fatalf("write test file: %v", err)
+	}
+
+	sender := &mockMediaSender{}
+	mgr := newTestCoderConfirmationManager(t, "deny", nil)
+
+	result, err := ExecuteToolCall(context.Background(), "send_media",
+		json.RawMessage(fmt.Sprintf(`{"target":"feishu:oc_target123","file_path":%q}`, testFile)),
+		ToolExecParams{
+			SessionKey:        "feishu:oc_test123",
+			MediaSender:       sender,
+			WorkspaceDir:      tmpDir,
+			ScopePaths:        []string{tmpDir},
+			CoderConfirmation: mgr,
+		})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "[send_media] User denied send operation." {
+		t.Fatalf("unexpected result: %q", result)
+	}
+	if sender.lastFileName != "" {
+		t.Fatalf("send should not happen after denial, got fileName=%q", sender.lastFileName)
 	}
 }
 

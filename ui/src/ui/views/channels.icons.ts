@@ -7,51 +7,51 @@
 import { html, type TemplateResult } from "lit";
 
 const ICONS: Record<string, () => TemplateResult> = {
-    whatsapp: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+  whatsapp: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
     <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.86 9.86 0 004.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0012.04 2z" fill="#25D366"/>
     <path d="M17.47 14.38c-.3-.15-1.77-.87-2.04-.97-.28-.1-.48-.15-.68.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.47-2.4-1.49-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.14-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.03-.52-.07-.15-.68-1.62-.93-2.22-.24-.58-.49-.5-.68-.51h-.58c-.2 0-.52.07-.79.37-.28.3-1.04 1.02-1.04 2.49s1.07 2.88 1.22 3.08c.15.2 2.1 3.22 5.1 4.51.71.31 1.27.49 1.7.63.72.23 1.37.2 1.88.12.58-.09 1.77-.73 2.02-1.43.25-.7.25-1.3.17-1.43-.07-.13-.28-.2-.58-.35z" fill="#fff"/>
   </svg>`,
 
-    telegram: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+  telegram: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
     <circle cx="12" cy="12" r="10" fill="#2AABEE"/>
     <path d="M6.53 11.5c2.74-1.2 4.57-1.98 5.49-2.37 2.62-1.09 3.16-1.28 3.52-1.28.08 0 .25.02.37.1.1.07.12.16.14.23.01.07.03.23.01.35-.17 1.77-.9 6.07-1.27 8.06-.16.84-.47 1.12-.77 1.15-.66.06-1.16-.44-1.8-.86-.99-.65-1.55-1.06-2.52-1.7-1.11-.74-.39-1.14.24-1.8.17-.17 3.04-2.79 3.1-3.02.01-.03.01-.14-.05-.2-.07-.06-.16-.04-.23-.02-.1.02-1.62 1.03-4.58 3.03-.43.3-.82.44-1.18.43-.39-.01-1.14-.22-1.7-.4-.68-.22-1.23-.34-1.18-.72.03-.2.28-.4.76-.61z" fill="#fff"/>
   </svg>`,
 
-    discord: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+  discord: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
     <rect width="24" height="24" rx="5" fill="#5865F2"/>
     <path d="M16.94 8.04a12.1 12.1 0 00-2.98-.93.05.05 0 00-.05.02c-.13.23-.27.53-.37.77a11.18 11.18 0 00-3.08 0 7.3 7.3 0 00-.38-.77.05.05 0 00-.05-.02c-1.04.18-2.04.49-2.98.93a.04.04 0 00-.02.02c-1.9 2.84-2.42 5.61-2.16 8.34 0 .02.01.03.02.04a12.2 12.2 0 003.68 1.86.05.05 0 00.05-.02c.28-.39.53-.8.75-1.23a.05.05 0 00-.03-.07 8.03 8.03 0 01-1.15-.55.05.05 0 01-.01-.08c.08-.06.15-.12.23-.18a.05.05 0 01.05-.01c2.4 1.1 5.01 1.1 7.38 0a.05.05 0 01.05.01c.07.06.15.12.23.18a.05.05 0 01-.01.08c-.37.22-.75.4-1.15.55a.05.05 0 00-.03.07c.22.43.48.84.75 1.23a.05.05 0 00.05.02 12.17 12.17 0 003.69-1.86.05.05 0 00.02-.04c.31-3.17-.52-5.92-2.19-8.34a.04.04 0 00-.02-.02zM9.68 14.78c-.72 0-1.32-.66-1.32-1.48s.58-1.48 1.32-1.48c.74 0 1.33.67 1.32 1.48 0 .82-.58 1.48-1.32 1.48zm4.88 0c-.72 0-1.32-.66-1.32-1.48s.58-1.48 1.32-1.48c.74 0 1.33.67 1.32 1.48 0 .82-.58 1.48-1.32 1.48z" fill="#fff"/>
   </svg>`,
 
-    slack: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+  slack: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
     <path d="M6.53 14.5a1.5 1.5 0 11-1.5-1.5h1.5v1.5zm.75 0a1.5 1.5 0 113 0v3.75a1.5 1.5 0 11-3 0V14.5z" fill="#E01E5A"/>
     <path d="M9.53 6.53a1.5 1.5 0 111.5-1.5v1.5h-1.5zm0 .75a1.5 1.5 0 110 3H5.78a1.5 1.5 0 110-3h3.75z" fill="#36C5F0"/>
     <path d="M17.47 9.53a1.5 1.5 0 111.5 1.5h-1.5v-1.5zm-.75 0a1.5 1.5 0 11-3 0V5.78a1.5 1.5 0 113 0v3.75z" fill="#2EB67D"/>
     <path d="M14.47 17.47a1.5 1.5 0 11-1.5 1.5v-1.5h1.5zm0-.75a1.5 1.5 0 110-3h3.75a1.5 1.5 0 110 3h-3.75z" fill="#ECB22E"/>
   </svg>`,
 
-    signal: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+  signal: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
     <circle cx="12" cy="12" r="10" fill="#3A76F0"/>
     <path d="M12 6.5c-3.04 0-5.5 2.46-5.5 5.5s2.46 5.5 5.5 5.5 5.5-2.46 5.5-5.5S15.04 6.5 12 6.5zm0 9.5c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z" fill="#fff"/>
     <circle cx="12" cy="12" r="2" fill="#fff"/>
   </svg>`,
 
-    imessage: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+  imessage: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
     <path d="M12 3C6.48 3 2 6.58 2 11c0 2.52 1.39 4.76 3.56 6.24-.14.85-.6 2.42-1.56 3.26 0 0 2.52-.29 4.27-1.62.56.08 1.14.12 1.73.12 5.52 0 10-3.58 10-8s-4.48-8-10-8z" fill="#34C759"/>
   </svg>`,
 
-    googlechat: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+  googlechat: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
     <path d="M12 3H6a3 3 0 00-3 3v6l3-3h6a3 3 0 003-3V6a3 3 0 00-3-3z" fill="#00AC47"/>
     <path d="M21 9h-6a3 3 0 00-3 3v6a3 3 0 003 3h6l3 3v-6a3 3 0 000-6v-3z" fill="#5BB974"/>
     <path d="M15 9V6a3 3 0 00-3-3H6L3 6v6a3 3 0 003 3h3v-3a3 3 0 013-3h6z" fill="#00AC47"/>
     <rect x="9" y="9" width="6" height="6" rx="3" fill="#188038"/>
   </svg>`,
 
-    nostr: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+  nostr: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
     <circle cx="12" cy="12" r="10" fill="#8B5CF6"/>
     <path d="M15.5 8.5c-.83 0-1.5.67-1.5 1.5v1c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-1c0-.83-.67-1.5-1.5-1.5zm-7 0c-.83 0-1.5.67-1.5 1.5v1c0 .83.67 1.5 1.5 1.5S10 12.33 10 11.5v-1c0-.83-.67-1.5-1.5-1.5zM12 16c-1.66 0-3-1.34-3-3h6c0 1.66-1.34 3-3 3z" fill="#fff"/>
   </svg>`,
 
-    wecom: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+  wecom: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
     <path d="M9.66 4C6.00 4 3 6.69 3 10c0 1.85.95 3.51 2.45 4.6L5 17l2.63-1.32c.64.2 1.32.32 2.03.32.22 0 .44-.01.65-.04-.14-.47-.21-.96-.21-1.46C10.1 11.47 12.69 9 15.87 9c.38 0 .75.04 1.11.11C16.39 6.22 13.31 4 9.66 4z" fill="#2BAD13"/>
     <path d="M20.5 14.5c0 2.49-2.38 4.5-5.32 4.5-.64 0-1.26-.09-1.83-.26L11 20l.39-1.83c-1.17-.89-1.89-2.16-1.89-3.57 0-2.69 2.58-4.87 5.76-4.87S20.5 11.91 20.5 14.5z" fill="#4DC91F"/>
     <circle cx="12.8" cy="14.3" r=".8" fill="#fff"/>
@@ -60,24 +60,29 @@ const ICONS: Record<string, () => TemplateResult> = {
     <circle cx="11" cy="9.5" r=".8" fill="#fff"/>
   </svg>`,
 
-    dingtalk: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+  dingtalk: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
     <rect width="24" height="24" rx="5" fill="#0089FF"/>
     <path d="M17.32 11.84c-.16.01-.94.09-2.06-.44l-.33-.15c-.05-.02-.2-.09-.25-.1l.1 2.53.01.17c.02.39-.1.8-.46 1.1-.54.46-1.2.48-1.2.48H9.1l-.06.46-.16 1.17-.06.44h4.54c.44 0 1.34-.14 2.06-.78.56-.5.82-1.16.89-1.47l.07-.26c.19-.76.54-2.43.54-2.43-.19.16-.5.31-1.06.33zm-4.77 1.34h-.73l.58-2.76h-1.97l-.08.38c-.18.87-.53 2.3-.95 3.04-.31.56-.68.89-.89 1.04h2.52c.26 0 .63-.05.94-.32.23-.2.45-.6.45-.6l.13-.78zM14.68 7h-4.02s.16 1.07.33 1.59l.13.38c.18.53.34.87.34.87l-.03.01c-.8-.19-2.3-.49-3.64-.38-.63.05-1.6.27-1.93.38l-.06.02s.16.47.83.86c.56.33 1.21.47 1.79.53.58.06.91.01 1.55-.07.77-.1 1.53-.43 1.53-.43s-.37 1.6-.48 2.06h.67l.6-2.85c.15-.06.35-.16.59-.29.71-.42 1.39-1.01 1.74-1.64.12-.22.32-.72.06-1.04z" fill="#fff"/>
   </svg>`,
 
-    feishu: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+  feishu: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
     <path d="M4.5 7.5C6.5 5 10 3.5 10 3.5s0 3-1 5c3-2.5 7.5-3 7.5-3s-2 3.5-4 5c4-1 7-1 7-1s-3 4-7 6c-4 2-8.5 1.5-8.5 1.5s1-2 2.5-3.5c-3 .5-4.5 0-4.5 0s1-3 2.5-4c-2 .5-3 0-3 0S3 7.5 4.5 7.5z" fill="#3370FF"/>
     <path d="M10 3.5s0 3-1 5c3-2.5 7.5-3 7.5-3s-2 3.5-4 5c4-1 7-1 7-1s-3 4-7 6c-2 1-4.2 1.3-5.8 1.4 1.3-.8 3.3-2.4 5.3-4.4 2-2 3-5 3-5s-3 1-5 3c1-2 1-4 0-4.5L10 3.5z" fill="#245BDB"/>
+  </svg>`,
+
+  email: () => html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+    <rect x="2" y="4" width="20" height="16" rx="3" fill="#4A90D9"/>
+    <path d="M2 7l10 6 10-6" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`,
 };
 
 /** Return the SVG icon for a channel, or a default icon */
 export function channelIcon(key: string): TemplateResult {
-    return (ICONS[key] ?? ICONS._default ?? fallbackIcon)();
+  return (ICONS[key] ?? ICONS._default ?? fallbackIcon)();
 }
 
 function fallbackIcon(): TemplateResult {
-    return html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+  return html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
     <rect width="24" height="24" rx="5" fill="var(--muted, #666)"/>
     <path d="M7 9h10M7 12h7M7 15h10" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
   </svg>`;

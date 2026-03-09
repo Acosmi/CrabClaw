@@ -2,9 +2,11 @@ package gateway
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -120,6 +122,7 @@ type extensionRelayInstance interface {
 	Close() error
 	Port() int
 	AuthToken() string
+	ExtensionConnected() bool
 }
 
 // BootPhase 网关启动阶段。
@@ -288,7 +291,7 @@ func NewGatewayState() *GatewayState {
 			if cfg.Feishu != nil {
 				userID = cfg.Feishu.LastKnownUserID
 			}
-			s.remoteApprovalNotifier.NotifyCoderConfirm(CoderConfirmCardRequest{
+			fallbackReq := CoderConfirmCardRequest{
 				ConfirmID:        req.ID,
 				ToolName:         req.ToolName,
 				Preview:          preview,
@@ -296,7 +299,14 @@ func NewGatewayState() *GatewayState {
 				OriginatorChatID: chatID,
 				OriginatorUserID: userID,
 				TTLMinutes:       5,
-			})
+				Workflow:         req.Workflow,
+			}
+			if req.ToolName == "send_media" {
+				typedReq := buildSendMediaExportApproval(req, sessionKey, chatID, userID)
+				s.remoteApprovalNotifier.NotifyTypedOrCoderConfirm(&typedReq, fallbackReq)
+				return
+			}
+			s.remoteApprovalNotifier.NotifyCoderConfirm(fallbackReq)
 		},
 		5*time.Minute,
 	)
@@ -325,15 +335,31 @@ func NewGatewayState() *GatewayState {
 			if cfg.Feishu != nil {
 				userID = cfg.Feishu.LastKnownUserID
 			}
-			s.remoteApprovalNotifier.NotifyPlanConfirm(PlanConfirmCardRequest{
+			typedReq := TypedApprovalRequest{
+				Type:             ApprovalTypePlanConfirm,
+				ID:               req.ID,
+				Reason:           "执行前方案确认",
+				TTLMinutes:       5,
+				RequestedAt:      time.UnixMilli(req.CreatedAtMs),
+				SessionKey:       sessionKey,
+				OriginatorChatID: chatID,
+				OriginatorUserID: userID,
+				TaskBrief:        req.TaskBrief,
+				PlanSteps:        req.PlanSteps,
+				IntentTier:       req.IntentTier,
+				Workflow:         req.Workflow,
+			}
+			s.remoteApprovalNotifier.NotifyTypedOrPlanConfirm(&typedReq, PlanConfirmCardRequest{
 				ConfirmID:        req.ID,
 				TaskBrief:        req.TaskBrief,
 				PlanSteps:        req.PlanSteps,
+				ApprovalSummary:  req.ApprovalSummary,
 				IntentTier:       req.IntentTier,
 				SessionKey:       sessionKey,
 				OriginatorChatID: chatID,
 				OriginatorUserID: userID,
 				TTLMinutes:       5,
+				Workflow:         req.Workflow,
 			})
 		},
 		5*time.Minute,
@@ -346,6 +372,22 @@ func NewGatewayState() *GatewayState {
 	s.resultApprovalMgr = runner.NewResultApprovalManager(
 		func(event string, payload interface{}) {
 			bc.Broadcast(event, payload, nil)
+		},
+		func(req runner.ResultApprovalRequest, sessionKey string) {
+			if s.remoteApprovalNotifier == nil {
+				return
+			}
+			var chatID string
+			if strings.HasPrefix(sessionKey, "feishu:") {
+				chatID = strings.TrimPrefix(sessionKey, "feishu:")
+			}
+			var userID string
+			cfg := s.remoteApprovalNotifier.GetConfig()
+			if cfg.Feishu != nil {
+				userID = cfg.Feishu.LastKnownUserID
+			}
+			typedReq := buildResultReviewApproval(req, sessionKey, chatID, userID)
+			s.remoteApprovalNotifier.NotifyTypedApproval(typedReq)
 		},
 		3*time.Minute,
 	)
@@ -375,6 +417,83 @@ func NewGatewayState() *GatewayState {
 	}
 
 	return s
+}
+
+func buildSendMediaExportApproval(
+	req runner.CoderConfirmationRequest,
+	sessionKey, originatorChatID, originatorUserID string,
+) TypedApprovalRequest {
+	var input struct {
+		Target   string `json:"target"`
+		FilePath string `json:"file_path"`
+		FileName string `json:"file_name"`
+		Message  string `json:"message"`
+	}
+	_ = json.Unmarshal(req.Args, &input)
+
+	targetChannel := strings.TrimSpace(input.Target)
+	if targetChannel == "" {
+		targetChannel = strings.TrimSpace(sessionKey)
+	}
+
+	exportFile := strings.TrimSpace(input.FileName)
+	if exportFile == "" && strings.TrimSpace(input.FilePath) != "" {
+		exportFile = filepath.Base(strings.TrimSpace(input.FilePath))
+	}
+	if exportFile == "" && req.Preview != nil && strings.TrimSpace(req.Preview.FilePath) != "" {
+		exportFile = filepath.Base(strings.TrimSpace(req.Preview.FilePath))
+	}
+	if exportFile == "" {
+		exportFile = "(inline media)"
+	}
+
+	reason := "send_media 请求向外部频道发送文件或媒体"
+	if strings.TrimSpace(input.Message) != "" {
+		reason = "send_media 请求向外部频道发送文件或媒体，并附带消息"
+	}
+
+	requestedAt := time.Now()
+	if req.CreatedAtMs > 0 {
+		requestedAt = time.UnixMilli(req.CreatedAtMs)
+	}
+
+	return TypedApprovalRequest{
+		Type:             ApprovalTypeDataExport,
+		ID:               req.ID,
+		Reason:           reason,
+		TTLMinutes:       5,
+		RequestedAt:      requestedAt,
+		SessionKey:       sessionKey,
+		OriginatorChatID: originatorChatID,
+		OriginatorUserID: originatorUserID,
+		TargetChannel:    targetChannel,
+		ExportFiles:      []string{exportFile},
+		Sanitized:        false,
+		Workflow:         req.Workflow,
+	}
+}
+
+func buildResultReviewApproval(
+	req runner.ResultApprovalRequest,
+	sessionKey, originatorChatID, originatorUserID string,
+) TypedApprovalRequest {
+	requestedAt := time.Now()
+	if req.CreatedAtMs > 0 {
+		requestedAt = time.UnixMilli(req.CreatedAtMs)
+	}
+	return TypedApprovalRequest{
+		Type:             ApprovalTypeResultReview,
+		ID:               req.ID,
+		Reason:           "子智能体结果需要最终签收",
+		TTLMinutes:       3,
+		RequestedAt:      requestedAt,
+		SessionKey:       sessionKey,
+		OriginatorChatID: originatorChatID,
+		OriginatorUserID: originatorUserID,
+		ResultSummary:    req.Result,
+		ReviewSummary:    req.ReviewSummary,
+		Workflow:         req.Workflow,
+	}
 }
 
 // Phase 返回当前阶段。

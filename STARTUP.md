@@ -6,19 +6,19 @@
 
 ```
 CrabClaw/
-├── start.command       # ⚡ macOS 双击启动
-├── start.bat           # ⚡ Windows 双击启动
-├── scripts/start.sh    # ⚡ 核心启动脚本 (macOS/Linux)
-├── Makefile            # 根级构建系统 (make start)
-├── backend/            # Go Gateway (acosmi)
-├── cli-rust/           # Rust CLI (openacosmi)
-├── ui/                 # 前端控制面板 (Vite + Lit)
-├── Argus/              # 视觉子智能体 (Go+Rust 混合架构)
-│   ├── rust-core/      # Rust 核心库 (libargus_core.dylib)
-│   ├── go-sensory/     # Go 感知服务 (MCP Server)
-│   ├── web-console/    # Next.js Web 控制台
-│   └── wails-console/  # Wails 桌面控制台
-└── docs/               # 文档
+├── start.command          # ⚡ macOS 双击启动
+├── start.bat              # ⚡ Windows 双击启动
+├── scripts/start.sh       # ⚡ 核心启动脚本 (macOS/Linux)
+├── Makefile               # 根级构建系统 (make start)
+├── backend/               # Go Gateway (acosmi)
+├── cli-rust/              # Rust CLI (openacosmi)
+├── ui/                    # 前端控制面板 (Vite + Lit)
+├── Argus/                 # 视觉子智能体
+│   └── go-sensory/        # Go 感知服务 (MCP Server)
+├── browser-extension/     # Chrome 浏览器扩展
+├── coder/                 # Coder 子智能体 (预留)
+├── Swabble/               # Swabble 子智能体 (预留)
+└── docs/                  # 文档
 ```
 
 ---
@@ -35,7 +35,7 @@ CrabClaw/
 | **Linux** | Landlock + Seccomp + Namespaces + Cgroups | Docker |
 | **Windows** | Restricted Token + Job Object + ACL | Docker |
 
-**自动降级**：每个平台都有多层防线，若原生隔离不可用会自动回退至 Docker 容器方案，确保沙箱始终可用。
+**自动降级**：每个平台都有多层防线，若原生隔离不可用，Gateway 代码会自动回退至 Docker 容器方案（需本地安装 Docker），确保沙箱始终可用。
 
 > [!NOTE]
 > **注意事项**
@@ -139,7 +139,7 @@ Gateway 以 dev 模式启动在 `localhost:19001`。
 ```bash
 cd ui
 npm install   # 首次需要安装依赖
-npm run devnpm run dev
+npm run dev
 ```
 
 Vite 开发服务器启动在 `http://localhost:26222`，WebSocket 自动代理到 Gateway。

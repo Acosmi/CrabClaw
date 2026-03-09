@@ -22,6 +22,14 @@ func (l *staticCfgLoader) LoadConfig() (*types.OpenAcosmiConfig, error) {
 	return l.cfg, nil
 }
 
+type errCfgLoader struct {
+	err error
+}
+
+func (l *errCfgLoader) LoadConfig() (*types.OpenAcosmiConfig, error) {
+	return nil, l.err
+}
+
 type fakeSTTProvider struct {
 	transcript string
 }
@@ -35,14 +43,18 @@ func (f *fakeSTTProvider) Name() string { return "fake-stt" }
 func (f *fakeSTTProvider) TestConnection(_ context.Context) error { return nil }
 
 type fakeDocConverter struct {
-	markdown string
+	markdown  string
+	onConvert func()
 }
 
 func (f *fakeDocConverter) Convert(_ context.Context, _ []byte, _, _ string) (string, error) {
+	if f.onConvert != nil {
+		f.onConvert()
+	}
 	return f.markdown, nil
 }
 
-func (f *fakeDocConverter) SupportedFormats() []string { return []string{".txt", ".md"} }
+func (f *fakeDocConverter) SupportedFormats() []string { return []string{".txt", ".md", ".pdf"} }
 
 func (f *fakeDocConverter) Name() string { return "fake-docconv" }
 
@@ -59,8 +71,8 @@ func testAttachments() []map[string]interface{} {
 		{
 			"type":     "document",
 			"content":  base64.StdEncoding.EncodeToString([]byte("doc-bytes")),
-			"mimeType": "text/plain",
-			"fileName": "note.txt",
+			"mimeType": "application/pdf",
+			"fileName": "note.pdf",
 		},
 	}
 }
@@ -94,10 +106,10 @@ func TestProcessAttachmentsForChat_ProviderCacheReuse(t *testing.T) {
 	out1, _ := processAttachmentsForChatWithCache(context.Background(), "base", attachments, loader, cache)
 	out2, _ := processAttachmentsForChatWithCache(context.Background(), "base", attachments, loader, cache)
 
-	if !strings.Contains(out1, "[语音转录]: hello from stt") || !strings.Contains(out1, "[文件: note.txt]") {
+	if !strings.Contains(out1, "[语音转录]: hello from stt") || !strings.Contains(out1, "[文件: note.pdf]") {
 		t.Fatalf("first process output missing expected conversions: %q", out1)
 	}
-	if !strings.Contains(out2, "[语音转录]: hello from stt") || !strings.Contains(out2, "[文件: note.txt]") {
+	if !strings.Contains(out2, "[语音转录]: hello from stt") || !strings.Contains(out2, "[文件: note.pdf]") {
 		t.Fatalf("second process output missing expected conversions: %q", out2)
 	}
 	if got := atomic.LoadInt32(&sttInitCount); got != 1 {
@@ -242,7 +254,7 @@ func TestProcessAttachmentsForChat_ProviderInitFailureMessage(t *testing.T) {
 	if !strings.Contains(out, "[语音附件: STT 初始化失败]") {
 		t.Fatalf("expected STT init failure hint, got %q", out)
 	}
-	if !strings.Contains(out, "[文件: note.txt, 转换器初始化失败]") {
+	if !strings.Contains(out, "[文件: note.pdf, 转换器初始化失败]") {
 		t.Fatalf("expected DocConv init failure hint, got %q", out)
 	}
 }

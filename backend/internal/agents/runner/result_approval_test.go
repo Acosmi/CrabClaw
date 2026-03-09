@@ -14,7 +14,7 @@ func TestResultApproval_Approve(t *testing.T) {
 		broadcastCalls = append(broadcastCalls, event)
 	}
 
-	mgr := NewResultApprovalManager(broadcast, 5*time.Second)
+	mgr := NewResultApprovalManager(broadcast, nil, 5*time.Second)
 	defer mgr.Close()
 
 	var decision ResultApprovalDecision
@@ -74,7 +74,7 @@ func TestResultApproval_Approve(t *testing.T) {
 // ---------- Reject 流程 ----------
 
 func TestResultApproval_Reject(t *testing.T) {
-	mgr := NewResultApprovalManager(nil, 5*time.Second)
+	mgr := NewResultApprovalManager(nil, nil, 5*time.Second)
 	defer mgr.Close()
 
 	var decision ResultApprovalDecision
@@ -115,7 +115,7 @@ func TestResultApproval_Reject(t *testing.T) {
 // ---------- 超时自动批准（与 Phase 1 超时拒绝不同） ----------
 
 func TestResultApproval_TimeoutAutoApproves(t *testing.T) {
-	mgr := NewResultApprovalManager(nil, 200*time.Millisecond)
+	mgr := NewResultApprovalManager(nil, nil, 200*time.Millisecond)
 	defer mgr.Close()
 
 	decision, err := mgr.RequestResultApproval(context.Background(), ResultApprovalRequest{
@@ -137,7 +137,7 @@ func TestResultApproval_TimeoutAutoApproves(t *testing.T) {
 // ---------- Context 取消自动批准 ----------
 
 func TestResultApproval_ContextCancel(t *testing.T) {
-	mgr := NewResultApprovalManager(nil, 5*time.Second)
+	mgr := NewResultApprovalManager(nil, nil, 5*time.Second)
 	defer mgr.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -163,7 +163,7 @@ func TestResultApproval_ContextCancel(t *testing.T) {
 // ---------- Resolve 错误路径 ----------
 
 func TestResultApproval_ResolveUnknownID(t *testing.T) {
-	mgr := NewResultApprovalManager(nil, 5*time.Second)
+	mgr := NewResultApprovalManager(nil, nil, 5*time.Second)
 	defer mgr.Close()
 
 	err := mgr.ResolveResultApproval("nonexistent-id", ResultApprovalDecision{Action: "approve"})
@@ -173,7 +173,7 @@ func TestResultApproval_ResolveUnknownID(t *testing.T) {
 }
 
 func TestResultApproval_ResolveInvalidAction(t *testing.T) {
-	mgr := NewResultApprovalManager(nil, 5*time.Second)
+	mgr := NewResultApprovalManager(nil, nil, 5*time.Second)
 	defer mgr.Close()
 
 	err := mgr.ResolveResultApproval("any-id", ResultApprovalDecision{Action: "edit"})
@@ -185,7 +185,7 @@ func TestResultApproval_ResolveInvalidAction(t *testing.T) {
 // ---------- Default Timeout ----------
 
 func TestResultApproval_DefaultTimeout(t *testing.T) {
-	mgr := NewResultApprovalManager(nil, 0)
+	mgr := NewResultApprovalManager(nil, nil, 0)
 	defer mgr.Close()
 
 	if mgr.Timeout() != 3*time.Minute {
@@ -196,7 +196,71 @@ func TestResultApproval_DefaultTimeout(t *testing.T) {
 // ---------- Close 幂等性 ----------
 
 func TestResultApproval_CloseIdempotent(t *testing.T) {
-	mgr := NewResultApprovalManager(nil, 5*time.Second)
+	mgr := NewResultApprovalManager(nil, nil, 5*time.Second)
 	mgr.Close()
 	mgr.Close() // 不应 panic
+}
+
+func TestResultApproval_BroadcastsWorkflowUpdates(t *testing.T) {
+	type workflowEvent struct {
+		source   string
+		workflow ApprovalWorkflow
+	}
+
+	var events []workflowEvent
+	broadcast := func(event string, payload interface{}) {
+		if event != "approval.workflow.updated" {
+			return
+		}
+		record, ok := payload.(map[string]interface{})
+		if !ok {
+			t.Fatalf("payload type = %T, want map[string]interface{}", payload)
+		}
+		source, _ := record["source"].(string)
+		workflow, _ := record["workflow"].(ApprovalWorkflow)
+		events = append(events, workflowEvent{source: source, workflow: workflow})
+	}
+
+	mgr := NewResultApprovalManager(broadcast, nil, 5*time.Second)
+	defer mgr.Close()
+
+	done := make(chan struct{})
+	go func() {
+		_, _ = mgr.RequestResultApproval(context.Background(), ResultApprovalRequest{
+			OriginalTask: "review child result",
+			ContractID:   "test-005",
+			Result:       "all checks passed",
+			Workflow: NewSingleStageApprovalWorkflow(
+				"review child result",
+				ApprovalTypeResultReview,
+				"result_review（交付前最终签收）",
+			),
+		})
+		close(done)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	mgr.mu.Lock()
+	var pendingID string
+	for id := range mgr.pending {
+		pendingID = id
+	}
+	mgr.mu.Unlock()
+
+	if err := mgr.ResolveResultApproval(pendingID, ResultApprovalDecision{Action: "approve"}); err != nil {
+		t.Fatalf("ResolveResultApproval error: %v", err)
+	}
+
+	<-done
+
+	if len(events) != 2 {
+		t.Fatalf("workflow events = %d, want 2", len(events))
+	}
+	if events[0].workflow.Status != ApprovalStagePending {
+		t.Fatalf("first workflow status = %q, want pending", events[0].workflow.Status)
+	}
+	if events[1].workflow.Status != ApprovalStageApproved {
+		t.Fatalf("final workflow status = %q, want approved", events[1].workflow.Status)
+	}
 }

@@ -36,5 +36,9 @@ jobs:
       - name: Desktop build placeholder
         working-directory: backend/cmd/desktop
         run: |
-          echo "Template only. Replace with active wails3 build/package commands after runtime-safe review."
+          echo "Template only. Replace with active wails3 package + release:manifest commands after runtime-safe review."
           echo "Target platform: ${{ matrix.label }}"
+          echo "Expected release outputs:"
+          echo "  - bin/<platform artifacts>"
+          echo "  - release/stable/update.json"
+          echo "  - release/stable/SHA256SUMS"

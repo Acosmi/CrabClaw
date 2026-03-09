@@ -8,6 +8,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 	"sync"
@@ -322,6 +323,40 @@ func validateDeepConstraints(cfg *types.OpenAcosmiConfig) []ValidationError {
 				Tag:     "enum",
 				Value:   cfg.Update.Channel,
 				Message: fmt.Sprintf("update.channel must be one of: %s", strings.Join(validChannels, ", ")),
+			})
+		}
+	}
+
+	// update.installPolicy 枚举
+	if cfg.Update != nil && cfg.Update.InstallPolicy != "" {
+		validPolicies := []string{"manual", "on-quit", "idle"}
+		if !isValidEnum(cfg.Update.InstallPolicy, validPolicies) {
+			errs = append(errs, ValidationError{
+				Field:   "update.installPolicy",
+				Tag:     "enum",
+				Value:   cfg.Update.InstallPolicy,
+				Message: fmt.Sprintf("update.installPolicy must be one of: %s", strings.Join(validPolicies, ", ")),
+			})
+		}
+	}
+
+	// update.sourceURL URL 基本合法性
+	if cfg.Update != nil && strings.TrimSpace(cfg.Update.SourceURL) != "" {
+		sourceURL := strings.TrimSpace(cfg.Update.SourceURL)
+		parsed, err := url.Parse(sourceURL)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+			errs = append(errs, ValidationError{
+				Field:   "update.sourceURL",
+				Tag:     "url",
+				Value:   cfg.Update.SourceURL,
+				Message: "update.sourceURL must be an absolute http(s) URL",
+			})
+		} else if parsed.Scheme != "http" && parsed.Scheme != "https" {
+			errs = append(errs, ValidationError{
+				Field:   "update.sourceURL",
+				Tag:     "url",
+				Value:   cfg.Update.SourceURL,
+				Message: "update.sourceURL must use http or https",
 			})
 		}
 	}

@@ -14,6 +14,7 @@ package runner
 import (
 	"strings"
 
+	"github.com/Acosmi/ClawAcosmi/internal/agents/capabilities"
 	"github.com/Acosmi/ClawAcosmi/internal/agents/llmclient"
 )
 
@@ -89,29 +90,14 @@ func classifyIntent(prompt string) intentTier {
 
 // ---------- 关键词集 ----------
 
-var deleteKeywords = []string{
-	"删除", "删掉", "删了", "删",
-	"移除", "清理", "清除", "清掉",
-	"remove", "delete", "rm ",
-}
-
-var multimodalKeywords = []string{
-	"截屏", "截图", "截个", "截一", "屏幕截",
-	"拍照", "拍个照", "拍一张",
-	"screenshot", "capture screen", "capture ",
-	"浏览器", "网页", "browser",
-	"灵瞳", "argus",
-}
-
-var writeKeywords = []string{
-	"写", "创建", "编写", "开发", "修改", "改一", "改个",
-	"修", "添加", "新增", "生成", "实现", "重构", "优化",
-	"部署", "配置", "安装", "升级",
-	"发送", "发给", "发消息", "通知",
-	"write", "create", "code", "develop", "build", "fix",
-	"add", "modify", "implement", "generate", "refactor",
-	"deploy", "configure", "install", "upgrade", "send",
-}
+// P3-6: D4 derivation — intent classification keywords sourced from capability tree
+// IntentKeywords + IntentPriority fields, replacing hand-written keyword arrays.
+// Priority mapping: 30→task_delete, 20→task_multimodal, 10→task_write.
+// Tools with IntentPriority=0 (e.g. send_media) don't contribute to classification
+// — their MinTier determines tool availability directly.
+var deleteKeywords = capabilities.TreeClassificationKeywords("task_delete")
+var multimodalKeywords = capabilities.TreeClassificationKeywords("task_multimodal")
+var writeKeywords = capabilities.TreeClassificationKeywords("task_write")
 
 // ---------- 疑问 / 祈使检测 ----------
 
@@ -192,7 +178,8 @@ func hasImperativePrefix(lower string) bool {
 // ---------- 工具过滤 ----------
 
 // filterToolsByIntent 按意图分级过滤工具。
-// 核心设计: 每个 tier 暴露 3-8 个工具，约束 LLM 输出收敛性。
+// P1-6/P1-7: D3 derivation — allowlists from capability tree instead of hand-written map.
+// Dynamic prefix tools (argus_/remote_/mcp_) handled via tree.MatchesDynamicGroup().
 //
 // | Tier            | 工具数 | 策略                    |
 // |-----------------|--------|------------------------|
@@ -207,53 +194,48 @@ func filterToolsByIntent(tools []llmclient.ToolDef, tier intentTier) []llmclient
 		return nil
 	}
 	if tier == intentTaskMultimodal {
-		// Phase 5: task_multimodal 移除直接 argus_* 工具（除 capture_screen），
+		// task_multimodal 移除直接 argus_* 工具（除 capture_screen），
 		// 改由 spawn_argus_agent 子智能体提供完整视觉操作能力。
 		filtered := make([]llmclient.ToolDef, 0, len(tools))
 		for _, t := range tools {
 			if strings.HasPrefix(t.Name, "argus_") && t.Name != "argus_capture_screen" {
-				continue // 跳过直接 argus 工具
+				continue
 			}
 			filtered = append(filtered, t)
 		}
 		return filtered
 	}
 
-	allowed := tierToolAllowlist[tier]
-	if allowed == nil {
-		return tools // safety fallback
-	}
+	// D3: derive allowlist from capability tree
+	tree := capabilities.DefaultTree()
+	allowed := tree.AllowlistForTier(string(tier))
 
 	filtered := make([]llmclient.ToolDef, 0, len(allowed))
 	for _, t := range tools {
 		name := t.Name
 
-		// argus_* 前缀工具: 仅 task_write(只允许截屏) 和 task_multimodal(全部)
-		if strings.HasPrefix(name, "argus_") {
-			if tier == intentTaskWrite && name == "argus_capture_screen" {
-				filtered = append(filtered, t)
-			}
-			// 其他 tier 不暴露 argus 工具
-			continue
-		}
-
-		// remote_* 前缀工具: task_write 及以上
-		if strings.HasPrefix(name, "remote_") {
-			if tier == intentTaskWrite {
-				filtered = append(filtered, t)
-			}
-			continue
-		}
-
-		// mcp_* 前缀工具（本地安装的 MCP 服务器）: task_light 及以上
-		if strings.HasPrefix(name, "mcp_") {
-			if tier == intentTaskLight || tier == intentTaskWrite {
-				filtered = append(filtered, t)
+		// Dynamic prefix tools: check against tree dynamic groups
+		if g := tree.MatchesDynamicGroup(name); g != nil {
+			// Dynamic group has its own MinTier in the tree.
+			// Check if the dynamic group's MinTier allows this tier.
+			if g.Routing != nil && g.Routing.MinTier != "" {
+				groupIdx := capabilities.TierIndex(g.Routing.MinTier)
+				tierIdx := capabilities.TierIndex(string(tier))
+				if groupIdx >= 0 && tierIdx >= 0 && tierIdx >= groupIdx {
+					// Special case: argus_ at task_write only allows capture_screen
+					if g.Runtime != nil && g.Runtime.NamePrefix == "argus_" && tier == intentTaskWrite {
+						if name == "argus_capture_screen" {
+							filtered = append(filtered, t)
+						}
+						continue
+					}
+					filtered = append(filtered, t)
+				}
 			}
 			continue
 		}
 
-		// 普通工具: 按 allowlist 过滤
+		// Static tools: use tree-derived allowlist
 		if allowed[name] {
 			filtered = append(filtered, t)
 		}
@@ -262,59 +244,7 @@ func filterToolsByIntent(tools []llmclient.ToolDef, tier intentTier) []llmclient
 	return filtered
 }
 
-// tierToolAllowlist 每个意图层级的工具白名单。
-// nil = 全量通过（用于 task_multimodal 和 fallback）。
-var tierToolAllowlist = map[intentTier]map[string]bool{
-	intentQuestion: {
-		"search_skills": true,
-		"lookup_skill":  true,
-		"memory_search": true,
-		"memory_get":    true,
-	},
-	intentTaskLight: {
-		"bash":            true,
-		"read_file":       true,
-		"list_dir":        true,
-		"search":          true,
-		"grep":            true,
-		"glob":            true,
-		"web_search":      true,
-		"browser":         true, // navigate/screenshot/observe 是只读操作，与 web_search 同级
-		"search_skills":   true,
-		"lookup_skill":    true,
-		"memory_search":   true,
-		"memory_get":      true,
-		"report_progress": true,
-	},
-	intentTaskWrite: {
-		"bash":              true,
-		"read_file":         true,
-		"write_file":        true,
-		"list_dir":          true,
-		"search":            true,
-		"grep":              true,
-		"glob":              true,
-		"web_search":        true,
-		"browser":           true,
-		"send_media":        true,
-		"send_email":        true,
-		"spawn_coder_agent": true,
-		"spawn_media_agent": true,
-		"search_skills":     true,
-		"lookup_skill":      true,
-		"memory_search":     true,
-		"memory_get":        true,
-		"report_progress":   true,
-	},
-	intentTaskDelete: {
-		"bash":            true,
-		"read_file":       true,
-		"list_dir":        true,
-		"search_skills":   true,
-		"lookup_skill":    true,
-		"report_progress": true,
-	},
-}
+// P1-7: tierToolAllowlist deleted. Allowlists now derived from capability tree (D3).
 
 // ---------- 历史裁剪 ----------
 
@@ -344,7 +274,22 @@ func trimHistoryByIntent(messages []llmclient.ChatMessage, tier intentTier) []ll
 // intentGuidanceText 返回当前意图层级的行为指引文本。
 // 注入到系统提示词中，引导 LLM 在特定意图下采取最优策略。
 // 这是提示词系统维度与意图维度的联动点。
+// P1-8: D8 derivation — group context derived from tree GroupIntro; behavioral rules remain hand-written.
 func intentGuidanceText(tier intentTier) string {
+	base := intentGuidanceBase(tier)
+	if base == "" {
+		return ""
+	}
+	// Append tree-derived group context (P1-8)
+	summaries := capabilities.TreeIntentGroupSummaries()
+	if gs, ok := summaries[string(tier)]; ok && gs != "" {
+		base += "\n- Available tool groups: " + gs
+	}
+	return base
+}
+
+// intentGuidanceBase returns the hand-written behavioral guidance per tier.
+func intentGuidanceBase(tier intentTier) string {
 	switch tier {
 	case intentGreeting:
 		return "" // 无需指引
@@ -361,6 +306,8 @@ This is a read/check operation.
 - For system status checks (memory, CPU, disk, processes): use bash directly with standard commands (top, vm_stat, df, ps, sysctl, etc.). Do NOT search for skills first.
 - Use known file paths from history — avoid broad searches like 'find ~'.
 - Prefer read_file/list_dir for direct access over bash for file operations.
+- For sending/sharing an existing local file or image whose path/name is already known, use 'send_media' directly. Do NOT delegate to 'spawn_argus_agent' just to transmit an already-known file.
+- If a file must be located first, do the minimal file discovery needed, then call 'send_media' once the path is known.
 - If the user is checking status, provide a brief summary.
 - When the user's request matches a known skill topic (e.g., system diagnostics, deployment, debugging, monitoring), use search_skills first to leverage specialized knowledge and best practices.
 - For common system commands (ls, top, df, cat, grep, etc.), use tools directly without searching skills.
@@ -390,6 +337,7 @@ This task involves visual or browser interaction.
 - For web page screenshots: use 'browser' tool with 'screenshot' action (NOT argus_capture_screen).
 - For web page interaction (click, type, scroll): use 'browser' tool with CSS selectors or ARIA refs.
 - For complex multi-step web tasks: use 'browser' tool with 'ai_browse' action.
+- For sending an existing local file or screenshot to a channel, use 'send_media'. Only use 'spawn_argus_agent' if the file must first be discovered or produced through native desktop interaction.
 - For desktop application interaction (native apps, not web): use 'spawn_argus_agent' to delegate to 灵瞳 sub-agent.
 - For full desktop screenshots (not web): use 'argus_capture_screen' directly.
 - Rule: if the target is a URL or web page, use 'browser'. Only use argus for native desktop apps.

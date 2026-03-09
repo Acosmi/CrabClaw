@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   applyConfigSnapshot,
   applyConfig,
+  rollbackUpdate,
   runUpdate,
   updateConfigFormValue,
   type ConfigState,
@@ -31,8 +32,10 @@ function createState(): ConfigState {
     configUiHints: {},
     configValid: null,
     connected: false,
+    desktopUpdateStatus: null,
     lastError: null,
     updateRunning: false,
+    updateRollbackRunning: false,
   };
 }
 
@@ -160,8 +163,11 @@ describe("applyConfig", () => {
 });
 
 describe("runUpdate", () => {
-  it("sends update.run with session key", async () => {
-    const request = vi.fn().mockResolvedValue({});
+  it("checks desktop status before running legacy source update", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({ installKind: "source", state: "idle" })
+      .mockResolvedValueOnce({});
     const state = createState();
     state.connected = true;
     state.client = { request } as unknown as ConfigState["client"];
@@ -169,8 +175,194 @@ describe("runUpdate", () => {
 
     await runUpdate(state);
 
-    expect(request).toHaveBeenCalledWith("update.run", {
+    expect(request).toHaveBeenNthCalledWith(1, "desktop.update.check", {});
+    expect(state.desktopUpdateStatus).toEqual({ installKind: "source", state: "idle" });
+    expect(request).toHaveBeenNthCalledWith(2, "update.run", {
       sessionKey: "agent:main:whatsapp:dm:+15555550123",
+    });
+  });
+
+  it("stops after desktop.update.check for packaged installs", async () => {
+    const request = vi.fn().mockResolvedValue({
+      installKind: "macos-wails",
+      state: "idle",
+      updateAvailable: false,
+    });
+    const state = createState();
+    state.connected = true;
+    state.client = { request } as unknown as ConfigState["client"];
+
+    await runUpdate(state);
+
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request).toHaveBeenCalledWith("desktop.update.check", {});
+    expect(state.desktopUpdateStatus).toEqual({
+      installKind: "macos-wails",
+      state: "idle",
+      updateAvailable: false,
+    });
+  });
+
+  it("downloads packaged updates after desktop.update.check", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({
+        installKind: "macos-wails",
+        state: "available",
+        updateAvailable: true,
+        candidateVersion: "1.2.0",
+      })
+      .mockResolvedValueOnce({
+        installKind: "macos-wails",
+        state: "ready-to-install",
+        readyToInstall: true,
+        action: "downloaded",
+        candidateVersion: "1.2.0",
+      });
+    const state = createState();
+    state.connected = true;
+    state.client = { request } as unknown as ConfigState["client"];
+
+    await runUpdate(state);
+
+    expect(request).toHaveBeenNthCalledWith(1, "desktop.update.check", {});
+    expect(request).toHaveBeenNthCalledWith(2, "desktop.update.download", {});
+    expect(state.desktopUpdateStatus).toEqual({
+      installKind: "macos-wails",
+      state: "ready-to-install",
+      readyToInstall: true,
+      action: "downloaded",
+      candidateVersion: "1.2.0",
+    });
+  });
+
+  it("applies packaged updates when readyToInstall", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({
+        installKind: "macos-wails",
+        state: "ready-to-install",
+        readyToInstall: true,
+        candidateVersion: "1.2.0",
+      })
+      .mockResolvedValueOnce({
+        installKind: "macos-wails",
+        state: "ready-to-install",
+        readyToInstall: true,
+        action: "artifact-opened",
+        candidateVersion: "1.2.0",
+      });
+    const state = createState();
+    state.connected = true;
+    state.client = { request } as unknown as ConfigState["client"];
+
+    await runUpdate(state);
+
+    expect(request).toHaveBeenNthCalledWith(1, "desktop.update.check", {});
+    expect(request).toHaveBeenNthCalledWith(2, "desktop.update.apply", {});
+    expect(state.desktopUpdateStatus).toEqual({
+      installKind: "macos-wails",
+      state: "ready-to-install",
+      readyToInstall: true,
+      action: "artifact-opened",
+      candidateVersion: "1.2.0",
+    });
+  });
+
+  it("records desktop.update.check errors", async () => {
+    const request = vi.fn().mockRejectedValue(new Error("boom"));
+    const state = createState();
+    state.connected = true;
+    state.client = { request } as unknown as ConfigState["client"];
+
+    await runUpdate(state);
+
+    expect(request).toHaveBeenCalledWith("desktop.update.check", {});
+    expect(state.lastError).toContain("boom");
+  });
+
+  it("stops when update is managed by package manager", async () => {
+    const request = vi.fn().mockResolvedValue({
+      installKind: "linux-system-package",
+      updateManager: "package-manager",
+      state: "idle",
+      updateAvailable: false,
+    });
+    const state = createState();
+    state.connected = true;
+    state.client = { request } as unknown as ConfigState["client"];
+
+    await runUpdate(state);
+
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request).toHaveBeenCalledWith("desktop.update.check", {});
+  });
+});
+
+describe("rollbackUpdate", () => {
+  it("calls desktop.update.rollback directly", async () => {
+    const request = vi.fn().mockResolvedValue({
+      installKind: "linux-appimage",
+      state: "rolled-back",
+      action: "rollback-completed",
+    });
+    const state = createState();
+    state.connected = true;
+    state.client = { request } as unknown as ConfigState["client"];
+
+    await rollbackUpdate(state);
+
+    expect(request).toHaveBeenCalledWith("desktop.update.rollback", {});
+    expect(state.desktopUpdateStatus).toEqual({
+      installKind: "linux-appimage",
+      state: "rolled-back",
+      action: "rollback-completed",
+    });
+    expect(state.updateRollbackRunning).toBe(false);
+  });
+
+  it("records desktop.update.rollback errors", async () => {
+    const request = vi.fn().mockRejectedValue(new Error("rollback boom"));
+    const state = createState();
+    state.connected = true;
+    state.client = { request } as unknown as ConfigState["client"];
+
+    await rollbackUpdate(state);
+
+    expect(request).toHaveBeenCalledWith("desktop.update.rollback", {});
+    expect(state.lastError).toContain("rollback boom");
+    expect(state.updateRollbackRunning).toBe(false);
+  });
+});
+
+describe("loadConfig", () => {
+  it("refreshes desktop update status after config snapshot load", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({
+        config: { update: { channel: "stable" } },
+        valid: true,
+        issues: [],
+        raw: "{\n}\n",
+      })
+      .mockResolvedValueOnce({
+        installKind: "macos-wails",
+        state: "idle",
+        lastCheckedAt: "2026-03-09T12:00:00Z",
+      });
+    const state = createState();
+    state.connected = true;
+    state.client = { request } as unknown as ConfigState["client"];
+
+    const { loadConfig } = await import("./config.ts");
+    await loadConfig(state);
+
+    expect(request).toHaveBeenNthCalledWith(1, "config.get", {});
+    expect(request).toHaveBeenNthCalledWith(2, "desktop.update.status", {});
+    expect(state.desktopUpdateStatus).toEqual({
+      installKind: "macos-wails",
+      state: "idle",
+      lastCheckedAt: "2026-03-09T12:00:00Z",
     });
   });
 });

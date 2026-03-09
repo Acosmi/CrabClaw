@@ -24,6 +24,7 @@ export type ChatHost = {
   chatAvatarUrl: string | null;
   refreshSessionsAfterChat: Set<string>;
   chatReadonlyRun?: ChatReadonlyRunState;
+  chatReadonlyRunHistory?: ChatReadonlyRunState[];
 };
 
 // 会话下拉框不限制活跃时间，显示所有历史会话
@@ -194,6 +195,7 @@ export async function handleSendChat(
     host.chatAttachments = [];
     host.chatRunId = null;
     host.chatReadonlyRun = createChatReadonlyRunState(newKey);
+    host.chatReadonlyRunHistory = [];
     host.chatQueue = [];
     // 重新加载历史（新 session 为空）
     await loadChatHistory(host as unknown as Parameters<typeof loadChatHistory>[0]);

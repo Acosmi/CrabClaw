@@ -32,8 +32,15 @@ type OpenAcosmiWizardConfig struct {
 
 // OpenAcosmiUpdateConfig 更新配置
 type OpenAcosmiUpdateConfig struct {
-	Channel      string `json:"channel,omitempty"` // "stable"|"beta"|"dev"
-	CheckOnStart *bool  `json:"checkOnStart,omitempty"`
+	Channel         string   `json:"channel,omitempty"`         // "stable"|"beta"|"dev"
+	SourceURL       string   `json:"sourceURL,omitempty"`       // 桌面更新源根地址或 manifest URL
+	CheckOnStart    *bool    `json:"checkOnStart,omitempty"`    // 兼容旧字段，等价于 autoCheck
+	AutoCheck       *bool    `json:"autoCheck,omitempty"`       // 桌面 App: 是否自动检查更新
+	AutoDownload    *bool    `json:"autoDownload,omitempty"`    // 桌面 App: 是否自动下载更新
+	InstallPolicy   string   `json:"installPolicy,omitempty"`   // "manual"|"on-quit"|"idle"
+	SkippedVersions []string `json:"skippedVersions,omitempty"` // 用户显式忽略的版本
+	LastCheckedAt   string   `json:"lastCheckedAt,omitempty"`   // ISO 时间戳
+	LastSeenVersion string   `json:"lastSeenVersion,omitempty"` // 最近一次看到的远端版本
 }
 
 // OpenAcosmiUIAssistantConfig UI 助手显示配置

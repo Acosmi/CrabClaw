@@ -114,17 +114,24 @@ func (p *wecomProvider) buildTextCard(req ApprovalCardRequest) map[string]interf
 		levelLabel = req.RequestedLevel
 	}
 
+	durationLine := fmt.Sprintf("授权时长: %d 分钟", req.TTLMinutes)
+	if isPermanentApprovalLevel(req.RequestedLevel) {
+		durationLine = "授权模式: 永久授权"
+	}
 	description := fmt.Sprintf(
-		"请求级别: %s\n原因: %s\n授权时长: %d 分钟\n请求时间: %s\nID: %s",
+		"请求级别: %s\n原因: %s\n%s\n请求时间: %s\nID: %s",
 		levelLabel,
 		req.Reason,
-		req.TTLMinutes,
+		durationLine,
 		req.RequestedAt.Format("2006-01-02 15:04:05"),
 		req.EscalationID,
 	)
 
 	// 企业微信文本卡片仅支持一个跳转 URL
-	approveURL := fmt.Sprintf("%s?action=approve&id=%s&ttl=%d", req.CallbackURL, req.EscalationID, req.TTLMinutes)
+	approveURL := fmt.Sprintf("%s?action=approve&id=%s", req.CallbackURL, req.EscalationID)
+	if !isPermanentApprovalLevel(req.RequestedLevel) {
+		approveURL = fmt.Sprintf("%s&ttl=%d", approveURL, req.TTLMinutes)
+	}
 
 	msg := map[string]interface{}{
 		"msgtype": "textcard",
@@ -204,9 +211,15 @@ func (p *wecomProvider) buildResultTextCard(result ApprovalResultNotification) m
 
 	if result.Approved {
 		title = "✅ 权限已生效"
-		description = fmt.Sprintf(
-			"授权级别: %s\n有效时长: %d 分钟\n\n权限到期后将自动降级。\nID: %s",
-			result.RequestedLevel, result.TTLMinutes, result.EscalationID)
+		if isPermanentApprovalLevel(result.RequestedLevel) {
+			description = fmt.Sprintf(
+				"授权级别: %s\n授权模式: 永久授权\n\n该权限将持续生效，直到手动改回。\nID: %s",
+				result.RequestedLevel, result.EscalationID)
+		} else {
+			description = fmt.Sprintf(
+				"授权级别: %s\n有效时长: %d 分钟\n\n权限到期后将自动降级。\nID: %s",
+				result.RequestedLevel, result.TTLMinutes, result.EscalationID)
+		}
 	} else {
 		reason := result.Reason
 		if reason == "" {

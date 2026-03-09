@@ -469,6 +469,48 @@ func TestToAnthropicMessages_ToolResultWithContent(t *testing.T) {
 	}
 }
 
+func TestToAnthropicMessages_UserImageConversion(t *testing.T) {
+	msgs := []ChatMessage{
+		{
+			Role: "user",
+			Content: []ContentBlock{
+				{Type: "text", Text: "describe"},
+				{
+					Type: "image",
+					Source: &ImageSource{
+						Type:      "base64",
+						MediaType: "image/png",
+						Data:      "ZmFrZQ==",
+					},
+				},
+			},
+		},
+	}
+
+	result := toAnthropicMessages(msgs)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(result))
+	}
+
+	var blocks []map[string]interface{}
+	if err := json.Unmarshal(result[0].Content, &blocks); err != nil {
+		t.Fatalf("failed to unmarshal content: %v", err)
+	}
+	if len(blocks) != 2 {
+		t.Fatalf("expected 2 blocks, got %d", len(blocks))
+	}
+	if blocks[0]["type"] != "text" {
+		t.Fatalf("unexpected first block: %+v", blocks[0])
+	}
+	source, ok := blocks[1]["source"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected image source map, got %+v", blocks[1])
+	}
+	if source["media_type"] != "image/png" || source["data"] != "ZmFrZQ==" {
+		t.Fatalf("unexpected image source: %+v", source)
+	}
+}
+
 func TestToOpenAIMessages_ToolResultConversion(t *testing.T) {
 	msgs := []ChatMessage{
 		TextMessage("user", "run ls"),
@@ -500,6 +542,46 @@ func TestToOpenAIMessages_ToolResultConversion(t *testing.T) {
 	}
 	if result[3].Role != "tool" || result[3].ToolCallID != "call_1" {
 		t.Errorf("expected tool message: %+v", result[3])
+	}
+}
+
+func TestToOpenAIMessages_UserImageConversion(t *testing.T) {
+	msgs := []ChatMessage{
+		{
+			Role: "user",
+			Content: []ContentBlock{
+				{Type: "text", Text: "describe"},
+				{
+					Type: "image",
+					Source: &ImageSource{
+						Type:      "base64",
+						MediaType: "image/png",
+						Data:      "ZmFrZQ==",
+					},
+				},
+			},
+		},
+	}
+
+	result := toOpenAIMessages("system prompt", msgs)
+	if len(result) != 2 {
+		t.Fatalf("expected 2 messages, got %d", len(result))
+	}
+	parts, ok := result[1].Content.([]openAIContentPart)
+	if !ok {
+		t.Fatalf("expected multimodal content parts, got %T", result[1].Content)
+	}
+	if len(parts) != 2 {
+		t.Fatalf("expected 2 parts, got %d", len(parts))
+	}
+	if parts[0].Type != "text" || parts[0].Text != "describe" {
+		t.Fatalf("unexpected text part: %+v", parts[0])
+	}
+	if parts[1].Type != "image_url" || parts[1].ImageURL == nil {
+		t.Fatalf("unexpected image part: %+v", parts[1])
+	}
+	if parts[1].ImageURL.URL != "data:image/png;base64,ZmFrZQ==" {
+		t.Fatalf("unexpected image url: %q", parts[1].ImageURL.URL)
 	}
 }
 

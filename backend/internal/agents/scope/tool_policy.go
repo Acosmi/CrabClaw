@@ -3,6 +3,8 @@ package scope
 import (
 	"math/rand"
 	"strings"
+
+	"github.com/Acosmi/ClawAcosmi/internal/agents/capabilities"
 )
 
 // ---------- 工具策略 ----------
@@ -36,23 +38,33 @@ var toolNameAliases = map[string]string{
 	"apply-patch": "apply_patch",
 }
 
-// ToolGroups 工具分组定义（名称与 capabilities.Registry 对齐）。
-var ToolGroups = map[string][]string{
-	"group:memory":     {"memory_search", "memory_get"},
-	"group:web":        {"web_search", "web_fetch"},
-	"group:fs":         {"read_file", "write_file", "list_dir"},
-	"group:runtime":    {"bash"},
-	"group:sessions":   {"sessions_list", "sessions_history", "sessions_send", "sessions_spawn", "session_status"},
-	"group:ui":         {"browser", "canvas"},
-	"group:automation": {"cron", "gateway"},
-	"group:messaging":  {"message"},
-	"group:nodes":      {"nodes"},
-	"group:openacosmi": {
-		"browser", "canvas", "nodes", "cron", "message", "gateway",
-		"agents_list", "sessions_list", "sessions_history", "sessions_send",
-		"sessions_spawn", "session_status", "memory_search", "memory_get",
-		"web_search", "web_fetch", "image",
-	},
+// ToolGroups 工具分组定义。
+// P1-11: D5 derivation — derived from capability tree instead of hand-written map.
+// Backward-compatible groups (group:automation, group:nodes, group:openacosmi) are
+// preserved via merge with tree-derived groups.
+var ToolGroups = mergeToolGroups()
+
+func mergeToolGroups() map[string][]string {
+	// D5: start from tree-derived policy groups
+	groups := capabilities.TreePolicyGroups()
+
+	// Backward-compat: groups that exist in old code but not yet fully modeled in tree
+	backcompat := map[string][]string{
+		"group:automation": {"cron", "gateway"},
+		"group:nodes":      {"nodes"},
+		"group:openacosmi": {
+			"browser", "canvas", "nodes", "cron", "message", "gateway",
+			"agents_list", "sessions_list", "sessions_history", "sessions_send",
+			"sessions_spawn", "session_status", "memory_search", "memory_get",
+			"web_search", "web_fetch", "image",
+		},
+	}
+	for g, members := range backcompat {
+		if _, ok := groups[g]; !ok {
+			groups[g] = members
+		}
+	}
+	return groups
 }
 
 // ownerOnlyToolNames 仅所有者可用的工具。

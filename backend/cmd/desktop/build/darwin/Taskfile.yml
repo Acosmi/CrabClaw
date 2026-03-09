@@ -27,13 +27,16 @@ tasks:
             ref: .VERSION
     cmds:
       - rm -rf "{{.BIN_DIR}}/{{.PRODUCT_NAME}}.app"
+      - rm -f "{{.BIN_DIR}}/{{.ARTIFACT_NAME}}-macos-{{.ARCH}}.zip"
       - mkdir -p "{{.BIN_DIR}}/{{.PRODUCT_NAME}}.app/Contents/MacOS"
       - mkdir -p "{{.BIN_DIR}}/{{.PRODUCT_NAME}}.app/Contents/Resources"
       - cp "{{.BIN_DIR}}/{{.APP_NAME}}" "{{.BIN_DIR}}/{{.PRODUCT_NAME}}.app/Contents/MacOS/{{.APP_NAME}}"
       - cp build/darwin/Info.plist "{{.BIN_DIR}}/{{.PRODUCT_NAME}}.app/Contents/Info.plist"
       - cp build/darwin/icons.icns "{{.BIN_DIR}}/{{.PRODUCT_NAME}}.app/Contents/Resources/icons.icns"
       - codesign --force --deep --sign - "{{.BIN_DIR}}/{{.PRODUCT_NAME}}.app"
+      - ditto -c -k --sequesterRsrc --keepParent "{{.BIN_DIR}}/{{.PRODUCT_NAME}}.app" "{{.BIN_DIR}}/{{.ARTIFACT_NAME}}-macos-{{.ARCH}}.zip"
     vars:
+      ARCH: '{{.ARCH | default ARCH}}'
       VERSION: '{{.VERSION | default "0.0.0-dev"}}'
 
   run:

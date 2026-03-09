@@ -1,4 +1,5 @@
 import { truncateText } from "./format.ts";
+import { formatToolDetail, resolveToolDisplay } from "./tool-display.ts";
 import type { ChatReadonlyRunState } from "./chat/readonly-run-state.ts";
 import {
   updateChatReadonlyRunFromLifecycle,
@@ -337,12 +338,14 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
         : undefined;
 
   const now = Date.now();
+  const toolDetail = formatToolDetail(resolveToolDisplay({ name, args })) ?? null;
   updateChatReadonlyRunFromTool(host, {
     runId: payload.runId,
     sessionKey,
     ts: typeof payload.ts === "number" ? payload.ts : now,
     toolCallId,
     name,
+    detail: toolDetail,
     phase,
     isError: typeof data.isError === "boolean" ? data.isError : false,
     output: output || undefined,

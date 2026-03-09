@@ -109,9 +109,19 @@ type openaiRequest struct {
 
 type openaiMessage struct {
 	Role       string           `json:"role"`
-	Content    *string          `json:"content"` // 使用 *string: nil=省略字段, ""=空字符串。DeepSeek 要求 assistant 消息必须有 content 字段。
+	Content    interface{}      `json:"content"` // string 或多模态 content parts。DeepSeek 要求 assistant 消息必须有 content 字段。
 	ToolCalls  []openaiToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string           `json:"tool_call_id,omitempty"`
+}
+
+type openAIContentPart struct {
+	Type     string             `json:"type"`
+	Text     string             `json:"text,omitempty"`
+	ImageURL *openAIImageURLRef `json:"image_url,omitempty"`
+}
+
+type openAIImageURLRef struct {
+	URL string `json:"url"`
 }
 
 type openaiToolCall struct {
@@ -133,8 +143,6 @@ type openaiTool struct {
 }
 
 // ---------- 消息转换 ----------
-
-func strPtr(s string) *string { return &s }
 
 // openaiToolResultText 提取 tool_result 的文本内容（OpenAI 不支持 image tool results）。
 func openaiToolResultText(b ContentBlock) string {
@@ -158,7 +166,7 @@ func openaiToolResultText(b ContentBlock) string {
 func toOpenAIMessages(systemPrompt string, msgs []ChatMessage) []openaiMessage {
 	out := make([]openaiMessage, 0, len(msgs)+1)
 	if systemPrompt != "" {
-		out = append(out, openaiMessage{Role: "system", Content: strPtr(systemPrompt)})
+		out = append(out, openaiMessage{Role: "system", Content: systemPrompt})
 	}
 	for _, m := range msgs {
 		if m.Role == "system" {
@@ -167,6 +175,7 @@ func toOpenAIMessages(systemPrompt string, msgs []ChatMessage) []openaiMessage {
 		// 检查是否包含 tool_use / tool_result
 		hasToolUse := false
 		hasToolResult := false
+		hasImage := false
 		for _, b := range m.Content {
 			if b.Type == "tool_use" {
 				hasToolUse = true
@@ -174,16 +183,18 @@ func toOpenAIMessages(systemPrompt string, msgs []ChatMessage) []openaiMessage {
 			if b.Type == "tool_result" {
 				hasToolResult = true
 			}
+			if b.Type == "image" {
+				hasImage = true
+			}
 		}
 
 		if m.Role == "assistant" && hasToolUse {
 			// 转换为 OpenAI tool_calls 格式
-			emptyStr := ""
-			om := openaiMessage{Role: "assistant", Content: &emptyStr}
+			om := openaiMessage{Role: "assistant", Content: ""}
 			for _, b := range m.Content {
 				switch b.Type {
 				case "text":
-					om.Content = strPtr(b.Text)
+					om.Content = b.Text
 				case "tool_use":
 					om.ToolCalls = append(om.ToolCalls, openaiToolCall{
 						ID:   b.ID,
@@ -205,10 +216,38 @@ func toOpenAIMessages(systemPrompt string, msgs []ChatMessage) []openaiMessage {
 				if b.Type == "tool_result" {
 					out = append(out, openaiMessage{
 						Role:       "tool",
-						Content:    strPtr(openaiToolResultText(b)),
+						Content:    openaiToolResultText(b),
 						ToolCallID: b.ToolUseID,
 					})
 				}
+			}
+		} else if m.Role == "user" && hasImage {
+			parts := make([]openAIContentPart, 0, len(m.Content))
+			for _, b := range m.Content {
+				switch b.Type {
+				case "text":
+					if b.Text != "" {
+						parts = append(parts, openAIContentPart{
+							Type: "text",
+							Text: b.Text,
+						})
+					}
+				case "image":
+					if b.Source == nil || b.Source.Data == "" || b.Source.MediaType == "" {
+						continue
+					}
+					parts = append(parts, openAIContentPart{
+						Type: "image_url",
+						ImageURL: &openAIImageURLRef{
+							URL: "data:" + b.Source.MediaType + ";base64," + b.Source.Data,
+						},
+					})
+				}
+			}
+			if len(parts) == 0 {
+				out = append(out, openaiMessage{Role: m.Role, Content: ""})
+			} else {
+				out = append(out, openaiMessage{Role: m.Role, Content: parts})
 			}
 		} else {
 			// 纯文本
@@ -218,7 +257,7 @@ func toOpenAIMessages(systemPrompt string, msgs []ChatMessage) []openaiMessage {
 					text.WriteString(b.Text)
 				}
 			}
-			out = append(out, openaiMessage{Role: m.Role, Content: strPtr(text.String())})
+			out = append(out, openaiMessage{Role: m.Role, Content: text.String()})
 		}
 	}
 	return out

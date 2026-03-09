@@ -1,6 +1,7 @@
 import { html, nothing } from "lit";
 import { repeat } from "lit/directives/repeat.js";
 import { t } from "../i18n.ts";
+import { resolveToolDisplay } from "../tool-display.ts";
 import type {
   ChatReadonlyRunState,
   ReadonlyRunActivity,
@@ -8,11 +9,12 @@ import type {
   ReadonlyToolStep,
 } from "./readonly-run-state.ts";
 
-function formatElapsed(startedAt: number | null): string {
+function formatElapsed(startedAt: number | null, completedAt: number | null): string {
   if (!startedAt) {
     return "0:00";
   }
-  const totalSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+  const endAt = completedAt ?? Date.now();
+  const totalSeconds = Math.max(0, Math.floor((endAt - startedAt) / 1000));
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
@@ -28,6 +30,8 @@ function phaseLabel(phase: ReadonlyRunPhase): string {
       return t("chat.readonly.phase.drafting");
     case "finalizing":
       return t("chat.readonly.phase.finalizing");
+    case "complete":
+      return t("chat.readonly.phase.complete");
     case "aborted":
       return t("chat.readonly.phase.aborted");
     case "error":
@@ -48,7 +52,93 @@ function stepStatusLabel(status: ReadonlyToolStep["status"]): string {
 }
 
 function isLivePhase(phase: ReadonlyRunPhase): boolean {
-  return phase !== "idle" && phase !== "aborted" && phase !== "error";
+  return phase !== "idle" && phase !== "complete" && phase !== "aborted" && phase !== "error";
+}
+
+function statusLabel(phase: ReadonlyRunPhase): string {
+  if (phase === "complete") {
+    return t("chat.readonly.status.complete");
+  }
+  if (phase === "aborted") {
+    return t("chat.readonly.status.aborted");
+  }
+  if (phase === "error") {
+    return t("chat.readonly.status.error");
+  }
+  return t("chat.readonly.status.live");
+}
+
+function summarizeTool(name: string, detail: string | null): string {
+  const display = resolveToolDisplay({ name, meta: detail ?? undefined });
+  return display.detail ? `${display.title} · ${display.detail}` : display.title;
+}
+
+function classifyToolMetric(name: string): "files" | "searches" | "skills" | "edits" | "commands" | null {
+  const normalized = name.trim().toLowerCase();
+  if (["read", "read_file", "coder_read", "list_dir", "ls"].includes(normalized)) {
+    return "files";
+  }
+  if (["search", "grep", "glob", "find", "coder_grep", "coder_glob", "web_search", "memory_search"].includes(normalized)) {
+    return "searches";
+  }
+  if (["search_skills", "lookup_skill"].includes(normalized)) {
+    return "skills";
+  }
+  if (["write", "write_file", "edit", "coder_edit", "coder_write", "apply_patch"].includes(normalized)) {
+    return "edits";
+  }
+  if (["bash", "coder_bash", "process"].includes(normalized)) {
+    return "commands";
+  }
+  return null;
+}
+
+function formatMetric(key: "files" | "searches" | "skills" | "edits" | "commands" | "tools", count: number): string {
+  switch (key) {
+    case "files":
+      return t("chat.readonly.summary.files", { count });
+    case "searches":
+      return t("chat.readonly.summary.searches", { count });
+    case "skills":
+      return t("chat.readonly.summary.skills", { count });
+    case "edits":
+      return t("chat.readonly.summary.edits", { count });
+    case "commands":
+      return t("chat.readonly.summary.commands", { count });
+    default:
+      return t("chat.readonly.summary.tools", { count });
+  }
+}
+
+function buildSummary(run: ChatReadonlyRunState): string | null {
+  if (run.toolSteps.length === 0) {
+    return null;
+  }
+
+  const metrics = {
+    files: 0,
+    searches: 0,
+    skills: 0,
+    edits: 0,
+    commands: 0,
+    tools: run.toolSteps.length,
+  };
+  for (const step of run.toolSteps) {
+    const key = classifyToolMetric(step.name);
+    if (!key) {
+      continue;
+    }
+    metrics[key] += 1;
+  }
+
+  const ordered: Array<keyof typeof metrics> = ["files", "searches", "skills", "edits", "commands"];
+  const parts = ordered
+    .filter((key) => metrics[key] > 0)
+    .map((key) => formatMetric(key, metrics[key]));
+  if (parts.length === 0) {
+    parts.push(formatMetric("tools", metrics.tools));
+  }
+  return parts.slice(0, 4).join("，");
 }
 
 function buildAnnouncement(run: ChatReadonlyRunState, activity: ReadonlyRunActivity[]): string {
@@ -60,7 +150,7 @@ function buildAnnouncement(run: ChatReadonlyRunState, activity: ReadonlyRunActiv
     return `${phaseLabel(run.phase)}. ${latest.summary}`;
   }
   if (latest.kind === "tool") {
-    return `${phaseLabel(run.phase)}. ${toolNarration(latest.name, latest.status)}`;
+    return `${phaseLabel(run.phase)}. ${summarizeTool(latest.name, latest.detail)}`;
   }
   if (latest.kind === "draft") {
     return `${phaseLabel(run.phase)}. ${t("chat.readonly.activity.phase.drafting")}`;
@@ -102,6 +192,7 @@ function buildActivities(run: ChatReadonlyRunState): ReadonlyRunActivity[] {
       kind: "tool",
       toolCallId: step.toolCallId,
       name: step.name,
+      detail: step.detail,
       status: step.status,
       phase: step.status === "done" ? "result" : "start",
       outputPreview: step.outputPreview,
@@ -138,6 +229,8 @@ function fallbackPhaseNarration(phase: ReadonlyRunPhase): string {
       return t("chat.readonly.empty.drafting");
     case "finalizing":
       return t("chat.readonly.empty.finalizing");
+    case "complete":
+      return t("chat.readonly.empty.complete");
     case "aborted":
       return t("chat.readonly.activity.phase.aborted");
     case "error":
@@ -157,6 +250,8 @@ function phaseNarration(phase: Exclude<ReadonlyRunPhase, "idle">): string {
       return t("chat.readonly.activity.phase.drafting");
     case "finalizing":
       return t("chat.readonly.activity.phase.finalizing");
+    case "complete":
+      return t("chat.readonly.activity.phase.complete");
     case "aborted":
       return t("chat.readonly.activity.phase.aborted");
     case "error":
@@ -194,8 +289,8 @@ function renderActivityRow(activity: ReadonlyRunActivity, index: number) {
     text = activity.summary;
     modifier = "neutral";
   } else if (activity.kind === "tool") {
-    label = `${t("chat.readonly.activity.toolLabel")} · ${stepStatusLabel(activity.status)}`;
-    text = toolNarration(activity.name, activity.status);
+    label = summarizeTool(activity.name, activity.detail);
+    text = `${toolNarration(activity.name, activity.status)} · ${stepStatusLabel(activity.status)}`;
     modifier = activity.status === "error" ? "danger" : activity.status === "done" ? "success" : "tool";
     detail = activity.outputPreview
       ? html`<div class="chat-readonly-run__entry-detail">${activity.outputPreview}</div>`
@@ -229,6 +324,15 @@ function renderActivityRow(activity: ReadonlyRunActivity, index: number) {
   `;
 }
 
+function renderToolChip(step: ReadonlyToolStep) {
+  return html`
+    <li class="chat-readonly-run__tool-chip chat-readonly-run__tool-chip--${step.status}">
+      <span class="chat-readonly-run__tool-chip-status" aria-hidden="true"></span>
+      <span class="chat-readonly-run__tool-chip-text">${summarizeTool(step.name, step.detail)}</span>
+    </li>
+  `;
+}
+
 function renderPresenceRow() {
   return html`
     <div class="chat-readonly-run__presence">
@@ -243,45 +347,106 @@ function renderPresenceRow() {
 }
 
 export function renderCodexReadonlySurface(run: ChatReadonlyRunState) {
+  return html`
+    <div class="chat-group assistant">
+      <div class="chat-group-messages">
+        ${renderCodexReadonlyPanel(run)}
+      </div>
+    </div>
+  `;
+}
+
+export function renderCodexReadonlyPanel(
+  run: ChatReadonlyRunState,
+  options?: { replyContent?: unknown },
+) {
   const activity = buildActivities(run);
+  const summary = buildSummary(run);
+  const recentTools = run.toolSteps.slice(-6);
+  const replyContent = options?.replyContent ?? nothing;
+  const hasReply = replyContent !== nothing;
+  const collapseDetails = run.phase === "complete";
+  const detailsContent = html`
+    ${run.latestProgress?.trim()
+      ? html`<div class="chat-readonly-run__latest">${run.latestProgress.trim()}</div>`
+      : nothing}
+
+    ${recentTools.length > 0
+      ? html`
+          <div class="chat-readonly-run__tools">
+            <div class="chat-readonly-run__tools-label">${t("chat.readonly.toolsLabel")}</div>
+            <ul class="chat-readonly-run__tools-list">
+              ${repeat(recentTools, (step) => step.toolCallId, (step) => renderToolChip(step))}
+            </ul>
+          </div>
+        `
+      : nothing}
+
+    <ol class="chat-readonly-run__stream">
+      ${repeat(activity, (item) => item.id, (item, index) => renderActivityRow(item, index))}
+    </ol>
+
+    ${isLivePhase(run.phase) ? renderPresenceRow() : nothing}
+  `;
   const modifierClass =
     run.phase === "error"
       ? "chat-readonly-run--error"
       : run.phase === "aborted"
         ? "chat-readonly-run--aborted"
+        : run.phase === "complete"
+          ? "chat-readonly-run--complete"
         : "";
 
   return html`
-    <div class="chat-group assistant">
-      <div class="chat-group-messages">
-        <section
-          class="chat-readonly-run ${modifierClass}"
-          aria-label=${t("chat.readonly.title")}
-        >
-          <div class="chat-readonly-run__sr-status" role="status" aria-live="polite" aria-atomic="true">
-            ${buildAnnouncement(run, activity)}
-          </div>
-
-          <div class="chat-readonly-run__meta">
-            <div class="chat-readonly-run__meta-main">
-              <span class="chat-readonly-run__title">${t("chat.readonly.title")}</span>
-              <span class="chat-readonly-run__phase-line">
-                <span class="chat-readonly-run__phase-dot" aria-hidden="true"></span>
-                <span>${phaseLabel(run.phase)}</span>
-              </span>
-            </div>
-            <span class="chat-readonly-run__timer" aria-hidden="true">
-              ${t("chat.processingTime", { time: formatElapsed(run.startedAt) })}
-            </span>
-          </div>
-
-          <ol class="chat-readonly-run__stream">
-            ${repeat(activity, (item) => item.id, (item, index) => renderActivityRow(item, index))}
-          </ol>
-
-          ${isLivePhase(run.phase) ? renderPresenceRow() : nothing}
-        </section>
+    <section
+      class="chat-readonly-run ${modifierClass}"
+      aria-label=${t("chat.readonly.title")}
+    >
+      <div class="chat-readonly-run__sr-status" role="status" aria-live="polite" aria-atomic="true">
+        ${buildAnnouncement(run, activity)}
       </div>
-    </div>
+
+      <div class="chat-readonly-run__meta">
+        <div class="chat-readonly-run__meta-main">
+          <span class="chat-readonly-run__title">${t("chat.readonly.title")}</span>
+          <span class="chat-readonly-run__phase-line">
+            <span class="chat-readonly-run__phase-dot" aria-hidden="true"></span>
+            <span>${phaseLabel(run.phase)}</span>
+          </span>
+          <span class="chat-readonly-run__status chat-readonly-run__status--${run.phase}">
+            ${statusLabel(run.phase)}
+          </span>
+        </div>
+        <span class="chat-readonly-run__timer" aria-hidden="true">
+          ${t("chat.processingTime", { time: formatElapsed(run.startedAt, run.completedAt) })}
+        </span>
+      </div>
+
+      ${summary
+    ? html`<div class="chat-readonly-run__summary">${summary}</div>`
+    : nothing}
+
+      ${collapseDetails
+        ? html`
+            <details class="chat-readonly-run__details">
+              <summary class="chat-readonly-run__details-summary">
+                ${t("chat.readonly.detailsSummary")}
+              </summary>
+              <div class="chat-readonly-run__details-body">
+                ${detailsContent}
+              </div>
+            </details>
+          `
+        : detailsContent}
+
+      ${hasReply
+        ? html`
+            <div class="chat-readonly-run__reply">
+              <div class="chat-readonly-run__reply-label">${t("chat.readonly.replyLabel")}</div>
+              <div class="chat-readonly-run__reply-body">${replyContent}</div>
+            </div>
+          `
+        : nothing}
+    </section>
   `;
 }

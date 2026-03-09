@@ -3,13 +3,13 @@
 !include "FileFunc.nsh"
 
 !ifndef INFO_PROJECTNAME
-    !define INFO_PROJECTNAME "ClawAcosmi-desktop"
+    !define INFO_PROJECTNAME "CrabClaw"
 !endif
 !ifndef INFO_COMPANYNAME
     !define INFO_COMPANYNAME "Acosmi"
 !endif
 !ifndef INFO_PRODUCTNAME
-    !define INFO_PRODUCTNAME "ClawAcosmi"
+    !define INFO_PRODUCTNAME "Crab Claw"
 !endif
 !ifndef INFO_PRODUCTVERSION
     !define INFO_PRODUCTVERSION "0.0.0-dev"

@@ -27,6 +27,10 @@ type BrowserExtensionHandlerConfig struct {
 	// ExtensionDir 扩展源码目录（browser-extension/）。
 	// 为空时自动从可执行文件相对路径推断。
 	ExtensionDir string
+	// ExpectedRelayPort 是安装引导页展示的默认 Relay 端口。
+	ExpectedRelayPort int
+	// ExpectedRelayURL 是安装引导页展示的默认 Relay 地址。
+	ExpectedRelayURL string
 	// GetRelayInfo 获取当前 relay 状态。
 	GetRelayInfo func() *RelayStatusInfo
 }
@@ -64,8 +68,7 @@ func RegisterBrowserExtensionRoutes(mux *http.ServeMux, cfg BrowserExtensionHand
 // ---------- 引导页 ----------
 
 func serveBrowserExtensionGuide(w http.ResponseWriter, r *http.Request, cfg BrowserExtensionHandlerConfig) {
-	relayPort := browser.ResolveRelayPort()
-	relayURL := fmt.Sprintf("ws://127.0.0.1:%d/ws", relayPort)
+	relayPort, relayURL := resolveExpectedRelay(cfg)
 
 	html := browserExtensionGuideHTML(relayURL, relayPort)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -76,10 +79,7 @@ func serveBrowserExtensionGuide(w http.ResponseWriter, r *http.Request, cfg Brow
 // ---------- Relay 状态 ----------
 
 func serveBrowserExtensionStatus(w http.ResponseWriter, r *http.Request, cfg BrowserExtensionHandlerConfig) {
-	info := &RelayStatusInfo{
-		Port:     browser.ResolveRelayPort(),
-		RelayURL: fmt.Sprintf("ws://127.0.0.1:%d/ws", browser.ResolveRelayPort()),
-	}
+	info := &RelayStatusInfo{}
 	if cfg.GetRelayInfo != nil {
 		if ri := cfg.GetRelayInfo(); ri != nil {
 			info = ri
@@ -87,6 +87,18 @@ func serveBrowserExtensionStatus(w http.ResponseWriter, r *http.Request, cfg Bro
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(info) //nolint:errcheck
+}
+
+func resolveExpectedRelay(cfg BrowserExtensionHandlerConfig) (int, string) {
+	port := cfg.ExpectedRelayPort
+	if port <= 0 {
+		port = browser.ResolveRelayPort()
+	}
+	url := strings.TrimSpace(cfg.ExpectedRelayURL)
+	if url == "" {
+		url = fmt.Sprintf("ws://127.0.0.1:%d/ws", port)
+	}
+	return port, url
 }
 
 // ---------- 扩展打包下载 ----------

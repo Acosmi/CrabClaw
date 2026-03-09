@@ -7,8 +7,10 @@ includes:
   darwin: ./build/darwin/Taskfile.yml
 
 vars:
-  APP_NAME: "ClawAcosmi-desktop"
-  PRODUCT_NAME: "ClawAcosmi"
+  APP_NAME: "CrabClaw"
+  PRODUCT_NAME: "Crab Claw"
+  PRODUCT_FULL_NAME: "Crab Claw by Acosmi.ai"
+  ARTIFACT_NAME: "CrabClaw"
   BIN_DIR: "bin"
   WAILS3_BIN: '{{.WAILS3_BIN | default "/Users/fushihua/go/bin/wails3"}}'
 
@@ -27,6 +29,50 @@ tasks:
     desc: Package the desktop host for the current platform
     cmds:
       - task: "{{OS}}:package"
+
+  release:manifest:
+    desc: Generate update.json and SHA256SUMS from packaged desktop artifacts
+    dir: '{{.USER_WORKING_DIR}}'
+    vars:
+      CHANNEL: '{{.CHANNEL | default "stable"}}'
+      ARTIFACTS_DIR: '{{.ARTIFACTS_DIR | default "./bin"}}'
+      OUTPUT_DIR: '{{.OUTPUT_DIR | default "./release"}}'
+      PUBLISHED_AT: '{{.PUBLISHED_AT | default ""}}'
+      NOTES: '{{.NOTES | default ""}}'
+      MINIMUM_SUPPORTED_VERSION: '{{.MINIMUM_SUPPORTED_VERSION | default ""}}'
+      ROLLOUT: '{{.ROLLOUT | default "0"}}'
+      EXTRA_ARGS: '{{.EXTRA_ARGS | default ""}}'
+    cmds:
+      - mkdir -p "{{.OUTPUT_DIR}}/{{.CHANNEL}}"
+      - >
+        go run ./build/tools/update_manifest
+        -version "{{.VERSION}}"
+        -channel "{{.CHANNEL}}"
+        -base-url "{{.BASE_URL}}"
+        -artifacts-dir "{{.ARTIFACTS_DIR}}"
+        -published-at "{{.PUBLISHED_AT}}"
+        -notes "{{.NOTES}}"
+        -minimum-supported-version "{{.MINIMUM_SUPPORTED_VERSION}}"
+        -rollout {{.ROLLOUT}}
+        -output "{{.OUTPUT_DIR}}/{{.CHANNEL}}/update.json"
+        -checksums "{{.OUTPUT_DIR}}/{{.CHANNEL}}/SHA256SUMS"
+        {{.EXTRA_ARGS}}
+
+  release:validate:
+    desc: Validate update.json, SHA256SUMS, and packaged desktop artifacts
+    dir: '{{.USER_WORKING_DIR}}'
+    vars:
+      CHANNEL: '{{.CHANNEL | default "stable"}}'
+      ARTIFACTS_DIR: '{{.ARTIFACTS_DIR | default "./bin"}}'
+      OUTPUT_DIR: '{{.OUTPUT_DIR | default "./release"}}'
+    cmds:
+      - >
+        go run ./build/tools/validate_release
+        -manifest "{{.OUTPUT_DIR}}/{{.CHANNEL}}/update.json"
+        -checksums "{{.OUTPUT_DIR}}/{{.CHANNEL}}/SHA256SUMS"
+        -artifacts-dir "{{.ARTIFACTS_DIR}}"
+        -version "{{.VERSION}}"
+        -channel "{{.CHANNEL}}"
 
   run:
     desc: Run the desktop host for the current platform

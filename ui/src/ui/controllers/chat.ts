@@ -3,6 +3,12 @@ import type { ChatReadonlyRunState } from "../chat/readonly-run-state.ts";
 import type { ChatAttachment } from "../ui-types.ts";
 import { extractText } from "../chat/message-extract.ts";
 import {
+  createChatReadonlyRunState,
+  isReadonlyRunTerminal,
+  loadPersistedChatReadonlyRun,
+  loadPersistedChatReadonlyRunHistory,
+  rebindChatReadonlyRun,
+  normalizeReadonlyRunAnchorText,
   setChatReadonlyRunTerminal,
   startChatReadonlyRun,
   updateChatReadonlyRunFromChat,
@@ -23,6 +29,7 @@ export type ChatState = {
   chatStream: string | null;
   chatStreamStartedAt: number | null;
   chatReadonlyRun?: ChatReadonlyRunState;
+  chatReadonlyRunHistory?: ChatReadonlyRunState[];
   lastError: string | null;
 };
 
@@ -33,6 +40,88 @@ export type ChatEventPayload = {
   message?: unknown;
   errorMessage?: string;
 };
+
+function extractMessageId(message: unknown): string | null {
+  if (!message || typeof message !== "object") {
+    return null;
+  }
+  const record = message as Record<string, unknown>;
+  if (typeof record.id === "string" && record.id.trim()) {
+    return record.id;
+  }
+  if (typeof record.messageId === "string" && record.messageId.trim()) {
+    return record.messageId;
+  }
+  return null;
+}
+
+function extractMessageTimestamp(message: unknown): number | null {
+  if (!message || typeof message !== "object") {
+    return null;
+  }
+  const value = (message as Record<string, unknown>).timestamp;
+  return typeof value === "number" ? value : null;
+}
+
+function shouldAppendChatMessage(existing: unknown[], incoming: unknown): boolean {
+  if (!incoming || typeof incoming !== "object") {
+    return false;
+  }
+  const previous = existing[existing.length - 1];
+  if (!previous || typeof previous !== "object") {
+    return true;
+  }
+  const prevRole = typeof (previous as Record<string, unknown>).role === "string"
+    ? (previous as Record<string, unknown>).role
+    : "";
+  const nextRole = typeof (incoming as Record<string, unknown>).role === "string"
+    ? (incoming as Record<string, unknown>).role
+    : "";
+  if (!prevRole || prevRole !== nextRole) {
+    return true;
+  }
+  const prevTimestamp = extractMessageTimestamp(previous);
+  const nextTimestamp = extractMessageTimestamp(incoming);
+  if (prevTimestamp !== null && nextTimestamp !== null && prevTimestamp !== nextTimestamp) {
+    return true;
+  }
+  const prevText = normalizeReadonlyRunAnchorText(extractText(previous));
+  const nextText = normalizeReadonlyRunAnchorText(extractText(incoming));
+  if (prevText !== null || nextText !== null) {
+    return prevText !== nextText;
+  }
+  const prevContent = JSON.stringify((previous as Record<string, unknown>).content ?? null);
+  const nextContent = JSON.stringify((incoming as Record<string, unknown>).content ?? null);
+  return prevContent !== nextContent;
+}
+
+function shouldRestorePersistedWorkflow(run: ChatReadonlyRunState, messages: unknown[]): boolean {
+  if (run.phase !== "complete") {
+    return true;
+  }
+  const finalId = run.finalMessageId?.trim() || "";
+  const finalTs = run.finalMessageTimestamp ?? null;
+  const finalText = normalizeReadonlyRunAnchorText(run.finalMessageText);
+  if (!finalId && finalTs === null && !finalText) {
+    return false;
+  }
+  return messages.some((message) => {
+    const record = message as Record<string, unknown>;
+    const role = typeof record.role === "string" ? record.role : "";
+    const messageId = typeof record.id === "string"
+      ? record.id
+      : typeof record.messageId === "string"
+        ? record.messageId
+        : "";
+    const timestamp = typeof record.timestamp === "number" ? record.timestamp : null;
+    const text = role === "assistant" ? normalizeReadonlyRunAnchorText(extractText(message)) : null;
+    return (
+      (finalId && messageId === finalId) ||
+      (finalTs !== null && timestamp === finalTs) ||
+      (finalText !== null && text === finalText)
+    );
+  });
+}
 
 export async function loadChatHistory(state: ChatState) {
   if (!state.client || !state.connected) {
@@ -68,6 +157,19 @@ export async function loadChatHistory(state: ChatState) {
       state.chatMessages = messages;
     }
     state.chatThinkingLevel = res.thinkingLevel ?? null;
+    const persistedRun = loadPersistedChatReadonlyRun(state.sessionKey);
+    const persistedHistory = loadPersistedChatReadonlyRunHistory(state.sessionKey)
+      .filter((run) => shouldRestorePersistedWorkflow(run, messages));
+    if ("chatReadonlyRunHistory" in state && Array.isArray(state.chatReadonlyRunHistory)) {
+      state.chatReadonlyRunHistory = persistedHistory;
+    }
+    if ("chatReadonlyRun" in state && state.chatReadonlyRun && !state.chatRunId) {
+      if (persistedRun && shouldRestorePersistedWorkflow(persistedRun, messages)) {
+        state.chatReadonlyRun = persistedRun;
+      } else if (isReadonlyRunTerminal(state.chatReadonlyRun)) {
+        state.chatReadonlyRun = createChatReadonlyRunState(state.sessionKey);
+      }
+    }
   } catch (err) {
     state.lastError = String(err);
   } finally {
@@ -220,18 +322,40 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
     return null;
   }
 
+  const canRebindRemotePlaceholder =
+    Boolean(payload.runId) &&
+    typeof state.chatRunId === "string" &&
+    state.chatRunId.startsWith("remote-") &&
+    payload.runId !== state.chatRunId;
+
   // Final from another run (e.g. sub-agent announce): refresh history to show new message.
   // See https://github.com/openacosmi/openacosmi/issues/1909
   if (payload.runId && state.chatRunId && payload.runId !== state.chatRunId) {
-    if (payload.state === "final") {
-      // Bug #9 fix: immediately append the assistant message to avoid gap
-      // between clearing stream and loadChatHistory completing.
-      if (payload.message) {
-        state.chatMessages = [...state.chatMessages, payload.message];
+    if (canRebindRemotePlaceholder) {
+      if ("chatReadonlyRun" in state && state.chatReadonlyRun) {
+        rebindChatReadonlyRun(
+          state as unknown as Parameters<typeof rebindChatReadonlyRun>[0],
+          payload.runId,
+          {
+            previousRunId: state.chatRunId,
+            sessionKey: payload.sessionKey,
+            ts: Date.now(),
+          },
+        );
       }
-      return "final";
+      state.chatRunId = payload.runId;
+      state.chatStreamStartedAt = state.chatStreamStartedAt ?? Date.now();
+    } else {
+      if (payload.state === "final") {
+        // Bug #9 fix: immediately append the assistant message to avoid gap
+        // between clearing stream and loadChatHistory completing.
+        if (payload.message && shouldAppendChatMessage(state.chatMessages, payload.message)) {
+          state.chatMessages = [...state.chatMessages, payload.message];
+        }
+        return "final";
+      }
+      return null;
     }
-    return null;
   }
 
   if (payload.state === "delta") {
@@ -240,7 +364,7 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
       state.chatRunId = payload.runId;
       state.chatStreamStartedAt = state.chatStreamStartedAt ?? Date.now();
     }
-    const next = extractText(payload.message);
+    const next = payload.message ? extractText(payload.message) : null;
     if (typeof next === "string") {
       const current = state.chatStream ?? "";
       if (!current || next.length >= current.length) {
@@ -265,7 +389,7 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
     // The subsequent loadChatHistory() call (in app-gateway.ts) will replace
     // chatMessages with the canonical backend transcript, which already
     // includes this message (transcript is persisted before broadcast).
-    if (payload.message) {
+    if (payload.message && shouldAppendChatMessage(state.chatMessages, payload.message)) {
       state.chatMessages = [...state.chatMessages, payload.message];
     }
     state.chatStream = null;
@@ -279,7 +403,9 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
           sessionKey: payload.sessionKey,
           state: "final",
           ts: Date.now(),
-          text: extractText(payload.message),
+          text: payload.message ? extractText(payload.message) : null,
+          messageId: extractMessageId(payload.message),
+          messageTimestamp: extractMessageTimestamp(payload.message),
         },
       );
     }
@@ -330,27 +456,181 @@ export type ChatModelState = {
   debugModels: unknown[];
 };
 
+type ChatModelSource = "builtin" | "custom";
+type ChatModelEntry = { id: string; name: string; provider: string; source: ChatModelSource };
+
+function modelIdentityKey(model: Pick<ChatModelEntry, "id" | "provider">): string {
+  return model.provider ? `${model.provider}/${model.id}` : model.id;
+}
+
+function uniqueChatModelsByIdentity(
+  models: ChatModelEntry[],
+  blockedKeys: Set<string> = new Set<string>(),
+): ChatModelEntry[] {
+  const seen = new Set<string>(blockedKeys);
+  const result: ChatModelEntry[] = [];
+  for (const model of models) {
+    const key = modelIdentityKey(model);
+    if (!key || !model.id || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(model);
+  }
+  return result;
+}
+
+function normalizeChatModels(rawModels: Array<Record<string, unknown>>): ChatModelEntry[] {
+  return rawModels
+    .map((m) => {
+      const id = String(m.id ?? "").trim();
+      const provider = String(m.provider ?? "").trim();
+      const rawSource = String(m.source ?? "").trim().toLowerCase();
+      const source: ChatModelSource | null = rawSource === "managed"
+        ? "builtin"
+        : rawSource === "custom"
+          ? "custom"
+          : null;
+      return {
+        id,
+        name: String(m.name ?? m.id ?? "").trim(),
+        provider,
+        source,
+      };
+    })
+    .filter((m): m is ChatModelEntry => m.id !== "" && m.source !== null);
+}
+
+function extractModelsFromConfigSnapshot(snapshot: unknown): ChatModelEntry[] {
+  const config = (snapshot as { config?: { models?: { providers?: Record<string, { models?: Array<Record<string, unknown>> | null } | null> } } } | undefined)?.config;
+  const providers = config?.models?.providers;
+  if (!providers || typeof providers !== "object") {
+    return [];
+  }
+  const result: ChatModelEntry[] = [];
+  for (const [providerName, providerConfig] of Object.entries(providers)) {
+    const models = providerConfig?.models;
+    if (!Array.isArray(models)) {
+      continue;
+    }
+    for (const model of models) {
+      const id = String(model.id ?? "").trim();
+      if (!id) continue;
+      result.push({
+        id,
+        name: String(model.name ?? model.id ?? "").trim(),
+        provider: providerName,
+        source: "custom",
+      });
+    }
+  }
+  return result;
+}
+
+function extractCurrentModelFromConfigSnapshot(snapshot: unknown): string | null {
+  const primary = (snapshot as {
+    config?: {
+      agents?: {
+        defaults?: {
+          model?: {
+            primary?: unknown;
+          } | null;
+        } | null;
+      } | null;
+    };
+  } | undefined)?.config?.agents?.defaults?.model?.primary;
+  if (typeof primary !== "string") {
+    return null;
+  }
+  const trimmed = primary.trim();
+  return trimmed || null;
+}
+
+function ensureCurrentModelOption(
+  models: ChatModelEntry[],
+  currentModel: string | null,
+  builtinKeys: Set<string>,
+): ChatModelEntry[] {
+  if (!currentModel) {
+    return models;
+  }
+  const trimmed = currentModel.trim();
+  if (!trimmed) {
+    return models;
+  }
+  const slash = trimmed.indexOf("/");
+  const provider = slash >= 0 ? trimmed.slice(0, slash) : "";
+  const id = slash >= 0 ? trimmed.slice(slash + 1) : trimmed;
+  if (!id) {
+    return models;
+  }
+  const exists = models.some((model) => {
+    const key = model.provider ? `${model.provider}/${model.id}` : model.id;
+    return key === trimmed || model.id === id;
+  });
+  if (exists) {
+    return models;
+  }
+  return [
+    ...models,
+    {
+      id,
+      name: id,
+      provider,
+      source: builtinKeys.has(trimmed) ? "builtin" : "custom",
+    },
+  ];
+}
+
 export async function loadChatModels(state: ChatModelState) {
   if (!state.client || !state.connected) return;
-  try {
-    const [listRes, defaultRes] = await Promise.all([
-      state.client.request<{ models?: Array<Record<string, unknown>> }>("models.list", {}),
-      state.client.request<{ model?: string }>("models.default.get", {}),
-    ]);
-    const rawModels = Array.isArray(listRes?.models) ? listRes.models : [];
-    state.chatModels = rawModels.map((m) => ({
-      id: String(m.id ?? ""),
-      name: String(m.name ?? m.id ?? ""),
-      provider: String(m.provider ?? ""),
-      source: String(m.source ?? "custom"),
-    }));
-    state.chatCurrentModel = defaultRes?.model ?? null;
-    // Keep debugModels in sync so agents tab doesn't need separate fetch
-    if (state.debugModels.length === 0) {
-      state.debugModels = rawModels;
-    }
-  } catch {
-    // non-critical — composer will work without model selector
+  const [listRes, defaultRes, configRes] = await Promise.allSettled([
+    state.client.request<{ models?: Array<Record<string, unknown>> }>("models.list", {}),
+    state.client.request<{ model?: string }>("models.default.get", {}),
+    state.client.request("config.get", {}),
+  ]);
+
+  const rawModels =
+    listRes.status === "fulfilled" && Array.isArray(listRes.value?.models)
+      ? listRes.value.models
+      : [];
+  const configModels =
+    configRes.status === "fulfilled" ? extractModelsFromConfigSnapshot(configRes.value) : [];
+  const configCurrentModel =
+    configRes.status === "fulfilled" ? extractCurrentModelFromConfigSnapshot(configRes.value) : null;
+  const currentModel =
+    defaultRes.status === "fulfilled" && typeof defaultRes.value?.model === "string"
+      ? (defaultRes.value.model.trim() || configCurrentModel || state.chatCurrentModel)
+      : configCurrentModel || state.chatCurrentModel;
+
+  // Configured models are always treated as custom in chat UX, even if the
+  // runtime catalog also exposes the same provider/model pair as a builtin placeholder.
+  const normalized = normalizeChatModels(rawModels);
+  const customModels = uniqueChatModelsByIdentity(
+    [
+      ...configModels,
+      ...normalized.filter((model) => model.source === "custom"),
+    ],
+  );
+  const customKeys = new Set<string>(customModels.map((model) => modelIdentityKey(model)));
+  const builtinModels = uniqueChatModelsByIdentity(
+    normalized.filter((model) => model.source === "builtin"),
+    customKeys,
+  );
+  const builtinKeys = new Set<string>(builtinModels.map((model) => modelIdentityKey(model)));
+  const nextModels = ensureCurrentModelOption(
+    [
+      ...customModels,
+      ...builtinModels,
+    ],
+    currentModel ?? null,
+    builtinKeys,
+  );
+
+  state.chatModels = nextModels;
+  state.chatCurrentModel = currentModel ?? null;
+  if (state.debugModels.length === 0 && rawModels.length > 0) {
+    state.debugModels = rawModels;
   }
 }
 

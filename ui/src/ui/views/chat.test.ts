@@ -1,5 +1,5 @@
 import { render } from "lit";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createChatReadonlyRunState } from "../chat/readonly-run-state.ts";
 import type { SessionsListResult } from "../types.ts";
 import { renderChat, type ChatProps } from "./chat.ts";
@@ -28,6 +28,7 @@ function createProps(overrides: Partial<ChatProps> = {}): ChatProps {
     toolMessages: [],
     uxMode: "classic",
     readonlyRun: createChatReadonlyRunState("main"),
+    readonlyRunHistory: [],
     stream: null,
     streamStartedAt: null,
     assistantAvatarUrl: null,
@@ -52,6 +53,10 @@ function createProps(overrides: Partial<ChatProps> = {}): ChatProps {
 }
 
 describe("chat view", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it("renders compacting indicator as a badge", () => {
     const container = document.createElement("div");
     render(
@@ -69,7 +74,7 @@ describe("chat view", () => {
 
     const indicator = container.querySelector(".compaction-indicator--active");
     expect(indicator).not.toBeNull();
-    expect(indicator?.textContent).toContain("Compacting context...");
+    expect(indicator?.textContent).toMatch(/Compacting context|正在压缩上下文/);
   });
 
   it("renders completion indicator shortly after compaction", () => {
@@ -90,7 +95,7 @@ describe("chat view", () => {
 
     const indicator = container.querySelector(".compaction-indicator--complete");
     expect(indicator).not.toBeNull();
-    expect(indicator?.textContent).toContain("Context compacted");
+    expect(indicator?.textContent).toMatch(/Context compacted|上下文已压缩/);
     nowSpy.mockRestore();
   });
 
@@ -128,13 +133,26 @@ describe("chat view", () => {
       container,
     );
 
-    const stopButton = Array.from(container.querySelectorAll("button")).find(
-      (btn) => btn.textContent?.trim() === "Stop",
-    );
-    expect(stopButton).not.toBeUndefined();
+    const stopButton = container.querySelector(".chat-compose__send--abort") as HTMLButtonElement | null;
+    expect(stopButton).not.toBeNull();
+    expect(container.querySelector(".chat-compose__below")).toBeNull();
     stopButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(onAbort).toHaveBeenCalledTimes(1);
-    expect(container.textContent).not.toContain("New session");
+  });
+
+  it("shows chat errors inside the chat card", () => {
+    const container = document.createElement("div");
+    render(
+      renderChat(
+        createProps({
+          error: "gateway offline",
+        }),
+      ),
+      container,
+    );
+
+    const callout = container.querySelector(".callout.danger");
+    expect(callout?.textContent).toContain("gateway offline");
   });
 
   it("shows a new session button when aborting is unavailable", () => {
@@ -151,13 +169,10 @@ describe("chat view", () => {
       container,
     );
 
-    const newSessionButton = Array.from(container.querySelectorAll("button")).find(
-      (btn) => btn.textContent?.trim() === "New session",
-    );
-    expect(newSessionButton).not.toBeUndefined();
+    const newSessionButton = container.querySelector(".chat-compose__new-session") as HTMLButtonElement | null;
+    expect(newSessionButton).not.toBeNull();
     newSessionButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(onNewSession).toHaveBeenCalledTimes(1);
-    expect(container.textContent).not.toContain("Stop");
+    expect(onNewSession).toHaveBeenCalledTimes(0);
   });
 
   it("renders the codex readonly surface without the classic processing card", () => {
@@ -174,6 +189,7 @@ describe("chat view", () => {
             phase: "working",
             startedAt: 1_000,
             updatedAt: 1_100,
+            completedAt: null,
             latestProgress: "Scanning the workspace and gathering context.",
             progressPhase: "analysis",
             draftingText: null,
@@ -199,6 +215,7 @@ describe("chat view", () => {
               {
                 toolCallId: "tool-1",
                 name: "read_files",
+                detail: "ui/src/ui/views/chat.ts",
                 status: "running",
                 startedAt: 1_000,
                 updatedAt: 1_100,
@@ -206,6 +223,9 @@ describe("chat view", () => {
               },
             ],
             lastError: null,
+            finalMessageId: null,
+            finalMessageTimestamp: null,
+            finalMessageText: null,
           },
         }),
       ),
@@ -214,7 +234,7 @@ describe("chat view", () => {
 
     expect(container.querySelector(".chat-readonly-run")).not.toBeNull();
     expect(container.querySelector(".chat-processing-card")).toBeNull();
-    expect(container.textContent).toContain("Agent Working");
+    expect(container.textContent).toMatch(/Agent Working|智能体工作中/);
     expect(container.textContent).toContain("Scanning the workspace and gathering context.");
   });
 
@@ -230,6 +250,7 @@ describe("chat view", () => {
             phase: "working",
             startedAt: 1_000,
             updatedAt: 1_100,
+            completedAt: null,
             latestProgress: "Scanning the workspace and gathering context.",
             progressPhase: "analysis",
             draftingText: null,
@@ -253,6 +274,9 @@ describe("chat view", () => {
             ],
             toolSteps: [],
             lastError: null,
+            finalMessageId: null,
+            finalMessageTimestamp: null,
+            finalMessageText: null,
           },
         }),
       ),
@@ -266,5 +290,207 @@ describe("chat view", () => {
     expect(liveStatus?.getAttribute("role")).toBe("status");
     expect(liveStatus?.getAttribute("aria-live")).toBe("polite");
     expect(timer?.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("keeps the workflow surface before the final assistant reply after completion", () => {
+    const container = document.createElement("div");
+    render(
+      renderChat(
+        createProps({
+          uxMode: "codex-readonly",
+          messages: [
+            {
+              role: "user",
+              content: [{ type: "text", text: "修一下聊天页" }],
+              timestamp: 1_000,
+            },
+            {
+              id: "msg-final",
+              role: "assistant",
+              content: [{ type: "text", text: "已经修好了。" }],
+              timestamp: 2_000,
+            },
+          ],
+          readonlyRun: {
+            runId: null,
+            sessionKey: "main",
+            phase: "complete",
+            startedAt: 1_100,
+            updatedAt: 1_900,
+            completedAt: 1_950,
+            latestProgress: "已经完成聊天页工作流展示的整理。",
+            progressPhase: "implementation",
+            draftingText: "已经把工作流摘要保留在最终回复前。",
+            lastToolName: "apply_patch",
+            activity: [
+              {
+                id: "tool:tool-1",
+                kind: "tool",
+                toolCallId: "tool-1",
+                name: "lookup_skill",
+                detail: "chat-ui",
+                status: "done",
+                phase: "result",
+                outputPreview: "Read SKILL.md",
+                ts: 1_300,
+                updatedAt: 1_500,
+              },
+            ],
+            toolSteps: [
+              {
+                toolCallId: "tool-1",
+                name: "lookup_skill",
+                detail: "chat-ui",
+                status: "done",
+                startedAt: 1_300,
+                updatedAt: 1_500,
+                outputPreview: "Read SKILL.md",
+              },
+            ],
+            lastError: null,
+            finalMessageId: "msg-final",
+            finalMessageTimestamp: 2_000,
+            finalMessageText: "已经修好了。",
+          },
+        }),
+      ),
+      container,
+    );
+
+    const thread = container.querySelector(".chat-thread");
+    const readonlyRun = thread?.querySelector(".chat-readonly-run");
+    const reply = thread?.querySelector(".chat-readonly-run__reply");
+    const details = thread?.querySelector(".chat-readonly-run__details") as HTMLDetailsElement | null;
+    expect(readonlyRun).not.toBeNull();
+    expect(readonlyRun?.textContent).toContain("Read SKILL.md");
+    expect(reply?.textContent).toContain("已经修好了。");
+    expect(details?.open).toBe(false);
+  });
+
+  it("keeps earlier workflow cards attached after newer replies arrive", () => {
+    const container = document.createElement("div");
+    render(
+      renderChat(
+        createProps({
+          uxMode: "codex-readonly",
+          messages: [
+            {
+              role: "user",
+              content: [{ type: "text", text: "第一问" }],
+              timestamp: 1_000,
+            },
+            {
+              id: "msg-1",
+              role: "assistant",
+              content: [{ type: "text", text: "第一答" }],
+              timestamp: 2_000,
+            },
+            {
+              role: "user",
+              content: [{ type: "text", text: "第二问" }],
+              timestamp: 3_000,
+            },
+            {
+              id: "msg-2",
+              role: "assistant",
+              content: [{ type: "text", text: "第二答" }],
+              timestamp: 4_000,
+            },
+          ],
+          readonlyRun: createChatReadonlyRunState("main"),
+          readonlyRunHistory: [
+            {
+              ...createChatReadonlyRunState("main"),
+              phase: "complete",
+              startedAt: 1_100,
+              updatedAt: 1_900,
+              completedAt: 1_950,
+              activity: [],
+              toolSteps: [],
+              finalMessageId: "msg-1",
+              finalMessageTimestamp: 2_000,
+              finalMessageText: "第一答",
+            },
+            {
+              ...createChatReadonlyRunState("main"),
+              phase: "complete",
+              startedAt: 3_100,
+              updatedAt: 3_900,
+              completedAt: 3_950,
+              activity: [],
+              toolSteps: [],
+              finalMessageId: "msg-2",
+              finalMessageTimestamp: 4_000,
+              finalMessageText: "第二答",
+            },
+          ],
+        }),
+      ),
+      container,
+    );
+
+    const workflowReplies = [...container.querySelectorAll(".chat-readonly-run__reply")]
+      .map((node) => node.textContent ?? "");
+    expect(workflowReplies).toHaveLength(2);
+    expect(workflowReplies[0]).toContain("第一答");
+    expect(workflowReplies[1]).toContain("第二答");
+  });
+
+  it("renders the composer model selector and keeps send visible when empty", () => {
+    const container = document.createElement("div");
+    const onOpenModelConfig = vi.fn();
+    render(
+      renderChat(
+        createProps({
+          models: [
+            {
+              id: "gpt-4o",
+              name: "GPT-4o",
+              provider: "openai",
+              source: "custom",
+            },
+            {
+              id: "gemini-2.5-flash",
+              name: "Gemini 2.5 Flash",
+              provider: "google",
+              source: "custom",
+            },
+          ],
+          currentModel: "openai/gpt-4o",
+          onOpenModelConfig,
+        }),
+      ),
+      container,
+    );
+
+    const modelShell = container.querySelector(".chat-compose__model-shell");
+    const modelSelect = container.querySelector(".chat-compose__model-select");
+    const modelChips = Array.from(container.querySelectorAll(".chat-compose__model-chip")).map((node) =>
+      node.textContent?.replace(/\s+/g, " ").trim() ?? ""
+    );
+    const activeChip = container.querySelector(".chat-compose__model-chip--active");
+    const placeholderChip = container.querySelector(".chat-compose__model-chip--placeholder");
+    const promo = container.querySelector(".chat-compose__model-popover");
+    const groupLabels = Array.from(container.querySelectorAll(".chat-compose__model-group-label")).map((node) =>
+      node.textContent?.trim() ?? ""
+    );
+    const addButton = container.querySelector(".chat-compose__model-add") as HTMLButtonElement | null;
+    const sendButton = container.querySelector(".chat-compose__send") as HTMLButtonElement | null;
+    expect(modelShell).not.toBeNull();
+    expect(modelSelect?.textContent).toContain("OpenAI");
+    expect(modelSelect?.textContent).toContain("GPT-4o");
+    expect(modelChips).toContain("内置");
+    expect(modelChips).toContain("自定义");
+    expect(activeChip?.textContent?.trim()).toBe("自定义");
+    expect(placeholderChip?.textContent?.trim()).toBe("内置");
+    expect(promo?.textContent).toContain("免费 tk");
+    expect(container.querySelector(".chat-compose__model-dot")).toBeNull();
+    expect(groupLabels).toContain("Google");
+    expect(groupLabels).toContain("OpenAI");
+    expect(addButton?.textContent?.trim()).toBe("新增自定义");
+    addButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(onOpenModelConfig).toHaveBeenCalledTimes(1);
+    expect(sendButton).not.toBeNull();
+    expect(sendButton?.disabled).toBe(true);
   });
 });

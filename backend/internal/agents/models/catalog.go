@@ -4,6 +4,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/Acosmi/ClawAcosmi/pkg/types"
 )
 
 // ---------- 模型目录 ----------
@@ -65,6 +67,65 @@ func (c *ModelCatalog) BuildFromRegistry(registry *ModelRegistry) {
 	}
 
 	// 排序: provider ASC, name ASC
+	sort.Slice(entries, func(i, j int) bool {
+		pi := entries[i].Provider
+		pj := entries[j].Provider
+		if pi != pj {
+			return pi < pj
+		}
+		return entries[i].Name < entries[j].Name
+	})
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries = entries
+}
+
+// BuildFromConfig 从运行时配置构建完整模型目录。
+func (c *ModelCatalog) BuildFromConfig(cfg *types.OpenAcosmiConfig) {
+	var entries []ModelCatalogEntry
+	if cfg != nil && cfg.Models != nil {
+		for providerName, provider := range cfg.Models.Providers {
+			if provider == nil {
+				continue
+			}
+			prov := strings.TrimSpace(providerName)
+			if prov == "" {
+				continue
+			}
+			for _, m := range provider.Models {
+				id := strings.TrimSpace(m.ID)
+				if id == "" {
+					continue
+				}
+				name := strings.TrimSpace(m.Name)
+				if name == "" {
+					name = id
+				}
+				entry := ModelCatalogEntry{
+					ID:       id,
+					Name:     name,
+					Provider: prov,
+				}
+				if m.ContextWindow > 0 {
+					contextWindow := m.ContextWindow
+					entry.ContextWindow = &contextWindow
+				}
+				if m.Reasoning {
+					reasoning := true
+					entry.Reasoning = &reasoning
+				}
+				if len(m.Input) > 0 {
+					entry.Input = make([]string, 0, len(m.Input))
+					for _, input := range m.Input {
+						entry.Input = append(entry.Input, string(input))
+					}
+				}
+				entries = append(entries, entry)
+			}
+		}
+	}
+
 	sort.Slice(entries, func(i, j int) bool {
 		pi := entries[i].Provider
 		pj := entries[j].Provider

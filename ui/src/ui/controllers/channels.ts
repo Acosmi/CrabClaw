@@ -92,3 +92,33 @@ export async function logoutWhatsApp(state: ChannelsState) {
     state.whatsappBusy = false;
   }
 }
+
+// ─── Email ───
+
+export async function testEmailConnection(state: ChannelsState, accountId: string) {
+  if (!state.client || !state.connected || state.emailTestLoading) {
+    return;
+  }
+  state.emailTestLoading = true;
+  state.emailTestResult = null;
+  try {
+    const res = await state.client.request<{
+      ok: boolean;
+      accountId: string;
+      address?: string;
+      provider?: string;
+      imap: { ok: boolean; host: string; latencyMs: number; error?: string };
+      smtp: { ok: boolean; host: string; latencyMs: number; error?: string };
+    }>("email.test", { accountId, timeoutMs: 30000 });
+    state.emailTestResult = res;
+  } catch (err) {
+    state.emailTestResult = {
+      ok: false,
+      accountId,
+      imap: { ok: false, host: "?", latencyMs: 0, error: String(err) },
+      smtp: { ok: false, host: "?", latencyMs: 0, error: String(err) },
+    };
+  } finally {
+    state.emailTestLoading = false;
+  }
+}
